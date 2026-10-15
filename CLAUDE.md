@@ -23,7 +23,11 @@ WPF (.NET 10) read-only log viewer for very large files (2 GB+). Full design and
 
 ### Issue tracker
 
-Local markdown under `.scratch/<feature>/`; never create GitHub issues and use no triage labels. See `docs/agents/issue-tracker.md`.
+Local markdown under `.scratch/<feature>/`; never create GitHub issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary, recorded as each issue file's `Status:` line: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
