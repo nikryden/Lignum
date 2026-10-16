@@ -69,6 +69,9 @@ public sealed partial class NavigationViewModel(Func<long> lineCount) : Observab
         return true;
     }
 
+    /// <summary>Moves the caret to the start of 0-based <paramref name="line"/> and reveals it (bookmarks).</summary>
+    public void GoToLine(long line) => JumpTo(new FilePosition(line, 0));
+
     private void JumpTo(FilePosition position)
     {
         Caret = position;

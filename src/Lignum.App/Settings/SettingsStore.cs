@@ -108,6 +108,9 @@ public sealed class SettingsFile<T> where T : class
 
     public T Value { get; }
 
+    /// <summary>The store this file came from (to open related files, e.g. per-file bookmarks).</summary>
+    internal SettingsStore Store => _store;
+
     /// <summary>Writes <see cref="Value"/> to disk now. Thread-safe; failures are logged, not thrown.</summary>
     public void Save()
     {

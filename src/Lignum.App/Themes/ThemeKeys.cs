@@ -33,4 +33,7 @@ public static class ThemeKeys
     public const string FilterIncludeBorder = "FilterIncludeBorderBrush";
     public const string FilterExcludeBackground = "FilterExcludeBackgroundBrush";
     public const string FilterExcludeBorder = "FilterExcludeBorderBrush";
+
+    /// <summary>The bookmark dot in the viewer margin (ticket 17).</summary>
+    public const string BookmarkMarker = "BookmarkMarkerBrush";
 }

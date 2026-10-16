@@ -19,7 +19,7 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- Right-click menus (ticket 15). The menu's DataContext is the LogView's (this tab). The text commands take
              the view's selection as parameter (null = the main view's); see LogTabViewModel.ContextMenu.cs.
-             "Toggle bookmark" is a disabled placeholder until ticket 17 binds it. -->
+             "Toggle bookmark" (ticket 17) toggles the caret line of the view the menu opened on. -->
         <ContextMenu x:Key="MainViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
             <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}" InputGestureText="Ctrl+Shift+C" />
@@ -28,7 +28,7 @@
             <MenuItem Header="Add as e_xclude filter" Command="{Binding AddExcludeFilterCommand}" />
             <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}" />
             <Separator />
-            <MenuItem Header="Toggle _bookmark" InputGestureText="Ctrl+F2" IsEnabled="False" />
+            <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
@@ -43,7 +43,8 @@
             <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" />
             <Separator />
-            <MenuItem Header="Toggle _bookmark" InputGestureText="Ctrl+F2" IsEnabled="False" />
+            <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}"
+                      CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+F2" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
     </UserControl.Resources>
@@ -72,6 +73,7 @@
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                         <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
+                                        Bookmarks="{Binding Bookmarks.Lines}"
                                         ContextMenu="{StaticResource MainViewMenu}"
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
@@ -108,6 +110,7 @@
                             <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
                                             Highlight="{Binding Search.Highlight}"
                                             Selection="{Binding Search.ResultsSelection}"
+                                            Bookmarks="{Binding Bookmarks.Lines}"
                                             ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"
@@ -118,6 +121,9 @@
                                     <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyResultsCommand}" />
                                     <KeyBinding Gesture="Ctrl+A" Command="{Binding Search.SelectAllResultsCommand}" />
                                     <KeyBinding Gesture="Ctrl+Shift+C" Command="{Binding CopyToSearchCommand}"
+                                                CommandParameter="{Binding Search.ResultsSelection}" />
+                                    <!-- Bookmarks the result line under the results caret (the window's Ctrl+F2 uses the main view's). -->
+                                    <KeyBinding Gesture="Ctrl+F2" Command="{Binding ToggleBookmarkCommand}"
                                                 CommandParameter="{Binding Search.ResultsSelection}" />
                                 </viewer:LogView.InputBindings>
                             </viewer:LogView>

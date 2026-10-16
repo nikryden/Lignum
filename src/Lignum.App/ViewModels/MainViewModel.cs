@@ -102,7 +102,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         ErrorMessage = null;
-        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History };
+        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History,
+            SettingsStore = _settings.Store };
         Tabs.Add(tab);
         return tab;
     }
