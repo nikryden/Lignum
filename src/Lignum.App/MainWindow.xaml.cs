@@ -17,7 +17,6 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         Closed += (_, _) => _viewModel.Dispose();
-        Loaded += (_, _) => LogView.Focus(); // arrow keys and PageUp/PageDown scroll the log straight away
     }
 
     /// <summary>Theme, font, zoom and tab width; XAML binds via RelativeSource AncestorType=Window.</summary>
@@ -48,6 +47,22 @@ public partial class MainWindow : Window
         {
             _ = _viewModel.OpenFileAsync(dialog.FileName);
         }
+    }
+
+    /// <summary>Accept files dragged from Explorer (Preview, so the viewer and text boxes don't refuse them).</summary>
+    private void OnPreviewDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Dropping one or more files opens each in a tab (or switches to it if already open).</summary>
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        e.Handled = true;
+        _ = _viewModel.OpenFilesAsync(paths);
+        Activate();
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
