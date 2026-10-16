@@ -6,11 +6,12 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </UserControl.Resources>
     <Border Visibility="{Binding IsFileChanged, Converter={StaticResource BoolToVisibility}}"
-            Background="#FFF4CE" BorderBrush="#E0C060" BorderThickness="0,0,0,1" Padding="8,4">
+            Background="{DynamicResource BannerBackgroundBrush}" BorderBrush="{DynamicResource BannerBorderBrush}"
+            BorderThickness="0,0,0,1" Padding="8,4">
         <DockPanel>
             <Button DockPanel.Dock="Right" Content="_Reload" Padding="10,1"
                     Command="{Binding ReloadCommand}" />
-            <TextBlock VerticalAlignment="Center" Foreground="#3A2E00">
+            <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource BannerForegroundBrush}">
                 <Run Text="File changed:" FontWeight="SemiBold" />
                 <Run Text="{Binding FileChangeMessage, Mode=OneWay}" />
             </TextBlock>
