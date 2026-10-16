@@ -78,6 +78,7 @@ public sealed partial class LogView : FrameworkElement
         SetResourceReference(LineNumberBackgroundProperty, ThemeKeys.LineNumberBackground);
         SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
         InitializeScrolling();
+        InitializeSelection();
         InitializeLongLines();
         InitializeSearch();
     }
@@ -204,6 +205,7 @@ public sealed partial class LogView : FrameworkElement
                 DrawTruncationMarker(dc, row, TabExpansion.Expand(row.Text, TabWidth).Length, textLeft, y, pixelsPerDip);
             }
 
+            DrawRowSelection(dc, row, y, textLeft, firstColumn);
             if (row.Text.Length == 0) continue;
             // Columns are tab-expanded display columns; expand up to the right edge, then skip the scrolled-off part.
             var expanded = TabExpansion.Expand(row.Text, TabWidth, (int)Math.Min((long)firstColumn + maxChars, int.MaxValue));

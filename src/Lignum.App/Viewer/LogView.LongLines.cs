@@ -49,6 +49,7 @@ public sealed partial class LogView
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        OnSelectionMouseMove(e);
         var point = e.GetPosition(this);
         Cursor = _markerHits.Exists(h => h.Bounds.Contains(point)) ? Cursors.Hand : null;
     }

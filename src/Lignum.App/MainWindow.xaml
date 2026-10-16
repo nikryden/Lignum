@@ -55,6 +55,10 @@
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Copy" Command="{Binding SelectedTab.CopyCommand}" InputGestureText="Ctrl+C" />
+                <MenuItem Header="Select _all" Command="{Binding SelectedTab.SelectAllCommand}" InputGestureText="Ctrl+A" />
+            </MenuItem>
             <MenuItem Header="_Go">
                 <MenuItem Header="_Line…" Command="{x:Static local:MainWindow.GoToLineCommand}" InputGestureText="Ctrl+G" />
                 <MenuItem Header="_Start of file" Command="{Binding SelectedTab.Navigation.GoToStartCommand}" InputGestureText="Ctrl+Home" />
@@ -164,6 +168,14 @@
                     <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
                             Command="{Binding SelectedTab.CancelIndexingCommand}"
                             Visibility="{Binding SelectedTab.IsIndexing, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                </StackPanel>
+            </StatusBarItem>
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding SelectedTab.CopyMessage}" VerticalAlignment="Center" />
+                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                            Command="{Binding SelectedTab.CancelCopyCommand}"
+                            Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                 </StackPanel>
             </StatusBarItem>
             <Separator />

@@ -8,6 +8,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:viewer="clr-namespace:Lignum.App.Viewer"
              xmlns:views="clr-namespace:Lignum.App.Views">
+    <UserControl.InputBindings>
+        <!-- Selection and copy (ticket 08); a focused text box in the tab handles its own Ctrl+C/Ctrl+A first. -->
+        <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyCommand}" />
+        <KeyBinding Gesture="Ctrl+A" Command="{Binding SelectAllCommand}" />
+    </UserControl.InputBindings>
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </UserControl.Resources>
@@ -33,6 +38,7 @@
                     <ScrollViewer Grid.Row="1" CanContentScroll="True" Focusable="False"
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                         <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
+                                        Selection="{Binding Selection}"
                                         Highlight="{Binding Search.Highlight}"
                                         FullLineRequested="OnFullLineRequested"
                                         FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
