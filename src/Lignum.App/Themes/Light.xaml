@@ -21,4 +21,10 @@
     <SolidColorBrush x:Key="BannerBackgroundBrush" Color="#FFF4CE" />
     <SolidColorBrush x:Key="BannerBorderBrush" Color="#E0C060" />
     <SolidColorBrush x:Key="BannerForegroundBrush" Color="#3A2E00" />
+
+    <!-- Filter rule chips (ticket 12): include green, exclude red. -->
+    <SolidColorBrush x:Key="FilterIncludeBackgroundBrush" Color="#E3F4E1" />
+    <SolidColorBrush x:Key="FilterIncludeBorderBrush" Color="#5A9E50" />
+    <SolidColorBrush x:Key="FilterExcludeBackgroundBrush" Color="#FBE3E1" />
+    <SolidColorBrush x:Key="FilterExcludeBorderBrush" Color="#C0504A" />
 </ResourceDictionary>

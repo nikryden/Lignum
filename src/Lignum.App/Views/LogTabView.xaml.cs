@@ -11,6 +11,9 @@ public partial class LogTabView : UserControl
         InitializeComponent();
         IsVisibleChanged += OnIsVisibleChanged;
         DataContextChanged += OnDataContextChanged;
+        // The results view handles the click itself (it starts a selection), so listen to handled clicks too.
+        ResultsView.AddHandler(MouseLeftButtonDownEvent, new System.Windows.Input.MouseButtonEventHandler(OnResultsMouseDown),
+            handledEventsToo: true);
     }
 
     /// <summary>The truncation marker was clicked (ticket 07): open the detail pane on that line.</summary>

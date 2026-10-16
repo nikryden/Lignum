@@ -14,8 +14,8 @@ namespace Lignum.App.ViewModels;
 /// </summary>
 /// <remarks>
 /// The regex / case / NonBacktracking toggles shape the query in <see cref="BuildQuery"/>; an invalid
-/// pattern sets <see cref="FindTextError"/> instead of searching. Ticket 12 feeds filter rules into the
-/// same result set and pane.
+/// pattern sets <see cref="FindTextError"/> instead of searching. Filter rules (SearchViewModel.Filter.cs)
+/// feed the same result set and pane: whichever of find all and the filter ran last owns it.
 /// </remarks>
 public sealed partial class SearchViewModel : ObservableObject, IDisposable
 {
@@ -23,6 +23,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private LogDocument? _document;
     private QueryResult? _result;
     private int _refreshPending;
+    private bool _showingFilter;
 
     [ObservableProperty]
     private string _findText = "";
@@ -96,19 +97,12 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <summary>Raised with a 0-based file line when the main view should scroll to it and select it.</summary>
     public event EventHandler<long>? NavigateRequested;
 
-    /// <summary>Switches to another document (or none): stops the search and clears the results.</summary>
+    /// <summary>Switches to another document (or none): stops the search, clears the results and re-applies the filter rules.</summary>
     public void SetDocument(LogDocument? document)
     {
-        StopSearch();
         _document = document;
-        Results = null;
-        Highlight = null;
-        MatchCount = 0;
-        SearchProgress = 0;
-        SearchStatus = "";
-        CurrentLine = null;
-        CurrentResultRow = null;
-        IsSearching = false;
+        ClearResults();
+        ApplyFilter(); // filter rules belong to the tab, not the document: run them on the new one
     }
 
     /// <summary>Runs find all for <see cref="FindText"/>; completes when the search stops.</summary>
@@ -129,10 +123,21 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         }
 
         FindTextError = null;
+        await RunQuery(document, query, isFilter: false);
+    }
+
+    /// <summary>
+    /// Shows <paramref name="query"/>'s results in the results pane (find all and the filter share it: the
+    /// last one run wins), cancelling the query shown before. Completes when the query stops.
+    /// </summary>
+    private async Task RunQuery(LogDocument document, Query query, bool isFilter)
+    {
         StopSearch();
         var result = document.StartQuery(query);
         _result = result;
+        _showingFilter = isFilter;
         Results = new LineSource(new ResultLines(result), new DocumentLineReader(document));
+        ResultsSelection.MoveCaret(default, extend: false);
         Highlight = new Query(query.Rules, HighlightRegexTimeout);
         CurrentLine = null;
         CurrentResultRow = null;
@@ -143,6 +148,22 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
         await result.Completion.ConfigureAwait(false);
         RunOnUi(() => Refresh(result));
+    }
+
+    /// <summary>Clears the results pane's content (not its open state).</summary>
+    private void ClearResults()
+    {
+        StopSearch();
+        _showingFilter = false;
+        Results = null;
+        Highlight = null;
+        MatchCount = 0;
+        SearchProgress = 0;
+        SearchStatus = "";
+        CurrentLine = null;
+        CurrentResultRow = null;
+        IsSearching = false;
+        ResultsSelection.MoveCaret(default, extend: false);
     }
 
     [RelayCommand(CanExecute = nameof(IsSearching))]
@@ -219,7 +240,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private void OnOptionChanged()
     {
         FindTextError = null;
-        if (Results is not null && !string.IsNullOrEmpty(FindText)) FindAllCommand.Execute(null);
+        if (Results is not null && !_showingFilter && !string.IsNullOrEmpty(FindText)) FindAllCommand.Execute(null);
     }
 
     private void StopSearch()
@@ -267,6 +288,19 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
             Highlight = null;
             SearchStatus = $"Search stopped: the regex took too long on one line (over {RegexTimeout.TotalSeconds:0.#} s). "
                 + "Simplify the pattern or turn on NonBacktracking.";
+            return;
+        }
+
+        if (_showingFilter)
+        {
+            var lines = count == 1 ? "1 line" : $"{count:N0} lines";
+            SearchStatus = state switch
+            {
+                QueryState.Running => $"Filtering… {result.Progress:P0} ({lines})",
+                QueryState.Cancelled => $"Filter cancelled ({lines})",
+                QueryState.Failed => $"Filter failed: {result.Error?.Message}",
+                _ => $"Filter: {lines}",
+            };
             return;
         }
 
