@@ -53,36 +53,15 @@ public sealed partial class LogDocument
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(line, count);
 
         var start = _index[line];
-        long end;
-        if (line + 1 < count)
-        {
-            end = _index[line + 1] - 1; // drop the '\n' that precedes the next line
-            if (end > start && ByteAt(end - 1) == (byte)'\r') end--;
-        }
-        else
-        {
-            end = Math.Max(start, indexedEnd);
-            if (end > start && ByteAt(end - 1) == (byte)'\n')
-            {
-                end--;
-                if (end > start && ByteAt(end - 1) == (byte)'\r') end--;
-            }
-        }
+        var rawEnd = line + 1 < count ? _index[line + 1] : Math.Max(start, indexedEnd);
+
+        // Drop the line break (\n or \r\n, in the file's code units) from the last few bytes.
+        var codec = Codec;
+        Span<byte> tail = stackalloc byte[4];
+        var tailLength = (int)Math.Min(rawEnd - start, 2 * codec.UnitSize);
+        var read = Blocks.Read(rawEnd - tailLength, tail[..tailLength]);
+        var end = rawEnd - tailLength + codec.TrimLineBreak(tail[..read]);
 
         return (start, end);
     }
-
-    private byte ByteAt(long offset)
-    {
-        Span<byte> one = stackalloc byte[1];
-        return Blocks.Read(offset, one) == 1 ? one[0] : (byte)0;
-    }
-
-    private static string Decode(ReadOnlySpan<byte> bytes) => TextEncoding.GetString(bytes);
-
-    /// <summary>The file's text encoding. Ticket 06 replaces this with the detected one.</summary>
-    private static Encoding TextEncoding => Encoding.UTF8;
-
-    /// <summary>A stateful decoder for streaming (characters may straddle chunk edges).</summary>
-    private static Decoder CreateDecoder() => TextEncoding.GetDecoder();
 }

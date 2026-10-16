@@ -151,14 +151,14 @@ public sealed partial class LogDocument
                 filled += read;
             }
 
+            var codec = Codec; // decoding and line breaks in the file's encoding (no encoding has more chars than bytes)
             for (var line = first; line < end; line++)
             {
                 var s = (int)(LineStart(line, count) - startByte);
                 var e = (int)Math.Min(filled, LineStart(line + 1, count) - startByte);
                 if (s >= e) continue;
-                if (bytes[e - 1] == (byte)'\n') e--;
-                if (e > s && bytes[e - 1] == (byte)'\r') e--;
-                var n = Encoding.UTF8.GetChars(bytes.AsSpan(s, e - s), chars);
+                e = s + codec.TrimLineBreak(bytes.AsSpan(s, e - s));
+                var n = codec.GetChars(bytes.AsSpan(s, e - s), chars);
                 if (matcher.IsMatch(chars.AsSpan(0, n))) matches.Add(line);
             }
         }

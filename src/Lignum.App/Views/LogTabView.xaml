@@ -1,4 +1,4 @@
-﻿<!--
+<!--
     The content of one tab. DataContext is a LogTabViewModel. One instance exists per open tab (MainWindow
     keeps them all alive and shows only the selected one), so each tab keeps its own viewer, scroll position
     and, later, its own results pane, filters and detail pane: add per-tab panes here, not in MainWindow.
@@ -42,6 +42,7 @@
                         <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
                                         Highlight="{Binding Search.Highlight}"
+                                        LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                         FullLineRequested="OnFullLineRequested"
                                         FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                         FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -75,6 +76,7 @@
                             <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
                                             Highlight="{Binding Search.Highlight}"
                                             Selection="{Binding Search.ResultsSelection}"
+                                            LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"
                                             FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                             FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"

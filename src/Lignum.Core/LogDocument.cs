@@ -1,4 +1,5 @@
 using Lignum.Core.Indexing;
+using Lignum.Core.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace Lignum.Core;
@@ -13,7 +14,7 @@ namespace Lignum.Core;
 /// <remarks>
 /// Line rules: only <c>\n</c> and <c>\r\n</c> end a line (a lone <c>\r</c> is an ordinary character).
 /// A trailing newline does not start an extra empty line; text after the last newline is a line.
-/// An empty file has no lines. Encoding is UTF-8 for now.
+/// An empty file has no lines. The encoding is detected when indexing starts (<see cref="FileEncoding"/>).
 /// </remarks>
 public sealed partial class LogDocument : IDisposable
 {
@@ -27,9 +28,10 @@ public sealed partial class LogDocument : IDisposable
     private int _state = (int)IndexingState.NotStarted;
     private int _disposed;
 
-    private LogDocument(string path, SafeFileHandle handle, long length)
+    private LogDocument(string path, SafeFileHandle handle, long length, LogEncoding? encoding)
     {
         Path = path;
+        _requestedEncoding = encoding;
         _handle = handle;
         TotalBytes = length;
     }
@@ -39,7 +41,14 @@ public sealed partial class LogDocument : IDisposable
     /// <see cref="StartIndexing"/> (after subscribing to <see cref="LinesAdded"/>) to build the index.
     /// Throws the usual file exceptions if the file cannot be opened.
     /// </summary>
-    public static LogDocument Open(string path)
+    public static LogDocument Open(string path) => Open(path, null);
+
+    /// <summary>
+    /// Opens <paramref name="path"/> like <see cref="Open(string)"/>, but reads it as <paramref name="encoding"/>
+    /// instead of detecting the encoding (null = detect). That encoding's byte order mark is still skipped if
+    /// the file starts with it. To change the encoding of an open file, open it again with the new one.
+    /// </summary>
+    public static LogDocument Open(string path, LogEncoding? encoding)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         var fullPath = System.IO.Path.GetFullPath(path);
@@ -47,7 +56,7 @@ public sealed partial class LogDocument : IDisposable
             FileShare.ReadWrite | FileShare.Delete, FileOptions.RandomAccess);
         try
         {
-            return new LogDocument(fullPath, handle, RandomAccess.GetLength(handle));
+            return new LogDocument(fullPath, handle, RandomAccess.GetLength(handle), encoding);
         }
         catch
         {
@@ -137,7 +146,8 @@ public sealed partial class LogDocument : IDisposable
         try
         {
             var buffer = new byte[ReadBufferSize];
-            var offset = 0L;
+            var codec = DetectEncoding();
+            var offset = (long)codec.PreambleLength; // the byte order mark is not part of line 0
             var atLineStart = true;
             while (offset < TotalBytes)
             {
@@ -146,8 +156,11 @@ public sealed partial class LogDocument : IDisposable
                 var read = RandomAccess.Read(_handle, buffer.AsSpan(0, toRead), offset);
                 if (read == 0) break; // file shrank under us; change detection deals with that later
 
-                atLineStart = IndexBlock(buffer.AsSpan(0, read), offset, atLineStart);
-                offset += read;
+                // Keep blocks on whole code units (UTF-16), except a stray last byte at the end of the file.
+                var usable = read - read % codec.UnitSize;
+                if (usable == 0) usable = read;
+                atLineStart = IndexBlock(codec, buffer.AsSpan(0, usable), offset, atLineStart);
+                offset += usable;
                 Interlocked.Exchange(ref _bytesIndexed, offset);
                 LinesAdded?.Invoke(this, new LinesAddedEventArgs(_index.Count, offset, TotalBytes));
             }
@@ -170,16 +183,16 @@ public sealed partial class LogDocument : IDisposable
     }
 
     /// <summary>Records the line starts in one block. Returns whether the next byte starts a line.</summary>
-    private bool IndexBlock(ReadOnlySpan<byte> block, long blockOffset, bool atLineStart)
+    private bool IndexBlock(TextCodec codec, ReadOnlySpan<byte> block, long blockOffset, bool atLineStart)
     {
         if (atLineStart) _index.Append(blockOffset);
 
         var pos = 0;
         while (true)
         {
-            var hit = block[pos..].IndexOf((byte)'\n');
-            if (hit < 0) return false;
-            pos += hit + 1;
+            var after = codec.IndexAfterNewline(block[pos..]);
+            if (after < 0) return false;
+            pos += after;
             if (pos == block.Length) return true; // the next line, if any, starts in the next block
             _index.Append(blockOffset + pos);
         }
