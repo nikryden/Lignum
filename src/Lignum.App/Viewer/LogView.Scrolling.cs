@@ -129,6 +129,7 @@ public sealed partial class LogView : IScrollInfo
         base.OnMouseDown(e);
         Focus();
         if (e.ChangedButton == MouseButton.Left && !BeginSelectionDrag(e)) PlaceCaret(e.GetPosition(this));
+        else if (e.ChangedButton == MouseButton.Right) PrepareContextMenuClick(e.GetPosition(this));
     }
 
     /// <summary>Unmodified arrows, Home/End and PageUp/PageDown move the caret (LogView.Caret.cs) and scroll to it.</summary>

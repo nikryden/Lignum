@@ -149,6 +149,23 @@ public sealed partial class LogView
         SetCurrentValue(CaretProperty, position);
     }
 
+    /// <summary>
+    /// Right button down (ticket 15): a click inside the selection keeps it, so the context menu acts on it; a
+    /// click elsewhere moves the caret there (clearing the selection), so the menu acts on the clicked word.
+    /// </summary>
+    private void PrepareContextMenuClick(Point point)
+    {
+        if (Selection is not { } selection)
+        {
+            PlaceCaret(point);
+            return;
+        }
+
+        if (HitTest(point) is not { } position) return;
+        if (!selection.IsEmpty && position >= selection.Start && position <= selection.End) return;
+        SetSelectionCaret(selection, position, extend: false);
+    }
+
     /// <summary>The file position nearest to a point in the view, or null when there are no rows.</summary>
     private FilePosition? HitTest(Point point)
     {

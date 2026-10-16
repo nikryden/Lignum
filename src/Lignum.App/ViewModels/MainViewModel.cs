@@ -44,6 +44,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Copies selections in every tab (the clipboard and the large-copy prompt); tests replace it.</summary>
     public SelectionCopier Copier { get; init; } = new(new WpfClipboard(), new DialogCopyPrompt());
 
+    /// <summary>The app-wide highlight rules; "Add as highlight rule" (ticket 15) adds to them. Null: no such item.</summary>
+    public HighlightingViewModel? Highlighting { get; init; }
+
     public string Title => SelectedTab is { } tab ? $"{tab.FileName} - {AppName}" : AppName;
 
     /// <summary>
@@ -99,7 +102,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         ErrorMessage = null;
-        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, History = History };
+        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History };
         Tabs.Add(tab);
         return tab;
     }
