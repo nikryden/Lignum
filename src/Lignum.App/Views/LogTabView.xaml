@@ -12,9 +12,40 @@
         <!-- Selection and copy (ticket 08); a focused text box in the tab handles its own Ctrl+C/Ctrl+A first. -->
         <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyCommand}" />
         <KeyBinding Gesture="Ctrl+A" Command="{Binding SelectAllCommand}" />
+        <!-- Copy to search (ticket 15): selection, its first line, or the word under the cursor; then find all. -->
+        <KeyBinding Gesture="Ctrl+Shift+C" Command="{Binding CopyToSearchCommand}" />
     </UserControl.InputBindings>
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <!-- Right-click menus (ticket 15). The menu's DataContext is the LogView's (this tab). The text commands take
+             the view's selection as parameter (null = the main view's); see LogTabViewModel.ContextMenu.cs.
+             "Toggle bookmark" is a disabled placeholder until ticket 17 binds it. -->
+        <ContextMenu x:Key="MainViewMenu">
+            <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}" InputGestureText="Ctrl+Shift+C" />
+            <Separator />
+            <MenuItem Header="Add as _include filter" Command="{Binding AddIncludeFilterCommand}" />
+            <MenuItem Header="Add as e_xclude filter" Command="{Binding AddExcludeFilterCommand}" />
+            <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}" />
+            <Separator />
+            <MenuItem Header="Toggle _bookmark" InputGestureText="Ctrl+F2" IsEnabled="False" />
+            <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
+        </ContextMenu>
+        <ContextMenu x:Key="ResultsViewMenu">
+            <MenuItem Header="_Copy" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}"
+                      CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+Shift+C" />
+            <Separator />
+            <MenuItem Header="Add as _include filter" Command="{Binding AddIncludeFilterCommand}"
+                      CommandParameter="{Binding Search.ResultsSelection}" />
+            <MenuItem Header="Add as e_xclude filter" Command="{Binding AddExcludeFilterCommand}"
+                      CommandParameter="{Binding Search.ResultsSelection}" />
+            <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}"
+                      CommandParameter="{Binding Search.ResultsSelection}" />
+            <Separator />
+            <MenuItem Header="Toggle _bookmark" InputGestureText="Ctrl+F2" IsEnabled="False" />
+            <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
+        </ContextMenu>
     </UserControl.Resources>
     <DockPanel>
         <views:FileChangedBanner DockPanel.Dock="Top" />
@@ -41,6 +72,7 @@
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                         <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
+                                        ContextMenu="{StaticResource MainViewMenu}"
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                         FullLineRequested="OnFullLineRequested"
@@ -76,6 +108,7 @@
                             <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
                                             Highlight="{Binding Search.Highlight}"
                                             Selection="{Binding Search.ResultsSelection}"
+                                            ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"
                                             FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -84,6 +117,8 @@
                                 <viewer:LogView.InputBindings>
                                     <KeyBinding Gesture="Ctrl+C" Command="{Binding CopyResultsCommand}" />
                                     <KeyBinding Gesture="Ctrl+A" Command="{Binding Search.SelectAllResultsCommand}" />
+                                    <KeyBinding Gesture="Ctrl+Shift+C" Command="{Binding CopyToSearchCommand}"
+                                                CommandParameter="{Binding Search.ResultsSelection}" />
                                 </viewer:LogView.InputBindings>
                             </viewer:LogView>
                         </ScrollViewer>
