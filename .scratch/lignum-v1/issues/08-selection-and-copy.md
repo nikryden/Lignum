@@ -4,10 +4,17 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Drag, Shift+Click, keyboard Shift+arrows and Ctrl+A select text; the selection survives scrolling
-- [ ] Ctrl+C copies exactly the selected text; multi-line selections keep the original line endings
-- [ ] `LogDocument` streams the text between two (line, column) positions (tested, including across block boundaries)
-- [ ] Above the threshold the user is asked to confirm or save to file; copying runs without blocking the UI
-- [ ] View-model tests cover the selection model and copying
+- [x] Drag, Shift+Click, keyboard Shift+arrows and Ctrl+A select text; the selection survives scrolling
+- [x] Ctrl+C copies exactly the selected text; multi-line selections keep the original line endings
+- [x] `LogDocument` streams the text between two (line, column) positions (tested, including across block boundaries)
+- [x] Above the threshold the user is asked to confirm or save to file; copying runs without blocking the UI
+- [x] View-model tests cover the selection model and copying
+
+## Comments
+
+Core: `FilePosition(Line, Column)` and `LogDocument.ReadTextRange(start, end, TextWriter, ct)` (first/last line decoded, the lines between streamed raw in 1 MB chunks through a stateful decoder, so `
+`/`
+` are kept as stored), plus `MeasureTextRange` (index-only byte estimate for the 50 MB prompt). App: `TextSelection` (anchor + caret as file positions), `SelectionCopier` (background read, clipboard/prompt/save-to-file behind `IClipboardService`/`ICopyPrompt`), `LogTabViewModel.Selection.cs` (Copy/SelectAll/CancelCopy, `CopyMessage`), `LogView.Selection.cs` (drawing, drag with auto-scroll, Shift+Click, Shift+arrows/Home/End/PageUp/PageDown), tab-aware column mapping in `TabExpansion`.
+Manual checks: drag selection and Shift+arrow extension were seen drawn correctly in a smoke run before ticket 16 merged. Ctrl+C/Ctrl+A now live as KeyBindings on `LogTabView` (Edit menu too) and are covered by view-model tests, but the real keypress path, the large-copy dialog and SaveFileDialog were not exercised in the running app (synthetic input was stopped): please check by hand.
