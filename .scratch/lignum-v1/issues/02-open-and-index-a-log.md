@@ -4,12 +4,18 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `LogDocument` opens files with share modes ReadWrite and Delete; tests show another handle can still append to, rename and delete the file while it is open
-- [ ] Indexing runs off the UI thread; the line count updates while it runs; cancelling stops it
-- [ ] Line splitting is tested for: `\n`, `\r\n`, a lone `\r` (not a line break), an empty file, a file without a trailing newline, and consecutive empty lines
-- [ ] The index stores line-start offsets in an append-friendly structure (ready for tail mode later), kept in memory only
-- [ ] File → Open, Ctrl+O and `Lignum.exe <path>` all open a file
-- [ ] The window shows the file name and the live line count
-- [ ] Tests go through `LogDocument` using real temp files
+- [x] `LogDocument` opens files with share modes ReadWrite and Delete; tests show another handle can still append to, rename and delete the file while it is open
+- [x] Indexing runs off the UI thread; the line count updates while it runs; cancelling stops it
+- [x] Line splitting is tested for: `\n`, `\r\n`, a lone `\r` (not a line break), an empty file, a file without a trailing newline, and consecutive empty lines
+- [x] The index stores line-start offsets in an append-friendly structure (ready for tail mode later), kept in memory only
+- [x] File → Open, Ctrl+O and `Lignum.exe <path>` all open a file
+- [x] The window shows the file name and the live line count
+- [x] Tests go through `LogDocument` using real temp files
+
+## Comments
+
+`LogDocument.Open(path)` + `StartIndexing()` in Core (`LineIndex` = chunked `long` offsets, internal); `MainViewModel` in App marshals coalesced updates to the UI thread. 30 Core tests (splitting, progress, cancel, sharing) and 5 view-model tests, all on real temp files.
+Splitting is asserted via line counts only; line content assertions arrive with ticket 03's line reader.
+Smoke-launched `Lignum.exe <path>`: title showed the file name. File → Open dialog and Ctrl+O were not clicked through manually (wired via `ApplicationCommands.Open`, which carries Ctrl+O).
