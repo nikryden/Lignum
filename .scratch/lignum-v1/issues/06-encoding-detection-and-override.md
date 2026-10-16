@@ -4,9 +4,14 @@
 
 **Blocked by:** 03, 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `LogDocument` reports the detected encoding; tests cover each supported encoding, with and without BOM
-- [ ] Line splitting is correct for UTF-16 LE and BE files
-- [ ] Overriding the encoding re-indexes and re-renders the file
-- [ ] The status bar shows the encoding and offers the override on click
+- [x] `LogDocument` reports the detected encoding; tests cover each supported encoding, with and without BOM
+- [x] Line splitting is correct for UTF-16 LE and BE files
+- [x] Overriding the encoding re-indexes and re-renders the file
+- [x] The status bar shows the encoding and offers the override on click
+
+## Comments
+- Core: `LogDocument.Open(path, LogEncoding?)`, `FileEncoding`/`HasByteOrderMark`/`IsEncodingOverridden`; detection (BOM, UTF-8 validity, UTF-16 zero pattern, 1252 fallback) runs on the indexer thread on the first 64 KB. All decoding and line-break trimming goes through internal `Text/TextCodec` (`LogDocument.Codec`); the indexer splits UTF-16 on whole 2-byte newline units.
+- Override = reopen in the same tab with the chosen encoding (kept for later reloads); "Detect automatically" clears it. Tests: `EncodingTests` (Core, real files per encoding, with/without BOM) and `EncodingStatusTests` (App).
+- The status-bar encoding menu (MainWindow.xaml) builds but was not checked visually (no manual app runs allowed); verify by hand.

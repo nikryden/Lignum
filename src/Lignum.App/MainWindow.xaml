@@ -5,6 +5,7 @@
         xmlns:views="clr-namespace:Lignum.App.Views"
         xmlns:settings="clr-namespace:Lignum.App.Settings"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns:core="clr-namespace:Lignum.Core;assembly=Lignum.Core"
         Title="{Binding Title}" Height="720" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
@@ -160,6 +161,31 @@
             <Separator />
             <StatusBarItem>
                 <TextBlock Text="{Binding SelectedTab.FileSizeText, FallbackValue=''}" />
+            </StatusBarItem>
+            <Separator />
+            <!-- Encoding (ticket 06): click to read the file with another encoding. -->
+            <StatusBarItem Padding="0">
+                <Menu Background="Transparent" Foreground="{DynamicResource StatusBarForegroundBrush}">
+                    <MenuItem Header="{Binding SelectedTab.EncodingText, FallbackValue=''}" Padding="6,0"
+                              ToolTip="Encoding: click to read the file with another encoding">
+                        <MenuItem Header="_Detect automatically" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                                  CommandParameter="{x:Null}"
+                                  IsChecked="{Binding SelectedTab.IsEncodingOverridden, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=False}" />
+                        <Separator />
+                        <MenuItem Header="UTF-_8" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                                  CommandParameter="{x:Static core:LogEncoding.Utf8}"
+                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf8}" />
+                        <MenuItem Header="UTF-16 _LE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                                  CommandParameter="{x:Static core:LogEncoding.Utf16LE}"
+                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16LE}" />
+                        <MenuItem Header="UTF-16 _BE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                                  CommandParameter="{x:Static core:LogEncoding.Utf16BE}"
+                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16BE}" />
+                        <MenuItem Header="_Windows-1252" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                                  CommandParameter="{x:Static core:LogEncoding.Windows1252}"
+                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Windows1252}" />
+                    </MenuItem>
+                </Menu>
             </StatusBarItem>
             <Separator />
             <StatusBarItem>
