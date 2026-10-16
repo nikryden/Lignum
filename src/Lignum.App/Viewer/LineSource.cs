@@ -53,6 +53,24 @@ public sealed class LineSource(ILineList lines, ILineReader reader)
     }
 
     /// <summary>
+    /// The row showing file line <paramref name="line"/>, or if the list does not contain it the next row after
+    /// it (the last row past the end, row 0 when empty). Binary search: the list is in ascending line order.
+    /// </summary>
+    public long RowOfLine(long line)
+    {
+        var count = Lines.Count;
+        long low = 0, high = count; // first row whose line >= target lies in [low, high]
+        while (low < high)
+        {
+            var mid = low + (high - low) / 2;
+            if (Lines[mid] < line) low = mid + 1;
+            else high = mid;
+        }
+
+        return Math.Max(0, Math.Min(low, count - 1));
+    }
+
+    /// <summary>
     /// Reads up to <paramref name="count"/> rows from <paramref name="firstRow"/> on a background thread.
     /// Rows past the end are left out. Consecutive line numbers are read in one call.
     /// </summary>

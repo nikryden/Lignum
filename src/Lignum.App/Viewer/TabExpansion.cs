@@ -27,4 +27,36 @@ public static class TabExpansion
         if (sb.Length > maxColumns) sb.Length = maxColumns;
         return sb.ToString();
     }
+
+    /// <summary>The display column of the gap before <paramref name="index"/> in <paramref name="text"/> (clamped to the end).</summary>
+    public static int IndexToColumn(string text, int tabWidth, int index)
+    {
+        tabWidth = Math.Max(1, tabWidth);
+        var end = Math.Clamp(index, 0, text.Length);
+        var column = 0;
+        for (var i = 0; i < end; i++) column = NextColumn(text[i], column, tabWidth);
+        return column;
+    }
+
+    /// <summary>
+    /// The character gap nearest to display <paramref name="column"/>: a click inside a tab goes to whichever
+    /// side is closer, a column past the end of the line goes to the end.
+    /// </summary>
+    public static int ColumnToIndex(string text, int tabWidth, int column)
+    {
+        tabWidth = Math.Max(1, tabWidth);
+        var current = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (current >= column) return i;
+            var next = NextColumn(text[i], current, tabWidth);
+            if (next > column) return column - current <= next - column ? i : i + 1;
+            current = next;
+        }
+
+        return text.Length;
+    }
+
+    private static int NextColumn(char c, int column, int tabWidth) =>
+        c == '\t' ? column + tabWidth - column % tabWidth : column + 1;
 }

@@ -202,6 +202,8 @@ public sealed partial class LogView : FrameworkElement
             var text = firstColumn == 0 ? expanded : expanded[firstColumn..];
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
+
+        DrawCaret(dc, first, wanted, textLeft);
     }
 
     private FormattedText Format(string text, Brush brush, double pixelsPerDip) =>
