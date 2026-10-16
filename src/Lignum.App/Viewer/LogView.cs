@@ -11,7 +11,7 @@ namespace Lignum.App.Viewer;
 /// with a line-number margin on the left. Row text is read on a background thread and drawn when it
 /// arrives, so the UI thread never touches the file. Used for the main view and, later, the results pane.
 /// </summary>
-public sealed class LogView : FrameworkElement
+public sealed partial class LogView : FrameworkElement
 {
     private const double MarginPadding = 8;
     private const double TextPadding = 6;
@@ -22,7 +22,8 @@ public sealed class LogView : FrameworkElement
 
     public static readonly DependencyProperty FirstRowProperty = DependencyProperty.Register(
         nameof(FirstRow), typeof(long), typeof(LogView),
-        new FrameworkPropertyMetadata(0L, FrameworkPropertyMetadataOptions.AffectsRender));
+        new FrameworkPropertyMetadata(0L, FrameworkPropertyMetadataOptions.AffectsRender, OnFirstRowChanged,
+            CoerceFirstRow));
 
     public static readonly DependencyProperty FontFamilyProperty = DependencyProperty.Register(
         nameof(FontFamily), typeof(FontFamily), typeof(LogView),
@@ -65,6 +66,7 @@ public sealed class LogView : FrameworkElement
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+        InitializeScrolling();
     }
 
     /// <summary>The rows to show. Null shows an empty view.</summary>
@@ -74,7 +76,7 @@ public sealed class LogView : FrameworkElement
         set => SetValue(SourceProperty, value);
     }
 
-    /// <summary>The row drawn at the top of the view (ticket 04 drives this from scrolling).</summary>
+    /// <summary>The row drawn at the top of the view; the vertical scroll offset. Clamped to the rows available.</summary>
     public long FirstRow
     {
         get => (long)GetValue(FirstRowProperty);
@@ -160,6 +162,8 @@ public sealed class LogView : FrameworkElement
         dc.DrawRectangle(LineNumberBackground, null, new Rect(0, 0, marginWidth, height));
 
         var textLeft = marginWidth + TextPadding;
+        UpdateTextLeft(textLeft);
+        var firstColumn = FirstColumn;
         // Draw only the characters that can be visible; long-line truncation proper is ticket 07.
         var maxChars = (int)Math.Ceiling(Math.Max(0, width - textLeft) / _charWidth) + 1;
         var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
@@ -173,8 +177,8 @@ public sealed class LogView : FrameworkElement
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
 
-            if (row.Text.Length == 0) continue;
-            var text = row.Text.Length > maxChars ? row.Text[..maxChars] : row.Text;
+            if (row.Text.Length <= firstColumn) continue;
+            var text = row.Text.Substring(firstColumn, Math.Min(maxChars, row.Text.Length - firstColumn));
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
     }
@@ -216,6 +220,7 @@ public sealed class LogView : FrameworkElement
             _rows = rows;
             _rowsFirst = first;
             _rowCountAtLoad = rowCount;
+            OnRowsLoaded(rows);
             InvalidateVisual();
         }
         catch (OperationCanceledException)
@@ -259,6 +264,7 @@ public sealed class LogView : FrameworkElement
         view._rowsFirst = 0;
         view._rowCountAtLoad = 0;
         view._pendingLoad = null;
+        view.ResetScrolling();
         if (e.NewValue is LineSource source) source.Changed += view.OnSourceRowsChanged;
     }
 
@@ -269,6 +275,7 @@ public sealed class LogView : FrameworkElement
         Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
         {
             Volatile.Write(ref _changePosted, 0);
+            ScrollOwner?.InvalidateScrollInfo(); // the extent grew; FirstRow stays put
             // Only a view that reaches the end of what was loaded can change; the rest stays as drawn.
             if (FirstRow + VisibleRowCapacity >= _rowCountAtLoad) InvalidateVisual();
         });
