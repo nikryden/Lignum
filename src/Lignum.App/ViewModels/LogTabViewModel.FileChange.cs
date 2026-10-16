@@ -20,14 +20,20 @@ public sealed partial class LogTabViewModel
     /// Completes when the new indexing stops.
     /// </summary>
     [RelayCommand(CanExecute = nameof(IsFileChanged))]
-    private Task Reload()
+    private Task Reload() => Reopen();
+
+    /// <summary>
+    /// Opens this tab's path again (with the chosen encoding, if any) and indexes it in the same tab. On
+    /// failure the current document stays and <see cref="ErrorMessage"/> says why.
+    /// </summary>
+    private Task Reopen()
     {
         if (_document is null) return Task.CompletedTask; // closed
 
         LogDocument document;
         try
         {
-            document = LogDocument.Open(Path);
+            document = LogDocument.Open(Path, EncodingOverride);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
                                        or NotSupportedException)

@@ -125,6 +125,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
         if (!ReferenceEquals(document, _document)) return; // a stale update from a replaced or closed document
 
         var state = document.IndexingState;
+        RefreshEncoding(document);
         LineCount = document.LineCount;
         IndexingProgress = document.IndexingProgress;
         IsIndexing = state is IndexingState.Running or IndexingState.NotStarted;
