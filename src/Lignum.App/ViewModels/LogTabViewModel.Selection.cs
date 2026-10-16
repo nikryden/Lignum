@@ -22,7 +22,7 @@ public sealed partial class LogTabViewModel
     public TextSelection Selection => _selection ??= CreateSelection();
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CopyCommand), nameof(CancelCopyCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CopyCommand), nameof(CopyResultsCommand), nameof(CancelCopyCommand))]
     private bool _isCopying;
 
     /// <summary>The outcome of the last copy, for the status bar.</summary>
@@ -33,16 +33,28 @@ public sealed partial class LogTabViewModel
     private void SelectAll() => Selection.SelectAll(_document?.LineCount ?? 0);
 
     [RelayCommand(CanExecute = nameof(CanCopy))]
-    private async Task Copy()
+    private Task Copy() =>
+        _document is { } document && Copier is { } copier && !Selection.IsEmpty
+            ? RunCopy(token => copier.CopyAsync(document, Selection, token))
+            : Task.CompletedTask;
+
+    /// <summary>Ctrl+C in the results pane: copies the selected result lines only (filter / find all).</summary>
+    [RelayCommand(CanExecute = nameof(CanCopy))]
+    private Task CopyResults() =>
+        _document is { } document && Copier is { } copier && Search.Results is { } results &&
+        !Search.ResultsSelection.IsEmpty
+            ? RunCopy(token => copier.CopyRowsAsync(document, results.Lines, Search.ResultsSelection, token))
+            : Task.CompletedTask;
+
+    private async Task RunCopy(Func<CancellationToken, Task<CopyResult>> copy)
     {
-        if (_document is not { } document || Copier is not { } copier || Selection.IsEmpty) return;
         var cancel = new CancellationTokenSource();
         _copyCancel = cancel;
         IsCopying = true;
         CopyMessage = "Copying…";
         try
         {
-            CopyMessage = (await copier.CopyAsync(document, Selection, cancel.Token)).Message;
+            CopyMessage = (await copy(cancel.Token)).Message;
         }
         finally
         {

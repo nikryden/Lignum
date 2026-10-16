@@ -7,7 +7,8 @@ using Lignum.Core;
 
 namespace Lignum.App.Views;
 
-// Find all (ticket 10): the find box, the results pane layout and navigation from results to the main view.
+// Find all (ticket 10) and filter rules (ticket 12): the find box, the results pane layout and navigation
+// from results to the main view.
 public partial class LogTabView
 {
     private GridLength _resultsHeight = new(1, GridUnitType.Star);
@@ -50,6 +51,10 @@ public partial class LogTabView
             case nameof(SearchViewModel.IsFindBarOpen) when _search is { IsFindBarOpen: false }:
                 LogView.Focus(); // Esc in the find box goes back to the log
                 break;
+            case nameof(SearchViewModel.IsFilterBarOpen) when _search is { } search:
+                if (search.IsFilterBarOpen) FilterBar.FocusNewRuleBox();
+                else LogView.Focus();
+                break;
             case nameof(SearchViewModel.CurrentLine) when _search is { CurrentLine: null }:
                 LogView.MarkedLine = -1;
                 ResultsView.MarkedLine = -1;
@@ -91,8 +96,10 @@ public partial class LogTabView
         if (_search?.CurrentResultRow is { } row) ResultsView.BringRowIntoView(row);
     }
 
+    /// <summary>A click on a result goes to its line; Shift+Click only extends the results selection.</summary>
     private void OnResultsMouseDown(object sender, MouseButtonEventArgs e)
     {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) return;
         if (ResultsView.RowAt(e.GetPosition(ResultsView)) is { } row) _search?.GoToResult(row);
     }
 
