@@ -200,6 +200,153 @@ public class SearchViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task The_case_toggle_applies_to_find_all()
+    {
+        var search = (await OpenLog("Error\nerror\nERROR\n")).Search;
+
+        search.MatchCase = true;
+        await FindAll(search, "error");
+
+        Assert.Equal([1L], ResultLines(search));
+    }
+
+    [Fact]
+    public async Task The_regex_toggle_applies_to_find_all_and_F3()
+    {
+        var search = (await OpenLog("id=1\nid=x\nid=22\nid=\\d+\n")).Search;
+        var navigated = new List<long>();
+        search.NavigateRequested += (_, line) => navigated.Add(line);
+
+        await FindAll(search, @"id=\d+");
+        Assert.Equal([3L], ResultLines(search)); // plain text: the literal pattern
+
+        search.IsRegex = true;
+        await FindAll(search, @"id=\d+");
+        search.FindNextCommand.Execute(null);
+        search.FindNextCommand.Execute(null);
+
+        Assert.Equal([0L, 2L], ResultLines(search));
+        Assert.Equal([0L, 2L], navigated);
+    }
+
+    [Fact]
+    public async Task Changing_an_option_reruns_the_last_search()
+    {
+        var search = (await OpenLog("Error\nerror\n")).Search;
+        await FindAll(search, "error");
+        Assert.Equal(2, search.MatchCount);
+
+        search.MatchCase = true;
+        WaitUntil(() => !search.IsSearching && search.MatchCount == 1);
+
+        Assert.Equal([1L], ResultLines(search));
+    }
+
+    [Fact]
+    public async Task An_invalid_regex_shows_a_validation_error_and_does_not_search()
+    {
+        var search = (await OpenLog("a(b\n")).Search;
+        search.IsRegex = true;
+
+        await FindAll(search, "a(b");
+
+        Assert.NotNull(search.FindTextError);
+        Assert.Contains("Not enough )", search.FindTextError);
+        Assert.Null(search.Results);
+        Assert.False(search.IsResultsPaneOpen);
+    }
+
+    [Fact]
+    public async Task The_validation_error_clears_when_the_text_or_options_change()
+    {
+        var search = (await OpenLog("a(b\n")).Search;
+        search.IsRegex = true;
+        await FindAll(search, "a(b");
+
+        search.FindText = "a(b)";
+        Assert.Null(search.FindTextError);
+
+        await FindAll(search, "a(");
+        Assert.NotNull(search.FindTextError);
+        search.IsRegex = false;
+        WaitUntil(() => !search.IsSearching);
+        Assert.Null(search.FindTextError);
+    }
+
+    [Fact]
+    public async Task A_pattern_NonBacktracking_cannot_run_shows_a_validation_error()
+    {
+        var search = (await OpenLog("aa\n")).Search;
+        search.IsRegex = true;
+        search.UseNonBacktracking = true;
+
+        await FindAll(search, @"(a)\1");
+
+        Assert.Contains("NonBacktracking", search.FindTextError);
+        Assert.Null(search.Results);
+    }
+
+    [Fact]
+    public async Task NonBacktracking_finds_the_same_lines()
+    {
+        var search = (await OpenLog("2024-01-01 ERROR\nINFO\nWARN 2024-02-03\n")).Search;
+        search.IsRegex = true;
+        await FindAll(search, @"\d{4}-\d\d-\d\d");
+        var backtracking = ResultLines(search);
+
+        search.UseNonBacktracking = true;
+        await FindAll(search, @"\d{4}-\d\d-\d\d");
+
+        Assert.Equal([0L, 2L], backtracking);
+        Assert.Equal(backtracking, ResultLines(search));
+    }
+
+    [Fact]
+    public async Task A_catastrophic_regex_times_out_with_a_clear_error_and_the_view_model_stays_usable()
+    {
+        var search = (await OpenLog("ok\n" + new string('a', 5_000) + "!\nmore\n")).Search;
+        search.RegexTimeout = TimeSpan.FromMilliseconds(100);
+        search.IsRegex = true;
+
+        var clock = Stopwatch.StartNew();
+        await FindAll(search, "^(a+)+$");
+
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10));
+        Assert.False(search.IsSearching);
+        Assert.Contains("too long", search.SearchStatus);
+        Assert.Null(search.Highlight); // nothing left to re-run the bad pattern while drawing
+
+        await FindAll(search, "more"); // and the next search works
+        Assert.Equal([2L], ResultLines(search));
+    }
+
+    [Fact]
+    public void The_keyboard_toggle_commands_flip_the_options()
+    {
+        var search = UiContext.None(() => new SearchViewModel(null));
+        _owned.Add(search);
+
+        search.ToggleMatchCaseCommand.Execute(null);
+        search.ToggleRegexCommand.Execute(null);
+        search.ToggleNonBacktrackingCommand.Execute(null);
+
+        Assert.True(search.MatchCase);
+        Assert.True(search.IsRegex);
+        Assert.True(search.UseNonBacktracking);
+    }
+
+    [Fact]
+    public async Task Highlighting_uses_a_short_regex_timeout()
+    {
+        var search = (await OpenLog("abc\n")).Search;
+        search.IsRegex = true;
+
+        await FindAll(search, "b");
+
+        Assert.True(search.Highlight!.RegexTimeout <= TimeSpan.FromMilliseconds(100));
+    }
+
+    [Fact]
     public async Task A_search_can_be_cancelled()
     {
         // A document that is never indexed keeps the query waiting, so it is still running when cancelled.
