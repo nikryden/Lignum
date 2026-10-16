@@ -1,0 +1,60 @@
+﻿<!--
+    The content of one tab. DataContext is a LogTabViewModel. One instance exists per open tab (MainWindow
+    keeps them all alive and shows only the selected one), so each tab keeps its own viewer, scroll position
+    and, later, its own results pane, filters and detail pane: add per-tab panes here, not in MainWindow.
+-->
+<UserControl x:Class="Lignum.App.Views.LogTabView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewer="clr-namespace:Lignum.App.Viewer"
+             xmlns:views="clr-namespace:Lignum.App.Views">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+    <DockPanel>
+        <views:FileChangedBanner DockPanel.Dock="Top" />
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="2*" MinHeight="40" />
+                <RowDefinition x:Name="SplitterRow" Height="0" />
+                <RowDefinition x:Name="ResultsRow" Height="0" />
+            </Grid.RowDefinitions>
+            <views:FindBar x:Name="FindBar" Grid.Row="0" DataContext="{Binding Search}" />
+            <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
+            <ScrollViewer Grid.Row="1" CanContentScroll="True" Focusable="False"
+                          VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                                Highlight="{Binding Search.Highlight}"
+                                MouseLeftButtonDown="OnMainViewMouseDown"
+                                FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+            </ScrollViewer>
+            <!-- Results pane (find all / filter): drag the splitter to resize; ✕ or Search > Results pane collapses it. -->
+            <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" ResizeDirection="Rows"
+                          ResizeBehavior="PreviousAndNext" Background="{DynamicResource PaneBorderBrush}"
+                          Visibility="{Binding Search.IsResultsPaneOpen, Converter={StaticResource BoolToVisibility}}" />
+            <DockPanel Grid.Row="3" Background="{DynamicResource PaneBackgroundBrush}"
+                       Visibility="{Binding Search.IsResultsPaneOpen, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel DockPanel.Dock="Top" Margin="8,2">
+                    <Button DockPanel.Dock="Right" Content="✕" ToolTip="Collapse the results pane" Padding="6,0"
+                            Command="{Binding Search.ToggleResultsPaneCommand}" />
+                    <TextBlock VerticalAlignment="Center">
+                        <Run Text="Results:" FontWeight="SemiBold" />
+                        <Run Text="{Binding Search.SearchStatus, Mode=OneWay}" />
+                    </TextBlock>
+                </DockPanel>
+                <ScrollViewer CanContentScroll="True" Focusable="False"
+                              VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
+                    <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
+                                    Highlight="{Binding Search.Highlight}"
+                                    MouseLeftButtonDown="OnResultsMouseDown"
+                                    FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </ScrollViewer>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</UserControl>

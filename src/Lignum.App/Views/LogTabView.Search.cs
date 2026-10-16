@@ -1,30 +1,37 @@
 using System.ComponentModel;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using Lignum.App.ViewModels;
 
-namespace Lignum.App;
+namespace Lignum.App.Views;
 
 // Find all (ticket 10): the find box, the results pane layout and navigation from results to the main view.
-public partial class MainWindow
+public partial class LogTabView
 {
     private GridLength _resultsHeight = new(1, GridUnitType.Star);
+    private SearchViewModel? _search;
 
-    private SearchViewModel Search => _viewModel.Search;
-
-    private void InitializeSearch()
+    private void AttachSearch(LogTabViewModel? oldTab, LogTabViewModel? newTab)
     {
-        Search.NavigateRequested += OnNavigateRequested;
-        Search.PropertyChanged += OnSearchPropertyChanged;
+        if (_search is { } old)
+        {
+            old.NavigateRequested -= OnNavigateRequested;
+            old.PropertyChanged -= OnSearchPropertyChanged;
+            old.FindBoxFocusRequested -= OnFindBoxFocusRequested;
+        }
+
+        _search = newTab?.Search;
+        if (_search is { } search)
+        {
+            search.NavigateRequested += OnNavigateRequested;
+            search.PropertyChanged += OnSearchPropertyChanged;
+            search.FindBoxFocusRequested += OnFindBoxFocusRequested;
+        }
+
         UpdateResultsPaneLayout();
     }
 
-    private void OnFindExecuted(object sender, ExecutedRoutedEventArgs e)
-    {
-        Search.IsFindBarOpen = true;
-        FindBar.FocusFindBox();
-    }
+    private void OnFindBoxFocusRequested(object? sender, EventArgs e) => FindBar.FocusFindBox();
 
     private void OnSearchPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -33,10 +40,10 @@ public partial class MainWindow
             case nameof(SearchViewModel.IsResultsPaneOpen):
                 UpdateResultsPaneLayout();
                 break;
-            case nameof(SearchViewModel.IsFindBarOpen) when !Search.IsFindBarOpen:
+            case nameof(SearchViewModel.IsFindBarOpen) when _search is { IsFindBarOpen: false }:
                 LogView.Focus(); // Esc in the find box goes back to the log
                 break;
-            case nameof(SearchViewModel.CurrentLine) when Search.CurrentLine is null:
+            case nameof(SearchViewModel.CurrentLine) when _search is { CurrentLine: null }:
                 LogView.MarkedLine = -1;
                 ResultsView.MarkedLine = -1;
                 break;
@@ -46,7 +53,7 @@ public partial class MainWindow
     /// <summary>The pane's rows collapse to nothing when it is closed and get their dragged height back when reopened.</summary>
     private void UpdateResultsPaneLayout()
     {
-        if (Search.IsResultsPaneOpen)
+        if (_search is { IsResultsPaneOpen: true })
         {
             SplitterRow.Height = GridLength.Auto;
             ResultsRow.Height = _resultsHeight;
@@ -65,20 +72,20 @@ public partial class MainWindow
         LogView.MarkedLine = line;
         ResultsView.MarkedLine = line;
         LogView.BringRowIntoView(line); // the main view shows every line, so row == line
-        if (Search.CurrentResultRow is { } row) ResultsView.BringRowIntoView(row);
+        if (_search?.CurrentResultRow is { } row) ResultsView.BringRowIntoView(row);
     }
 
     private void OnResultsMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (ResultsView.RowAt(e.GetPosition(ResultsView)) is { } row) Search.GoToResult(row);
+        if (ResultsView.RowAt(e.GetPosition(ResultsView)) is { } row) _search?.GoToResult(row);
     }
 
     /// <summary>F3 continues from the line clicked in the main view.</summary>
     private void OnMainViewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (LogView.RowAt(e.GetPosition(LogView)) is { } row && LogView.Source is { } source)
+        if (_search is { } search && LogView.RowAt(e.GetPosition(LogView)) is { } row && LogView.Source is { } source)
         {
-            Search.CurrentLine = source.Lines[row];
+            search.CurrentLine = source.Lines[row];
         }
     }
 }

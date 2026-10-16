@@ -17,7 +17,7 @@ namespace Lignum.App.ViewModels;
 /// </remarks>
 public sealed partial class SearchViewModel : ObservableObject, IDisposable
 {
-    private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
+    private readonly SynchronizationContext? _uiContext;
     private LogDocument? _document;
     private QueryResult? _result;
     private int _refreshPending;
@@ -59,6 +59,12 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <summary>The results row of <see cref="CurrentLine"/> when the user went there through the results.</summary>
     [ObservableProperty]
     private long? _currentResultRow;
+
+    /// <param name="uiContext">Where query updates are applied; null applies them inline (tests).</param>
+    internal SearchViewModel(SynchronizationContext? uiContext) => _uiContext = uiContext;
+
+    /// <summary>Raised when the find box should take the keyboard (Ctrl+F, even if it is already open).</summary>
+    public event EventHandler? FindBoxFocusRequested;
 
     /// <summary>Raised with a 0-based file line when the main view should scroll to it and select it.</summary>
     public event EventHandler<long>? NavigateRequested;
@@ -105,7 +111,11 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private void CancelSearch() => _result?.Cancel();
 
     [RelayCommand]
-    private void OpenFindBar() => IsFindBarOpen = true;
+    private void OpenFindBar()
+    {
+        IsFindBarOpen = true;
+        FindBoxFocusRequested?.Invoke(this, EventArgs.Empty);
+    }
 
     [RelayCommand]
     private void CloseFindBar() => IsFindBarOpen = false;

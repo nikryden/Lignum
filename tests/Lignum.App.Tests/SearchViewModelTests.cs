@@ -1,30 +1,43 @@
 using System.Diagnostics;
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
+using Lignum.Core;
+using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
-/// <summary>Find all, the results pane state and F3 / Shift+F3 navigation.</summary>
+/// <summary>Find all, the results pane state and F3 / Shift+F3 navigation (per tab).</summary>
 public class SearchViewModelTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "lignum-tests", Guid.NewGuid().ToString("N"));
+    private readonly List<IDisposable> _owned = [];
 
     public SearchViewModelTests() => Directory.CreateDirectory(_dir);
 
     public void Dispose()
     {
+        foreach (var owned in _owned) owned.Dispose();
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
-    private async Task<MainViewModel> OpenLog(string content)
+    private string WriteLog(string content, string name = "app.log")
     {
-        var path = Path.Combine(_dir, "app.log");
+        var path = Path.Combine(_dir, name);
         File.WriteAllText(path, content);
-        var vm = new MainViewModel();
-        await vm.OpenFileAsync(path);
-        return vm;
+        return path;
     }
 
-    /// <summary>Search updates are posted to the captured context; give them time to land.</summary>
+    private async Task<LogTabViewModel> OpenLog(string content)
+    {
+        var main = UiContext.None(() => new MainViewModel(
+            new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
+        _owned.Add(main);
+        await main.OpenFileAsync(WriteLog(content));
+        return main.SelectedTab!;
+    }
+
+    /// <summary>The last query update can land just after the command's task completes.</summary>
     private static void WaitUntil(Func<bool> condition)
     {
         var clock = Stopwatch.StartNew();
@@ -53,8 +66,8 @@ public class SearchViewModelTests : IDisposable
     [Fact]
     public async Task Find_all_lists_the_matching_lines_with_their_original_numbers_and_opens_the_pane()
     {
-        using var vm = await OpenLog("start\nerror one\nok\nERROR two\n");
-        var search = vm.Search;
+        var tab = await OpenLog("start\nerror one\nok\nERROR two\n");
+        var search = tab.Search;
         Assert.False(search.IsResultsPaneOpen);
 
         await FindAll(search, "error");
@@ -69,8 +82,7 @@ public class SearchViewModelTests : IDisposable
     [Fact]
     public async Task Clicking_a_result_navigates_to_its_line()
     {
-        using var vm = await OpenLog("a\nx\nb\nx\n");
-        var search = vm.Search;
+        var search = (await OpenLog("a\nx\nb\nx\n")).Search;
         await FindAll(search, "x");
         var navigated = new List<long>();
         search.NavigateRequested += (_, line) => navigated.Add(line);
@@ -79,13 +91,13 @@ public class SearchViewModelTests : IDisposable
 
         Assert.Equal([3L], navigated);
         Assert.Equal(3, search.CurrentLine);
+        Assert.Equal(1, search.CurrentResultRow);
     }
 
     [Fact]
     public async Task F3_and_Shift_F3_step_through_the_matches_and_wrap_around()
     {
-        using var vm = await OpenLog("x\na\nx\nb\nx\n"); // matches on lines 0, 2, 4
-        var search = vm.Search;
+        var search = (await OpenLog("x\na\nx\nb\nx\n")).Search; // matches on lines 0, 2, 4
         await FindAll(search, "x");
         var navigated = new List<long>();
         search.NavigateRequested += (_, line) => navigated.Add(line);
@@ -102,8 +114,7 @@ public class SearchViewModelTests : IDisposable
     [Fact]
     public async Task F3_continues_from_the_line_the_user_last_went_to()
     {
-        using var vm = await OpenLog("x\na\nb\nx\nc\nx\n"); // matches on lines 0, 3, 5
-        var search = vm.Search;
+        var search = (await OpenLog("x\na\nb\nx\nc\nx\n")).Search; // matches on lines 0, 3, 5
         await FindAll(search, "x");
         var navigated = new List<long>();
         search.NavigateRequested += (_, line) => navigated.Add(line);
@@ -119,50 +130,83 @@ public class SearchViewModelTests : IDisposable
     [Fact]
     public async Task An_empty_find_text_does_not_search()
     {
-        using var vm = await OpenLog("a\n");
+        var search = (await OpenLog("a\n")).Search;
 
-        await FindAll(vm.Search, "");
+        await FindAll(search, "");
 
-        Assert.Null(vm.Search.Results);
-        Assert.False(vm.Search.IsResultsPaneOpen);
+        Assert.Null(search.Results);
+        Assert.False(search.IsResultsPaneOpen);
     }
 
     [Fact]
-    public async Task Opening_another_file_clears_the_results()
+    public async Task Each_tab_has_its_own_results()
     {
-        using var vm = await OpenLog("x\n");
-        await FindAll(vm.Search, "x");
+        var first = await OpenLog("x\n");
+        await FindAll(first.Search, "x");
 
-        var other = Path.Combine(_dir, "other.log");
-        File.WriteAllText(other, "y\n");
-        await vm.OpenFileAsync(other);
+        var main = UiContext.None(() => new MainViewModel(
+            new SettingsStore(Path.Combine(_dir, "settings2"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
+        _owned.Add(main);
+        await main.OpenFileAsync(WriteLog("y\n", "other.log"));
 
-        Assert.Null(vm.Search.Results);
-        Assert.Equal(0, vm.Search.MatchCount);
-        Assert.Equal("", vm.Search.SearchStatus);
+        Assert.Null(main.SelectedTab!.Search.Results);
+        Assert.Equal(1, first.Search.MatchCount);
+    }
+
+    [Fact]
+    public async Task A_new_document_clears_the_results()
+    {
+        var search = UiContext.None(() => new SearchViewModel(null));
+        _owned.Add(search);
+        var doc = LogDocument.Open(WriteLog("x\n"));
+        _owned.Add(doc);
+        await doc.StartIndexing();
+        search.SetDocument(doc);
+        await FindAll(search, "x");
+
+        var other = LogDocument.Open(WriteLog("y\n", "other.log"));
+        _owned.Add(other);
+        search.SetDocument(other);
+
+        Assert.Null(search.Results);
+        Assert.Equal(0, search.MatchCount);
+        Assert.Equal("", search.SearchStatus);
     }
 
     [Fact]
     public async Task The_results_pane_can_be_collapsed_and_reopened()
     {
-        using var vm = await OpenLog("x\n");
-        await FindAll(vm.Search, "x");
+        var search = (await OpenLog("x\n")).Search;
+        await FindAll(search, "x");
 
-        vm.Search.ToggleResultsPaneCommand.Execute(null);
-        Assert.False(vm.Search.IsResultsPaneOpen);
-        vm.Search.ToggleResultsPaneCommand.Execute(null);
-        Assert.True(vm.Search.IsResultsPaneOpen);
+        search.ToggleResultsPaneCommand.Execute(null);
+        Assert.False(search.IsResultsPaneOpen);
+        search.ToggleResultsPaneCommand.Execute(null);
+        Assert.True(search.IsResultsPaneOpen);
+    }
+
+    [Fact]
+    public async Task Ctrl_F_opens_the_find_box_and_asks_for_focus_each_time()
+    {
+        var search = (await OpenLog("x\n")).Search;
+        var focusRequests = 0;
+        search.FindBoxFocusRequested += (_, _) => focusRequests++;
+
+        search.OpenFindBarCommand.Execute(null);
+        search.OpenFindBarCommand.Execute(null);
+
+        Assert.True(search.IsFindBarOpen);
+        Assert.Equal(2, focusRequests);
     }
 
     [Fact]
     public async Task A_search_can_be_cancelled()
     {
-        // Indexing a document that is never indexed keeps the query waiting, so it is still running when cancelled.
-        using var vm = new MainViewModel();
-        var search = vm.Search;
-        var path = Path.Combine(_dir, "app.log");
-        File.WriteAllText(path, "x\n");
-        using var doc = Lignum.Core.LogDocument.Open(path);
+        // A document that is never indexed keeps the query waiting, so it is still running when cancelled.
+        var search = UiContext.None(() => new SearchViewModel(null));
+        _owned.Add(search);
+        var doc = LogDocument.Open(WriteLog("x\n"));
+        _owned.Add(doc);
         search.SetDocument(doc);
         search.FindText = "x";
         var running = search.FindAllCommand.ExecuteAsync(null);
