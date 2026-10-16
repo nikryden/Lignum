@@ -17,6 +17,10 @@
     </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}" />
+        <!-- Find (ticket 10) acts on the selected tab. -->
+        <KeyBinding Gesture="Ctrl+F" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
+        <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
+        <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+Add" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding Appearance.ZoomOutCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -60,6 +64,14 @@
                 <MenuItem Header="_Start of file" Command="{Binding SelectedTab.Navigation.GoToStartCommand}" InputGestureText="Ctrl+Home" />
                 <MenuItem Header="_End of file" Command="{Binding SelectedTab.Navigation.GoToEndCommand}" InputGestureText="Ctrl+End" />
             </MenuItem>
+            <MenuItem Header="_Search">
+                <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />
+                <MenuItem Header="Find _next" Command="{Binding SelectedTab.Search.FindNextCommand}" InputGestureText="F3" />
+                <MenuItem Header="Find _previous" Command="{Binding SelectedTab.Search.FindPreviousCommand}" InputGestureText="Shift+F3" />
+                <Separator />
+                <MenuItem Header="_Results pane" IsCheckable="True"
+                          IsChecked="{Binding SelectedTab.Search.IsResultsPaneOpen, Mode=TwoWay, FallbackValue=False}" />
+            </MenuItem>
             <!-- Appearance (ticket 13). DataContext is the AppearanceViewModel. -->
             <MenuItem Header="_View" DataContext="{Binding Appearance, RelativeSource={RelativeSource AncestorType=Window}}">
                 <MenuItem Header="_Theme">
@@ -92,6 +104,15 @@
                 <MenuItem Header="Zoom _in" Command="{Binding ZoomInCommand}" InputGestureText="Ctrl+Plus / Ctrl+Wheel" />
                 <MenuItem Header="Zoom _out" Command="{Binding ZoomOutCommand}" InputGestureText="Ctrl+Minus" />
                 <MenuItem Header="_Reset zoom" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0" />
+                <Separator />
+                <!-- Detail pane (ticket 07); layout is app-wide: MainViewModel.DetailPane. -->
+                <MenuItem Header="_Detail pane" IsCheckable="True"
+                          IsChecked="{Binding DataContext.DetailPane.IsOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <MenuItem Header="Dock detail pane _right" Command="{Binding DataContext.DetailPane.DockRightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Right}" />
+                <MenuItem Header="Dock detail pane _bottom" Command="{Binding DataContext.DetailPane.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Bottom}" />
+                <MenuItem Header="Show _full line" Command="{Binding DataContext.ShowFullLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
             </MenuItem>
         </Menu>
         <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
@@ -155,6 +176,16 @@
                     <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
                             Command="{Binding SelectedTab.CancelCopyCommand}"
                             Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                </StackPanel>
+            </StatusBarItem>
+            <Separator />
+            <!-- Search (ticket 10): match count, progress and cancel for the selected tab. -->
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding SelectedTab.Search.SearchStatus, FallbackValue=''}" VerticalAlignment="Center" />
+                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                            Command="{Binding SelectedTab.Search.CancelSearchCommand}"
+                            Visibility="{Binding SelectedTab.Search.IsSearching, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                 </StackPanel>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">

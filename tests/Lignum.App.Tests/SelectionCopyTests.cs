@@ -158,6 +158,22 @@ public class SelectionCopyTests : IDisposable
     }
 
     [Fact]
+    public async Task Select_all_copies_lines_longer_than_the_display_limit_in_full()
+    {
+        using var vm = CreateMain();
+        var path = Path.Combine(_dir, "huge.log");
+        var huge = new string('x', LineSource.DisplayLimit * 3) + "END";
+        File.WriteAllText(path, $"short\n{huge}\n");
+        await vm.OpenFileAsync(path);
+        var tab = vm.SelectedTab!;
+
+        tab.SelectAllCommand.Execute(null);
+        await tab.CopyCommand.ExecuteAsync(null);
+
+        Assert.Equal($"short\n{huge}", Assert.Single(_clipboard.Texts));
+    }
+
+    [Fact]
     public async Task Each_tab_has_its_own_selection()
     {
         using var vm = CreateMain();

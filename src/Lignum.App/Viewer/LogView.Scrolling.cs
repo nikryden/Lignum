@@ -185,7 +185,8 @@ public sealed partial class LogView : IScrollInfo
         {
             var text = row.Text;
             var tabs = extraPerTab == 0 ? 0 : text.AsSpan().Count('\t');
-            longest = (int)Math.Min(int.MaxValue, Math.Max(longest, text.Length + (long)tabs * extraPerTab));
+            var marker = row.IsTruncated ? TruncationMarker.Length : 0; // ticket 07: the marker can be scrolled to
+            longest = (int)Math.Min(int.MaxValue, Math.Max(longest, text.Length + (long)tabs * extraPerTab + marker));
         }
 
         if (longest == _longestLine) return;

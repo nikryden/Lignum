@@ -79,6 +79,8 @@ public sealed partial class LogView : FrameworkElement
         SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
         InitializeScrolling();
         InitializeSelection();
+        InitializeLongLines();
+        InitializeSearch();
     }
 
     /// <summary>Columns between tab stops.</summary>
@@ -161,6 +163,7 @@ public sealed partial class LogView : FrameworkElement
         var width = ActualWidth;
         var height = ActualHeight;
         dc.DrawRectangle(Background, null, new Rect(0, 0, width, height));
+        _markerHits.Clear();
 
         var source = Source;
         if (source is null) return;
@@ -183,7 +186,7 @@ public sealed partial class LogView : FrameworkElement
         var textLeft = marginWidth + TextPadding;
         UpdateTextLeft(textLeft);
         var firstColumn = FirstColumn;
-        // Draw only the characters that can be visible; long-line truncation proper is ticket 07.
+        // Draw only the characters that can be visible. Rows are already cut at LineSource.DisplayLimit (ticket 07).
         var maxChars = (int)Math.Ceiling(Math.Max(0, width - textLeft) / _charWidth) + 1;
         var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
 
@@ -195,6 +198,12 @@ public sealed partial class LogView : FrameworkElement
             var number = Format((row.LineNumber + 1).ToString(CultureInfo.InvariantCulture),
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
+            DrawRowDecorations(dc, row, y, textLeft, firstColumn, maxChars);
+
+            if (row.IsTruncated)
+            {
+                DrawTruncationMarker(dc, row, TabExpansion.Expand(row.Text, TabWidth).Length, textLeft, y, pixelsPerDip);
+            }
 
             DrawRowSelection(dc, row, y, textLeft, firstColumn);
             if (row.Text.Length == 0) continue;

@@ -81,16 +81,18 @@ public sealed partial class LogView
     private bool BeginSelectionDrag(MouseButtonEventArgs e)
     {
         if (Selection is not { } selection) return false;
-        if (HitTest(e.GetPosition(this)) is not { } position) return true;
+        var point = e.GetPosition(this);
+        if (e.Handled || _markerHits.Exists(h => h.Bounds.Contains(point))) return true; // a truncation marker click
+        if (HitTest(point) is not { } position) return true;
         SetSelectionCaret(selection, position, extend: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
         _dragging = CaptureMouse();
         e.Handled = true;
         return true;
     }
 
-    protected override void OnMouseMove(MouseEventArgs e)
+    /// <summary>Extends a drag selection; called from <c>OnMouseMove</c> (LogView.LongLines.cs).</summary>
+    private void OnSelectionMouseMove(MouseEventArgs e)
     {
-        base.OnMouseMove(e);
         if (!_dragging) return;
         _dragPoint = e.GetPosition(this);
         ExtendDrag();

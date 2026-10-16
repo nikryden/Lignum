@@ -78,6 +78,17 @@ public class TextRangeReadingTests : IDisposable
     }
 
     [Fact]
+    public async Task A_huge_line_is_copied_in_full()
+    {
+        var huge = string.Concat(Enumerable.Range(0, 300_000).Select(i => (char)('a' + i % 26)));
+        using var doc = await OpenIndexed($"before\n{huge}\nafter\n");
+
+        Assert.Equal(huge, Read(doc, 1, 0, 1, int.MaxValue));
+        Assert.Equal($"before\n{huge}\nafter", Read(doc, 0, 0, 2, int.MaxValue));
+        Assert.Equal(huge[250_000..], Read(doc, 1, 250_000, 2, 0)[..^1]);
+    }
+
+    [Fact]
     public async Task Rejects_lines_that_are_not_indexed_and_reversed_ranges()
     {
         using var doc = await OpenIndexed("a\nb\n");
