@@ -82,6 +82,7 @@
                               IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Dark}" />
                 </MenuItem>
                 <MenuItem Header="_Font…" Click="OnFontClick" />
+                <MenuItem Header="_Highlight rules…" Click="OnHighlightRulesClick" />
                 <MenuItem Header="Tab _width">
                     <MenuItem Header="_2" Command="{Binding SetTabWidthCommand}"
                               IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">

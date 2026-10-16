@@ -26,6 +26,7 @@
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                 <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                 Highlight="{Binding Search.Highlight}"
+                                LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                 FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                 FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                 TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}">
@@ -54,6 +55,7 @@
                               VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                     <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
                                     Highlight="{Binding Search.Highlight}"
+                                LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                     MouseLeftButtonDown="OnResultsMouseDown"
                                     FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                     FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
