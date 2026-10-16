@@ -43,6 +43,15 @@ public sealed class AppSettings
     /// <summary>Full paths, most recent first (File &gt; Open recent). Capped by MainViewModel.</summary>
     public List<string> RecentFiles { get; set; } = [];
 
+    /// <summary>Find box history, most recent first. Capped by SearchHistory.</summary>
+    public List<string> SearchHistory { get; set; } = [];
+
+    /// <summary>Filter rule text history, most recent first. Capped by SearchHistory.</summary>
+    public List<string> FilterHistory { get; set; } = [];
+
+    /// <summary>The tabs open when Lignum last exited, restored on start (ticket 18).</summary>
+    public SessionSettings Session { get; set; } = new();
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

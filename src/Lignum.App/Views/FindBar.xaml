@@ -30,17 +30,19 @@
             <TextBlock DockPanel.Dock="Bottom" Text="{Binding FindTextError}" TextWrapping="Wrap" Margin="0,2,0,0"
                        Foreground="{DynamicResource ErrorForegroundBrush}"
                        Visibility="{Binding FindTextError, Converter={StaticResource NullToCollapsed}}" />
-            <TextBox x:Name="FindBox" VerticalContentAlignment="Center"
-                     Text="{Binding FindText, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="{Binding FindTextError}">
-                <TextBox.InputBindings>
+            <!-- Editable so the dropdown offers the last 20 searches (ticket 18); no autocomplete while typing. -->
+            <ComboBox x:Name="FindBox" IsEditable="True" IsTextSearchEnabled="False" VerticalContentAlignment="Center"
+                      Text="{Binding FindText, UpdateSourceTrigger=PropertyChanged}"
+                      ItemsSource="{Binding History.SearchTerms}"
+                      ToolTip="{Binding FindTextError}">
+                <ComboBox.InputBindings>
                     <KeyBinding Key="Enter" Command="{Binding FindAllCommand}" />
                     <KeyBinding Key="Escape" Command="{Binding CloseFindBarCommand}" />
                     <KeyBinding Key="C" Modifiers="Alt" Command="{Binding ToggleMatchCaseCommand}" />
                     <KeyBinding Key="R" Modifiers="Alt" Command="{Binding ToggleRegexCommand}" />
                     <KeyBinding Key="B" Modifiers="Alt" Command="{Binding ToggleNonBacktrackingCommand}" />
-                </TextBox.InputBindings>
-            </TextBox>
+                </ComboBox.InputBindings>
+            </ComboBox>
         </DockPanel>
     </Border>
 </UserControl>
