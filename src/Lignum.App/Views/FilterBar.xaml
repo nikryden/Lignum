@@ -29,14 +29,16 @@
                 <ToggleButton DockPanel.Dock="Right" Content="Aa" Padding="6,1" Margin="8,0,0,0"
                               ToolTip="Match case" IsChecked="{Binding NewFilterMatchCase}" />
                 <TextBlock DockPanel.Dock="Left" Text="Filter:" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <TextBox x:Name="NewRuleBox" VerticalContentAlignment="Center"
-                         Text="{Binding NewFilterText, UpdateSourceTrigger=PropertyChanged}">
-                    <TextBox.InputBindings>
+                <!-- Editable so the dropdown offers the last 20 filter rules (ticket 18). -->
+                <ComboBox x:Name="NewRuleBox" IsEditable="True" IsTextSearchEnabled="False" VerticalContentAlignment="Center"
+                          Text="{Binding NewFilterText, UpdateSourceTrigger=PropertyChanged}"
+                          ItemsSource="{Binding History.FilterTerms}">
+                    <ComboBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding AddIncludeFilterCommand}" />
                         <KeyBinding Key="Enter" Modifiers="Shift" Command="{Binding AddExcludeFilterCommand}" />
                         <KeyBinding Key="Escape" Command="{Binding ToggleFilterBarCommand}" />
-                    </TextBox.InputBindings>
-                </TextBox>
+                    </ComboBox.InputBindings>
+                </ComboBox>
             </DockPanel>
             <TextBlock DockPanel.Dock="Top" Text="{Binding FilterError}" TextWrapping="Wrap" Margin="0,2,0,0"
                        Foreground="{DynamicResource ErrorForegroundBrush}"

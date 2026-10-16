@@ -16,7 +16,11 @@ public partial class MainWindow : Window
         Appearance = appearance;
         DataContext = viewModel;
         InitializeComponent();
-        Closed += (_, _) => _viewModel.Dispose();
+        Closed += (_, _) =>
+        {
+            _viewModel.SaveSession(); // ticket 18: reopened on the next start
+            _viewModel.Dispose();
+        };
     }
 
     /// <summary>Theme, font, zoom and tab width; XAML binds via RelativeSource AncestorType=Window.</summary>

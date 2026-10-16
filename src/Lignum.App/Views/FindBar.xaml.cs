@@ -28,7 +28,8 @@ public partial class FindBar : UserControl
         Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
         {
             FindBox.Focus();
-            FindBox.SelectAll();
+            // The editable ComboBox's text lives in its template's text box.
+            (FindBox.Template?.FindName("PART_EditableTextBox", FindBox) as TextBox)?.SelectAll();
         });
     }
 }
