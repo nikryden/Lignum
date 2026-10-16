@@ -129,6 +129,19 @@ public class EncodingTests : IDisposable
     [Theory]
     [InlineData("utf-16le")]
     [InlineData("utf-16be")]
+    public async Task A_text_range_across_lines_is_decoded_in_the_files_encoding(string name)
+    {
+        using var doc = await OpenIndexed(Encode(Named(name), "first ü\r\nmiddle ✓\nlast line", bom: true));
+        var output = new StringWriter();
+
+        doc.ReadTextRange(new FilePosition(0, 6), new FilePosition(2, 4), output);
+
+        Assert.Equal("ü\r\nmiddle ✓\nlast", output.ToString());
+    }
+
+    [Theory]
+    [InlineData("utf-16le")]
+    [InlineData("utf-16be")]
     public async Task A_utf16_line_prefix_has_the_requested_number_of_characters(string name)
     {
         var line = new string('x', 500);

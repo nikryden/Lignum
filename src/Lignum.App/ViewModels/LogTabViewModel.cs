@@ -80,6 +80,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
     {
         _document = document;
         ErrorMessage = null;
+        ResetSelection();
         document.LinesAdded += (_, _) => RequestRefresh(document);
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts
         AttachChangeDetection(document);

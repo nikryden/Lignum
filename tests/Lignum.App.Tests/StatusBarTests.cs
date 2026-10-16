@@ -1,3 +1,4 @@
+using Lignum.Core;
 using Lignum.App.Settings;
 using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;

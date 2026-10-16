@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Input;
 using Lignum.App.ViewModels;
 using Lignum.App.Viewer;
+using Lignum.Core;
 
 namespace Lignum.App.Views;
 
