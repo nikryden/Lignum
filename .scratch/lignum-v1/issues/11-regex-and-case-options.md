@@ -4,9 +4,15 @@
 
 **Blocked by:** 10
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Regex and case toggles work for find all and F3 navigation
-- [ ] A catastrophic pattern times out and reports an error; the app stays responsive (tested)
-- [ ] An invalid regex shows a validation error
-- [ ] The NonBacktracking option can be selected and produces the same results for supported patterns (tested)
+- [x] Regex and case toggles work for find all and F3 navigation
+- [x] A catastrophic pattern times out and reports an error; the app stays responsive (tested)
+- [x] An invalid regex shows a validation error
+- [x] The NonBacktracking option can be selected and produces the same results for supported patterns (tested)
+
+## Comments
+
+Core: `QueryRule.NonBacktracking` / `Query.Find(..., nonBacktracking)`; NonBacktracking-unsupported constructs are rethrown as `ArgumentException`. Tests cover regex+case, timeout (`QueryState.Failed` + `RegexMatchTimeoutException`), invalid patterns and NonBacktracking parity.
+App: `SearchViewModel` gains `IsRegex`/`MatchCase`/`UseNonBacktracking` (Alt+R/C/B), `FindTextError`, reruns the shown search on toggle, clears the highlight and shows a clear message on timeout, and highlights with a 50 ms regex timeout.
+Find-bar toggles (Aa, .*, NB) and the error line were not checked visually (manual runs are disallowed); verify by hand.

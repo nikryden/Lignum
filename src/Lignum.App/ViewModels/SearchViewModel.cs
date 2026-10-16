@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Viewer;
@@ -12,8 +13,9 @@ namespace Lignum.App.ViewModels;
 /// created on (inline without one).
 /// </summary>
 /// <remarks>
-/// Ticket 11 adds regex / case toggles (build the <see cref="Query"/> in <see cref="BuildQuery"/>);
-/// ticket 12 feeds filter rules into the same result set and pane.
+/// The regex / case / NonBacktracking toggles shape the query in <see cref="BuildQuery"/>; an invalid
+/// pattern sets <see cref="FindTextError"/> instead of searching. Ticket 12 feeds filter rules into the
+/// same result set and pane.
 /// </remarks>
 public sealed partial class SearchViewModel : ObservableObject, IDisposable
 {
@@ -24,6 +26,22 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _findText = "";
+
+    /// <summary>Treat <see cref="FindText"/> as a .NET regular expression.</summary>
+    [ObservableProperty]
+    private bool _isRegex;
+
+    /// <summary>Case-sensitive matching (plain text and regex).</summary>
+    [ObservableProperty]
+    private bool _matchCase;
+
+    /// <summary>Run regexes on the linear-time NonBacktracking engine (no backreferences or lookarounds).</summary>
+    [ObservableProperty]
+    private bool _useNonBacktracking;
+
+    /// <summary>Why <see cref="FindText"/> cannot be searched (an invalid regex); null when it is fine.</summary>
+    [ObservableProperty]
+    private string? _findTextError;
 
     [ObservableProperty]
     private bool _isFindBarOpen;
@@ -63,6 +81,15 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <param name="uiContext">Where query updates are applied; null applies them inline (tests).</param>
     internal SearchViewModel(SynchronizationContext? uiContext) => _uiContext = uiContext;
 
+    /// <summary>
+    /// Regex timeout for highlighting: the views run it per visible row on the UI thread, so it must stay
+    /// short. A timeout there only drops highlights.
+    /// </summary>
+    internal static readonly TimeSpan HighlightRegexTimeout = TimeSpan.FromMilliseconds(50);
+
+    /// <summary>Limit for one regex match on one line during a search (tests shorten it).</summary>
+    internal TimeSpan RegexTimeout { get; set; } = Query.DefaultRegexTimeout;
+
     /// <summary>Raised when the find box should take the keyboard (Ctrl+F, even if it is already open).</summary>
     public event EventHandler? FindBoxFocusRequested;
 
@@ -90,12 +117,23 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     {
         if (_document is not { } document || string.IsNullOrEmpty(FindText)) return;
 
+        Query query;
+        try
+        {
+            query = BuildQuery(RegexTimeout);
+        }
+        catch (ArgumentException ex)
+        {
+            FindTextError = ex.Message; // invalid pattern: keep whatever was shown, start nothing
+            return;
+        }
+
+        FindTextError = null;
         StopSearch();
-        var query = BuildQuery();
         var result = document.StartQuery(query);
         _result = result;
         Results = new LineSource(new ResultLines(result), new DocumentLineReader(document));
-        Highlight = query;
+        Highlight = new Query(query.Rules, HighlightRegexTimeout);
         CurrentLine = null;
         CurrentResultRow = null;
         IsResultsPaneOpen = true;
@@ -122,6 +160,15 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ToggleResultsPane() => IsResultsPaneOpen = !IsResultsPaneOpen;
+
+    [RelayCommand]
+    private void ToggleMatchCase() => MatchCase = !MatchCase;
+
+    [RelayCommand]
+    private void ToggleRegex() => IsRegex = !IsRegex;
+
+    [RelayCommand]
+    private void ToggleNonBacktracking() => UseNonBacktracking = !UseNonBacktracking;
 
     /// <summary>F3: the first match after <see cref="CurrentLine"/>, wrapping to the first.</summary>
     [RelayCommand]
@@ -155,7 +202,25 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
     public void Dispose() => StopSearch();
 
-    private Query BuildQuery() => Query.Find(FindText);
+    /// <summary>Throws <see cref="ArgumentException"/> (with a user-facing message) for an invalid pattern.</summary>
+    private Query BuildQuery(TimeSpan regexTimeout) =>
+        new([new QueryRule(FindText, RuleKind.Include, IsRegex, MatchCase, NonBacktracking: UseNonBacktracking)],
+            regexTimeout);
+
+    partial void OnFindTextChanged(string value) => FindTextError = null;
+
+    partial void OnIsRegexChanged(bool value) => OnOptionChanged();
+
+    partial void OnMatchCaseChanged(bool value) => OnOptionChanged();
+
+    partial void OnUseNonBacktrackingChanged(bool value) => OnOptionChanged();
+
+    /// <summary>A toggle changed: drop a stale error and re-run the search the results pane shows.</summary>
+    private void OnOptionChanged()
+    {
+        FindTextError = null;
+        if (Results is not null && !string.IsNullOrEmpty(FindText)) FindAllCommand.Execute(null);
+    }
 
     private void StopSearch()
     {
@@ -196,6 +261,15 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         MatchCount = count;
         SearchProgress = result.Progress;
         IsSearching = state == QueryState.Running;
+        if (result.Error is RegexMatchTimeoutException)
+        {
+            // Don't keep a pattern that blows up as the highlight: the views would run it on every row.
+            Highlight = null;
+            SearchStatus = $"Search stopped: the regex took too long on one line (over {RegexTimeout.TotalSeconds:0.#} s). "
+                + "Simplify the pattern or turn on NonBacktracking.";
+            return;
+        }
+
         var matches = count == 1 ? "1 match" : $"{count:N0} matches";
         SearchStatus = state switch
         {
