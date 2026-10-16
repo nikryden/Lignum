@@ -1,130 +1,132 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Lignum.App.Viewer;
+using Lignum.App.Settings;
 using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
 
 /// <summary>
-/// The main window: one open <see cref="LogDocument"/>, its name and its live line count.
-/// Document events arrive on a background thread and are marshalled to the synchronization
-/// context the view model was created on (the UI thread in the app), coalesced so a fast
-/// indexer cannot flood the dispatcher. Without a context (tests) updates are applied inline.
+/// The main window: the open tabs (one <see cref="LogTabViewModel"/> per file), which one is selected,
+/// and app-wide state such as the recent-files list and open errors. Everything about one file lives in
+/// its tab; this class only opens, switches and closes tabs.
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
     private const string AppName = "Lignum";
 
     private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
-    private LogDocument? _document;
-    private int _refreshPending;
+    private readonly SettingsFile<AppSettings> _settings;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Title))]
-    private string? _fileName;
-
-    [ObservableProperty]
-    private long _lineCount;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CancelIndexingCommand))]
-    private bool _isIndexing;
-
-    [ObservableProperty]
-    private double _indexingProgress;
-
-    [ObservableProperty]
-    private string _statusText = "";
-
+    /// <summary>The app-wide error line (a file that could not be opened).</summary>
     [ObservableProperty]
     private string? _errorMessage;
 
-    /// <summary>What the viewer shows: every line of the open document. Null until a file is opened.</summary>
     [ObservableProperty]
-    private LineSource? _lines;
+    [NotifyPropertyChangedFor(nameof(Title))]
+    [NotifyCanExecuteChangedFor(nameof(CloseTabCommand))]
+    private LogTabViewModel? _selectedTab;
 
-    public string Title => FileName is null ? AppName : $"{FileName} - {AppName}";
+    /// <param name="settings">The app's one settings.json (recent files are stored there).</param>
+    public MainViewModel(SettingsFile<AppSettings> settings)
+    {
+        _settings = settings;
+        LoadRecentFiles();
+    }
+
+    public ObservableCollection<LogTabViewModel> Tabs { get; } = [];
+
+    public string Title => SelectedTab is { } tab ? $"{tab.FileName} - {AppName}" : AppName;
 
     /// <summary>
-    /// Opens <paramref name="path"/>, replacing the current document, and indexes it in the background.
-    /// The returned task completes when indexing stops; the UI does not need to await it.
+    /// Opens <paramref name="path"/> in a new tab and selects it, or selects its tab if it is already open
+    /// (paths compared case-insensitively after resolving the full path). The returned task completes when
+    /// that tab's indexing stops; the UI does not need to await it.
     /// </summary>
-    public async Task OpenFileAsync(string path)
+    public Task OpenFileAsync(string path)
     {
+        string fullPath;
+        try
+        {
+            fullPath = Path.GetFullPath(path);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            ErrorMessage = $"Could not open {path}: {ex.Message}";
+            return Task.CompletedTask;
+        }
+
+        var existing = FindTab(fullPath);
+        if (existing is not null)
+        {
+            ErrorMessage = null;
+            SelectedTab = existing;
+            AddRecentFile(existing.Path);
+            return existing.IndexingCompletion;
+        }
+
         LogDocument document;
         try
         {
-            document = LogDocument.Open(path);
+            document = LogDocument.Open(fullPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
                                        or NotSupportedException)
         {
             ErrorMessage = $"Could not open {path}: {ex.Message}";
-            return;
+            return Task.CompletedTask;
         }
 
-        _document?.Dispose();
-        _document = document;
         ErrorMessage = null;
-        FileName = document.FileName;
-        document.LinesAdded += (_, _) => RequestRefresh(document);
-        Lines = LineSource.ForDocument(document); // subscribes before indexing starts
-        AttachChangeDetection(document);
-        AttachNavigation(document);
-
-        var completion = document.StartIndexing();
-        Refresh(document);
-        await completion.ConfigureAwait(false);
-        RunOnUi(() => Refresh(document));
+        var tab = new LogTabViewModel(document, _uiContext);
+        Tabs.Add(tab);
+        SelectedTab = tab;
+        AddRecentFile(tab.Path);
+        return tab.Start();
     }
 
-    [RelayCommand(CanExecute = nameof(IsIndexing))]
-    private void CancelIndexing() => _document?.CancelIndexing();
+    /// <summary>
+    /// Opens each path (e.g. files dropped on the window) as <see cref="OpenFileAsync"/> does; the last one
+    /// ends up selected. Completes when all of them have finished indexing.
+    /// </summary>
+    public Task OpenFilesAsync(IEnumerable<string> paths) =>
+        Task.WhenAll(paths.Select(OpenFileAsync).ToList());
+
+    /// <summary>
+    /// Closes <paramref name="tab"/> (null = the selected tab, as Ctrl+W does) and releases its file.
+    /// Closing the selected tab selects the tab that took its place, or the one before it.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCloseTab))]
+    private void CloseTab(LogTabViewModel? tab)
+    {
+        tab ??= SelectedTab;
+        if (tab is null) return;
+        var index = Tabs.IndexOf(tab);
+        if (index < 0) return;
+
+        if (ReferenceEquals(tab, SelectedTab))
+        {
+            SelectedTab = Tabs.Count > 1 ? Tabs[index + 1 < Tabs.Count ? index + 1 : index - 1] : null;
+        }
+
+        Tabs.RemoveAt(index);
+        tab.Dispose();
+        CloseTabCommand.NotifyCanExecuteChanged();
+    }
+
+    private bool CanCloseTab(LogTabViewModel? tab) => (tab ?? SelectedTab) is not null;
 
     public void Dispose()
     {
-        _document?.Dispose();
-        _document = null;
+        foreach (var tab in Tabs) tab.Dispose();
     }
 
-    private void RequestRefresh(LogDocument document)
+    partial void OnSelectedTabChanged(LogTabViewModel? oldValue, LogTabViewModel? newValue)
     {
-        if (_uiContext is null)
-        {
-            Refresh(document);
-            return;
-        }
-
-        if (Interlocked.Exchange(ref _refreshPending, 1) == 0)
-        {
-            _uiContext.Post(_ =>
-            {
-                Volatile.Write(ref _refreshPending, 0);
-                Refresh(document);
-            }, null);
-        }
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
     }
 
-    private void RunOnUi(Action action)
-    {
-        if (_uiContext is null) action();
-        else _uiContext.Post(_ => action(), null);
-    }
-
-    private void Refresh(LogDocument document)
-    {
-        if (!ReferenceEquals(document, _document)) return; // a stale update from a replaced document
-
-        var state = document.IndexingState;
-        LineCount = document.LineCount;
-        IndexingProgress = document.IndexingProgress;
-        IsIndexing = state is IndexingState.Running or IndexingState.NotStarted;
-        StatusText = state switch
-        {
-            IndexingState.Running or IndexingState.NotStarted => $"Indexing… {document.IndexingProgress:P0}",
-            IndexingState.Cancelled => "Indexing cancelled",
-            IndexingState.Failed => $"Indexing failed: {document.IndexingError?.Message}",
-            _ => "",
-        };
-    }
+    private LogTabViewModel? FindTab(string fullPath) =>
+        Tabs.FirstOrDefault(t => string.Equals(t.Path, fullPath, StringComparison.OrdinalIgnoreCase));
 }

@@ -1,5 +1,8 @@
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
 using Lignum.App.Viewer;
+using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
@@ -14,6 +17,9 @@ public class StatusBarTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
+    private MainViewModel Create() => UiContext.None(() =>
+        new MainViewModel(new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
+
     private string WriteLog(string name, string content)
     {
         var path = Path.Combine(_dir, name);
@@ -24,38 +30,39 @@ public class StatusBarTests : IDisposable
     [Fact]
     public async Task Opening_a_file_shows_its_size()
     {
-        using var vm = new MainViewModel();
-        Assert.Equal("", vm.FileSizeText);
+        using var vm = Create();
 
         await vm.OpenFileAsync(WriteLog("a.log", new string('x', 2047) + "\n"));
 
-        Assert.Equal(2048, vm.FileSize);
-        Assert.Equal(ByteSize.Format(2048), vm.FileSizeText);
+        Assert.Equal(2048, vm.SelectedTab!.FileSize);
+        Assert.Equal(ByteSize.Format(2048), vm.SelectedTab.FileSizeText);
     }
 
     [Fact]
     public async Task Go_to_line_works_against_the_lines_indexed()
     {
-        using var vm = new MainViewModel();
+        using var vm = Create();
         await vm.OpenFileAsync(WriteLog("a.log", "1\n2\n3\n"));
 
-        Assert.True(vm.Navigation.TryGoToLine("3", out _));
-        Assert.Equal(new FilePosition(2, 0), vm.Navigation.Caret);
-        Assert.False(vm.Navigation.TryGoToLine("4", out var error));
+        Assert.True(vm.SelectedTab!.Navigation.TryGoToLine("3", out _));
+        Assert.Equal(new FilePosition(2, 0), vm.SelectedTab!.Navigation.Caret);
+        Assert.False(vm.SelectedTab!.Navigation.TryGoToLine("4", out var error));
         Assert.Equal("Enter a line between 1 and 3.", error);
     }
 
     [Fact]
-    public async Task Opening_another_file_puts_the_caret_back_at_the_start()
+    public async Task Each_tab_keeps_its_own_caret()
     {
-        using var vm = new MainViewModel();
+        using var vm = Create();
         await vm.OpenFileAsync(WriteLog("a.log", "1\n2\n3\n"));
-        vm.Navigation.GoToEndCommand.Execute(null);
+        var first = vm.SelectedTab!;
+        first.Navigation.GoToEndCommand.Execute(null);
 
         await vm.OpenFileAsync(WriteLog("b.log", "x\n"));
 
-        Assert.Equal(FilePosition.Start, vm.Navigation.Caret);
-        Assert.Equal("Ln 1, Col 1", vm.Navigation.CaretText);
+        Assert.Equal(FilePosition.Start, vm.SelectedTab!.Navigation.Caret);
+        Assert.Equal("Ln 1, Col 1", vm.SelectedTab.Navigation.CaretText);
+        Assert.Equal(new FilePosition(2, 0), first.Navigation.Caret);
     }
 
     [Theory]

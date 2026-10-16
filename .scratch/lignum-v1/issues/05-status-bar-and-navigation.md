@@ -14,5 +14,5 @@
 
 ## Comments
 
-Caret is `Viewer/FilePosition(Line, Column)` (0-based file line, character index), owned by `NavigationViewModel` (go to line with validation, Ctrl+Home/End, `CaretText`, `RevealRequested`) and bound two-way to `LogView.Caret`; click, arrows, Home/End, PageUp/PageDown move it. Status bar shows Ln/Col, line count, file size (`ByteSize`) and the existing indexing progress + Cancel. Ctrl+G opens `Views/GoToLineDialog`, which stays open with a message on bad input.
+Caret is `Viewer/FilePosition(Line, Column)` (0-based file line, character index), owned by `NavigationViewModel` (one per tab, `LogTabViewModel.Navigation`) (go to line with validation, Ctrl+Home/End, `CaretText`, `RevealRequested`) and bound two-way to `LogView.Caret`; click, arrows, Home/End, PageUp/PageDown move it. Status bar shows Ln/Col, line count, file size (`ByteSize`) and the existing indexing progress + Cancel. Ctrl+G opens `Views/GoToLineDialog`, which stays open with a message on bad input.
 Covered by `NavigationViewModelTests`, `StatusBarTests`, `CaretMappingTests`. The drawing (caret bar, dialog, key routing past the ScrollViewer) was not visually verified: the shared desktop had other agents' Lignum windows on top, so screenshots were unusable. Needs a manual check.

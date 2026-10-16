@@ -1,4 +1,5 @@
 using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
 using Serilog.Core;
 
@@ -14,8 +15,8 @@ public sealed class AppearanceViewModelTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
-    private AppearanceViewModel Create() =>
-        new(new SettingsStore(_dir, Logger.None).Open<AppSettings>(AppSettings.FileName), _windows);
+    private AppearanceViewModel Create() => UiContext.None(() =>
+        new AppearanceViewModel(new SettingsStore(_dir, Logger.None).Open<AppSettings>(AppSettings.FileName), _windows));
 
     [Fact]
     public void By_default_the_theme_follows_Windows()
