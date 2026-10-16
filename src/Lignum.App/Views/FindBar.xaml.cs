@@ -1,7 +1,20 @@
+using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Threading;
 
 namespace Lignum.App.Views;
+
+/// <summary>Collapsed for null or an empty string, visible otherwise (the find box's error line).</summary>
+public sealed class NullToCollapsedConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is null or "" ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
 
 /// <summary>The find box shown above the viewer by Ctrl+F.</summary>
 public partial class FindBar : UserControl
