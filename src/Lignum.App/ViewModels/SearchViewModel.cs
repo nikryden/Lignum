@@ -82,6 +82,9 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <param name="uiContext">Where query updates are applied; null applies them inline (tests).</param>
     internal SearchViewModel(SynchronizationContext? uiContext) => _uiContext = uiContext;
 
+    /// <summary>Where searched terms and filter rules are remembered (the dropdowns); null records nothing.</summary>
+    public SearchHistory? History { get; init; }
+
     /// <summary>
     /// Regex timeout for highlighting: the views run it per visible row on the UI thread, so it must stay
     /// short. A timeout there only drops highlights.
@@ -123,6 +126,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         }
 
         FindTextError = null;
+        History?.AddSearchTerm(FindText);
         await RunQuery(document, query, isFilter: false);
     }
 

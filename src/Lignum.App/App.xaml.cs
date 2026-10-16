@@ -49,12 +49,19 @@ public partial class App : Application
         MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
         MainWindow.Show();
 
-        // `Lignum.exe <path>` opens that file.
-        if (e.Args.Length > 0)
+        // Reopen the last session's tabs (ticket 18) once the window has painted; files re-index in the
+        // background. `Lignum.exe <path>` then opens (and selects) that file.
+        var args = e.Args;
+        var logger = _log.Logger;
+        MainWindow.Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
-            _log.Logger.Information("Opening {Path} from the command line", e.Args[0]);
-            _ = viewModel.OpenFileAsync(e.Args[0]);
-        }
+            _ = viewModel.RestoreSession();
+            if (args.Length > 0)
+            {
+                logger.Information("Opening {Path} from the command line", args[0]);
+                _ = viewModel.OpenFileAsync(args[0]);
+            }
+        });
     }
 
     protected override void OnExit(ExitEventArgs e)

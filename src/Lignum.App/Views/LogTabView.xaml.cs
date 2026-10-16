@@ -11,6 +11,7 @@ public partial class LogTabView : UserControl
         InitializeComponent();
         IsVisibleChanged += OnIsVisibleChanged;
         DataContextChanged += OnDataContextChanged;
+        InitializeScroll();
         // The results view handles the click itself (it starts a selection), so listen to handled clicks too.
         ResultsView.AddHandler(MouseLeftButtonDownEvent, new System.Windows.Input.MouseButtonEventHandler(OnResultsMouseDown),
             handledEventsToo: true);
@@ -38,6 +39,7 @@ public partial class LogTabView : UserControl
         if (e.OldValue is LogTabViewModel old) old.Navigation.RevealRequested -= OnRevealRequested;
         if (e.NewValue is LogTabViewModel tab) tab.Navigation.RevealRequested += OnRevealRequested;
         AttachSearch(e.OldValue as LogTabViewModel, e.NewValue as LogTabViewModel);
+        AttachScroll(e.NewValue as LogTabViewModel);
     }
 
     private void OnRevealRequested(object? sender, EventArgs e)

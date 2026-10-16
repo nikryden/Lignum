@@ -49,6 +49,7 @@ public sealed partial class SearchViewModel
     public FilterRuleViewModel AddFilterRule(QueryRule rule)
     {
         var item = new FilterRuleViewModel(rule);
+        History?.AddFilterTerm(rule.Text);
         FilterRules.Add(item);
         return item;
     }

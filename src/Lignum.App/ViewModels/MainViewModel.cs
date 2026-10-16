@@ -32,8 +32,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public MainViewModel(SettingsFile<AppSettings> settings)
     {
         _settings = settings;
+        History = new SearchHistory(settings);
         LoadRecentFiles();
     }
+
+    /// <summary>The find and filter history shared by every tab (the box dropdowns).</summary>
+    public SearchHistory History { get; }
 
     public ObservableCollection<LogTabViewModel> Tabs { get; } = [];
 
@@ -69,6 +73,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return existing.IndexingCompletion;
         }
 
+        var tab = AddTab(fullPath, path);
+        if (tab is null) return Task.CompletedTask;
+        SelectedTab = tab;
+        AddRecentFile(tab.Path);
+        return tab.Start();
+    }
+
+    /// <summary>
+    /// Opens <paramref name="fullPath"/> and appends its tab, not yet indexing (call <see cref="LogTabViewModel.Start"/>).
+    /// Null (and <see cref="ErrorMessage"/> set) when the file cannot be opened.
+    /// </summary>
+    private LogTabViewModel? AddTab(string fullPath, string displayPath)
+    {
         LogDocument document;
         try
         {
@@ -77,16 +94,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
                                        or NotSupportedException)
         {
-            ErrorMessage = $"Could not open {path}: {ex.Message}";
-            return Task.CompletedTask;
+            ErrorMessage = $"Could not open {displayPath}: {ex.Message}";
+            return null;
         }
 
         ErrorMessage = null;
-        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier };
+        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, History = History };
         Tabs.Add(tab);
-        SelectedTab = tab;
-        AddRecentFile(tab.Path);
-        return tab.Start();
+        return tab;
     }
 
     /// <summary>
