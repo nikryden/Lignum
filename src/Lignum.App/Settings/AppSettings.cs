@@ -38,6 +38,8 @@ public sealed class AppSettings
 
     public int TabWidth { get; set; } = DefaultTabWidth;
 
+    public DetailPaneSettings DetailPane { get; set; } = new();
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

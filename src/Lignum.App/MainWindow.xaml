@@ -65,6 +65,15 @@
                 <MenuItem Header="Zoom _in" Command="{Binding ZoomInCommand}" InputGestureText="Ctrl+Plus / Ctrl+Wheel" />
                 <MenuItem Header="Zoom _out" Command="{Binding ZoomOutCommand}" InputGestureText="Ctrl+Minus" />
                 <MenuItem Header="_Reset zoom" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0" />
+                <Separator />
+                <!-- Detail pane (ticket 07); these bind to the window's MainViewModel.Detail. -->
+                <MenuItem Header="_Detail pane" IsCheckable="True"
+                          IsChecked="{Binding DataContext.Detail.IsOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <MenuItem Header="Dock detail pane _right" Command="{Binding DataContext.Detail.DockRightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.Detail.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Right}" />
+                <MenuItem Header="Dock detail pane _bottom" Command="{Binding DataContext.Detail.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.Detail.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Bottom}" />
+                <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
             </MenuItem>
         </Menu>
         <views:FileChangedBanner DockPanel.Dock="Top" />
@@ -91,15 +100,23 @@
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
             </StatusBarItem>
         </StatusBar>
-        <Grid>
-            <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
-            <ScrollViewer CanContentScroll="True" Focusable="False"
-                          VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
-                                FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
-                                FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
-            </ScrollViewer>
-        </Grid>
+        <!-- Main view plus the detail pane (ticket 07), docked right or bottom with a splitter. -->
+        <views:DetailPaneLayout Dock="{Binding Detail.Dock}" IsPaneOpen="{Binding Detail.IsOpen}"
+                                PaneWidth="{Binding Detail.PaneWidth}" PaneHeight="{Binding Detail.PaneHeight}">
+            <views:DetailPaneLayout.Main>
+                <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
+                <ScrollViewer CanContentScroll="True" Focusable="False"
+                              VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
+                    <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                                    LineClicked="OnLogViewLineClicked" FullLineRequested="OnFullLineRequested"
+                                    FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </ScrollViewer>
+            </views:DetailPaneLayout.Main>
+            <views:DetailPaneLayout.Pane>
+                <views:DetailPane DataContext="{Binding Detail}" />
+            </views:DetailPaneLayout.Pane>
+        </views:DetailPaneLayout>
     </DockPanel>
 </Window>

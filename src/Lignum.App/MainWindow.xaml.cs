@@ -51,4 +51,18 @@ public partial class MainWindow : Window
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    // ---- detail pane (ticket 07). Clicking a row stands in for the caret/selection until tickets 05/08. ----
+
+    private void OnLogViewLineClicked(object? sender, long line) => _viewModel.Detail.CurrentLine = line;
+
+    private void OnFullLineRequested(object? sender, long line) => _viewModel.Detail.ShowFullLine(line);
+
+    /// <summary>View > Show full line: the current line, or the top visible one if there is none yet.</summary>
+    private void OnShowFullLineClick(object sender, RoutedEventArgs e)
+    {
+        var line = _viewModel.Detail.CurrentLine ?? LogView.LineAt(new Point(0, 0));
+        if (line is { } l) _viewModel.Detail.ShowFullLine(l);
+        else _viewModel.Detail.IsOpen = true;
+    }
 }
