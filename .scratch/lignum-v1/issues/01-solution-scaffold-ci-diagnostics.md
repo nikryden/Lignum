@@ -4,12 +4,17 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The solution builds with `dotnet build` and tests pass with `dotnet test`
-- [ ] The Core project has no reference to WPF or any Windows desktop framework
-- [ ] The App starts and shows an empty main window
-- [ ] Serilog writes a rolling log file under the local app data `Lignum\logs` folder on startup
-- [ ] An unhandled exception (UI thread and background tasks) shows the error dialog, which copies the details to the clipboard, and is logged
-- [ ] A GitHub Actions workflow builds and tests on a Windows runner for pushes and PRs
-- [ ] `CLAUDE.md` build/test/publish commands match the actual project layout
+- [x] The solution builds with `dotnet build` and tests pass with `dotnet test`
+- [x] The Core project has no reference to WPF or any Windows desktop framework
+- [x] The App starts and shows an empty main window
+- [x] Serilog writes a rolling log file under the local app data `Lignum\logs` folder on startup
+- [x] An unhandled exception (UI thread and background tasks) shows the error dialog, which copies the details to the clipboard, and is logged
+- [x] A GitHub Actions workflow builds and tests on a Windows runner for pushes and PRs
+- [x] `CLAUDE.md` build/test/publish commands match the actual project layout
+
+## Comments
+
+Scaffolded `Lignum.sln` with src/Lignum.Core, src/Lignum.App, tests/Lignum.Core.Tests and tests/Lignum.App.Tests; 7 tests pass (Core architecture guard, DiagnosticLog, CrashHandler). App launch verified manually (window titled "Lignum", `%LOCALAPPDATA%\Lignum\logs\lignum-YYYYMMDD.log` written); publish command verified.
+Crash logging/report content is unit-tested through `CrashHandler` with a fake `ICrashReporter`; the real `ClipboardCrashReporter` dialog and the event wiring in `App.xaml.cs` were not exercised by forcing a crash (manual check). The CI workflow was not run on GitHub (no push from here).

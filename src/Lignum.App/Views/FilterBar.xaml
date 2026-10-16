@@ -1,0 +1,88 @@
+<!--
+    Filter rules (ticket 12). DataContext is the SearchViewModel. The add box creates include or exclude rules;
+    each rule is a chip (green include, red exclude) with an on/off box, its text, case and regex toggles and
+    a remove button. Any change re-runs the filter into the results pane.
+-->
+<UserControl x:Class="Lignum.App.Views.FilterBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Lignum.App.Views">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <views:NullToCollapsedConverter x:Key="NullToCollapsed" />
+    </UserControl.Resources>
+    <Border Visibility="{Binding IsFilterBarOpen, Converter={StaticResource BoolToVisibility}}"
+            Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
+            BorderThickness="0,0,0,1" Padding="8,4">
+        <DockPanel>
+            <DockPanel DockPanel.Dock="Top">
+                <Button DockPanel.Dock="Right" Content="✕" ToolTip="Hide the filter bar (the rules stay)" Padding="8,1" Margin="4,0,0,0"
+                        Command="{Binding ToggleFilterBarCommand}" />
+                <Button DockPanel.Dock="Right" Content="− E_xclude" ToolTip="Hide lines matching this (Shift+Enter)" Padding="8,1" Margin="4,0,0,0"
+                        Command="{Binding AddExcludeFilterCommand}"
+                        Background="{DynamicResource FilterExcludeBackgroundBrush}" BorderBrush="{DynamicResource FilterExcludeBorderBrush}" />
+                <Button DockPanel.Dock="Right" Content="+ _Include" ToolTip="Show only lines matching this (Enter)" Padding="8,1" Margin="8,0,0,0"
+                        Command="{Binding AddIncludeFilterCommand}"
+                        Background="{DynamicResource FilterIncludeBackgroundBrush}" BorderBrush="{DynamicResource FilterIncludeBorderBrush}" />
+                <ToggleButton DockPanel.Dock="Right" Content=".*" Padding="6,1" Margin="4,0,0,0"
+                              ToolTip="Use regular expression" IsChecked="{Binding NewFilterIsRegex}" />
+                <ToggleButton DockPanel.Dock="Right" Content="Aa" Padding="6,1" Margin="8,0,0,0"
+                              ToolTip="Match case" IsChecked="{Binding NewFilterMatchCase}" />
+                <TextBlock DockPanel.Dock="Left" Text="Filter:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <!-- Editable so the dropdown offers the last 20 filter rules (ticket 18). -->
+                <ComboBox x:Name="NewRuleBox" IsEditable="True" IsTextSearchEnabled="False" VerticalContentAlignment="Center"
+                          Text="{Binding NewFilterText, UpdateSourceTrigger=PropertyChanged}"
+                          ItemsSource="{Binding History.FilterTerms}">
+                    <ComboBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding AddIncludeFilterCommand}" />
+                        <KeyBinding Key="Enter" Modifiers="Shift" Command="{Binding AddExcludeFilterCommand}" />
+                        <KeyBinding Key="Escape" Command="{Binding ToggleFilterBarCommand}" />
+                    </ComboBox.InputBindings>
+                </ComboBox>
+            </DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="{Binding FilterError}" TextWrapping="Wrap" Margin="0,2,0,0"
+                       Foreground="{DynamicResource ErrorForegroundBrush}"
+                       Visibility="{Binding FilterError, Converter={StaticResource NullToCollapsed}}" />
+            <ItemsControl ItemsSource="{Binding FilterRules}" Margin="0,2,0,0" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border x:Name="Chip" BorderThickness="1" CornerRadius="3" Padding="4,1" Margin="0,2,6,0"
+                                Background="{DynamicResource FilterIncludeBackgroundBrush}"
+                                BorderBrush="{DynamicResource FilterIncludeBorderBrush}">
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" ToolTip="Turn this rule on or off" />
+                                <TextBlock x:Name="KindLabel" Text="+" FontWeight="Bold" Width="12" TextAlignment="Center"
+                                           VerticalAlignment="Center" Margin="2,0" ToolTip="Include: show only matching lines" />
+                                <TextBox Text="{Binding Text}" MinWidth="80" MaxWidth="320" VerticalContentAlignment="Center"
+                                         ToolTip="Rule text (applied when the box loses focus)" />
+                                <ToggleButton Content="Aa" Padding="4,0" Margin="4,0,0,0" ToolTip="Match case"
+                                              IsChecked="{Binding MatchCase}" />
+                                <ToggleButton Content=".*" Padding="4,0" Margin="2,0,0,0" ToolTip="Use regular expression"
+                                              IsChecked="{Binding IsRegex}" />
+                                <Button Content="✕" Padding="4,0" Margin="4,0,0,0" ToolTip="Remove this rule"
+                                        Command="{Binding DataContext.RemoveFilterRuleCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                        CommandParameter="{Binding}" />
+                            </StackPanel>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsExclude}" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="{DynamicResource FilterExcludeBackgroundBrush}" />
+                                <Setter TargetName="Chip" Property="BorderBrush" Value="{DynamicResource FilterExcludeBorderBrush}" />
+                                <Setter TargetName="KindLabel" Property="Text" Value="−" />
+                                <Setter TargetName="KindLabel" Property="ToolTip" Value="Exclude: hide matching lines" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                <Setter TargetName="Chip" Property="Opacity" Value="0.5" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DockPanel>
+    </Border>
+</UserControl>

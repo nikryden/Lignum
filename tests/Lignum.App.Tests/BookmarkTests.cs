@@ -1,0 +1,216 @@
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
+using Lignum.App.ViewModels;
+using Lignum.Core;
+using Serilog.Core;
+
+namespace Lignum.App.Tests;
+
+/// <summary>Bookmarks (ticket 17): Ctrl+F2 toggles, F2 / Shift+F2 jump with wrap-around, saved per file.</summary>
+public sealed class BookmarkTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "lignum-tests", Guid.NewGuid().ToString("N"));
+    private readonly List<IDisposable> _owned = [];
+
+    public BookmarkTests() => Directory.CreateDirectory(_dir);
+
+    public void Dispose()
+    {
+        foreach (var owned in _owned) owned.Dispose();
+        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+    }
+
+    private string SettingsDir => Path.Combine(_dir, "settings");
+
+    /// <summary>A fresh app start: every settings file is read from disk again.</summary>
+    private MainViewModel Start()
+    {
+        var vm = UiContext.None(() => new MainViewModel(
+            new SettingsStore(SettingsDir, Logger.None).Open<AppSettings>(AppSettings.FileName)));
+        _owned.Add(vm);
+        return vm;
+    }
+
+    private string WriteLog(string name, int lines = 100)
+    {
+        var path = Path.Combine(_dir, name);
+        File.WriteAllLines(path, Enumerable.Range(0, lines).Select(i => $"line {i}"));
+        return path;
+    }
+
+    private async Task<LogTabViewModel> Open(MainViewModel vm, string path)
+    {
+        await vm.OpenFileAsync(path);
+        return vm.SelectedTab!;
+    }
+
+    private static void ToggleAt(LogTabViewModel tab, long line)
+    {
+        tab.Navigation.Caret = new FilePosition(line, 3);
+        tab.ToggleBookmarkCommand.Execute(null);
+    }
+
+    [Fact]
+    public async Task Toggling_the_caret_line_adds_and_removes_a_bookmark()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+
+        ToggleAt(tab, 40);
+        ToggleAt(tab, 10);
+        Assert.Equal([10L, 40L], tab.Bookmarks.Lines);
+
+        ToggleAt(tab, 40);
+        Assert.Equal([10L], tab.Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Toggle_uses_the_selection_passed_in_from_the_results_pane()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Navigation.Caret = new FilePosition(5, 0);
+        var results = new Lignum.App.Viewer.TextSelection();
+        results.MoveCaret(new FilePosition(77, 2), extend: false);
+
+        tab.ToggleBookmarkCommand.Execute(results);
+
+        Assert.Equal([77L], tab.Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Next_and_previous_jump_between_bookmarks_and_wrap_around()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        ToggleAt(tab, 20);
+        ToggleAt(tab, 60);
+        ToggleAt(tab, 90);
+        var reveals = 0;
+        tab.Navigation.RevealRequested += (_, _) => reveals++;
+
+        tab.Navigation.Caret = new FilePosition(30, 4);
+        tab.NextBookmarkCommand.Execute(null);
+        Assert.Equal(new FilePosition(60, 0), tab.Navigation.Caret);
+        tab.NextBookmarkCommand.Execute(null);
+        Assert.Equal(90, tab.Navigation.Caret.Line);
+        tab.NextBookmarkCommand.Execute(null); // wraps to the first
+        Assert.Equal(20, tab.Navigation.Caret.Line);
+
+        tab.PreviousBookmarkCommand.Execute(null); // wraps to the last
+        Assert.Equal(90, tab.Navigation.Caret.Line);
+        tab.PreviousBookmarkCommand.Execute(null);
+        Assert.Equal(60, tab.Navigation.Caret.Line);
+        tab.Navigation.Caret = new FilePosition(61, 0);
+        tab.PreviousBookmarkCommand.Execute(null);
+        Assert.Equal(60, tab.Navigation.Caret.Line);
+        Assert.Equal(6, reveals); // every jump scrolls the view to the caret
+    }
+
+    [Fact]
+    public async Task A_single_bookmark_is_reached_from_its_own_line_by_wrapping()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        ToggleAt(tab, 50);
+
+        tab.NextBookmarkCommand.Execute(null);
+        Assert.Equal(50, tab.Navigation.Caret.Line);
+        tab.PreviousBookmarkCommand.Execute(null);
+        Assert.Equal(50, tab.Navigation.Caret.Line);
+    }
+
+    [Fact]
+    public async Task Next_and_previous_do_nothing_without_bookmarks()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Navigation.Caret = new FilePosition(12, 3);
+
+        tab.NextBookmarkCommand.Execute(null);
+        tab.PreviousBookmarkCommand.Execute(null);
+
+        Assert.Equal(new FilePosition(12, 3), tab.Navigation.Caret);
+    }
+
+    [Fact]
+    public async Task Bookmarks_past_the_lines_indexed_are_skipped_when_jumping()
+    {
+        var path = WriteLog("a.log");
+        var vm = Start();
+        var tab = await Open(vm, path);
+        ToggleAt(tab, 10);
+        ToggleAt(tab, 95);
+        vm.Dispose();
+        File.WriteAllLines(path, Enumerable.Range(0, 50).Select(i => $"short {i}")); // the file shrank
+
+        var reopened = await Open(Start(), path);
+        Assert.Equal([10L, 95L], reopened.Bookmarks.Lines); // kept, in case the file grows back
+        reopened.Navigation.Caret = new FilePosition(20, 0);
+        reopened.NextBookmarkCommand.Execute(null);
+        Assert.Equal(10, reopened.Navigation.Caret.Line);
+    }
+
+    [Fact]
+    public async Task Bookmarks_are_saved_per_file_and_restored_when_it_is_reopened()
+    {
+        var a = WriteLog("a.log");
+        var b = WriteLog("b.log");
+        var vm = Start();
+        var tabA = await Open(vm, a);
+        ToggleAt(tabA, 3);
+        ToggleAt(tabA, 33);
+        var tabB = await Open(vm, b);
+        ToggleAt(tabB, 7);
+        vm.Dispose();
+
+        var restarted = Start();
+        // A different spelling of the same path finds the same bookmarks (Windows paths ignore case).
+        var reopenedA = await Open(restarted, a.ToUpperInvariant());
+        var reopenedB = await Open(restarted, b);
+
+        Assert.Equal([3L, 33L], reopenedA.Bookmarks.Lines);
+        Assert.Equal([7L], reopenedB.Bookmarks.Lines);
+        Assert.Empty((await Open(restarted, WriteLog("c.log"))).Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Each_file_gets_its_own_json_file_with_a_list_of_bookmark_objects()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 12);
+
+        var file = Assert.Single(Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json"));
+        var json = File.ReadAllText(file);
+        // Objects, not bare numbers, so a "note" can be added to each bookmark later without a migration.
+        Assert.Matches("\"bookmarks\":\\s*\\[\\s*\\{\\s*\"line\":\\s*12\\s*\\}\\s*\\]", json);
+        Assert.Contains("a.log", json); // the path is kept for people reading the folder
+        Assert.DoesNotContain("a.log", Path.GetFileName(file)); // the file name is a hash of the path
+    }
+
+    [Fact]
+    public async Task Unknown_fields_on_a_bookmark_such_as_a_future_note_survive_a_save()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 12);
+        var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
+        File.WriteAllText(file, File.ReadAllText(file).Replace("\"line\": 12", "\"line\": 12, \"note\": \"look here\""));
+
+        var reopened = await Open(Start(), a);
+        Assert.Equal([12L], reopened.Bookmarks.Lines);
+        ToggleAt(reopened, 40); // saves again
+
+        Assert.Contains("\"note\": \"look here\"", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public async Task A_corrupt_bookmarks_file_gives_no_bookmarks()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 12);
+        var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
+        File.WriteAllText(file, "{ not json");
+
+        var reopened = await Open(Start(), a);
+
+        Assert.Empty(reopened.Bookmarks.Lines);
+    }
+}

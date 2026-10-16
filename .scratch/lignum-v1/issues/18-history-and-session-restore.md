@@ -4,9 +4,14 @@
 
 **Blocked by:** 12, 16
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Search and filter history is capped at 20, most recent first, without duplicates (tested)
-- [ ] The session (tabs, scroll positions, filters) is saved on exit and restored on start (tested with a temp settings folder)
-- [ ] Missing files in the saved session are skipped with a message
-- [ ] Restoring does not block startup; indexing happens in the background
+- [x] Search and filter history is capped at 20, most recent first, without duplicates (tested)
+- [x] The session (tabs, scroll positions, filters) is saved on exit and restored on start (tested with a temp settings folder)
+- [x] Missing files in the saved session are skipped with a message
+- [x] Restoring does not block startup; indexing happens in the background
+
+## Comments
+
+`SearchHistory` (app-wide, on `MainViewModel.History`, saved in settings.json) records find-all terms and added filter rule texts; the find box and filter add box are now editable ComboBoxes listing them. `MainViewModel.SaveSession()` (called when the window closes) / `RestoreSession()` (called after the window shows) keep tabs, selected tab, first visible line and filter rules in `AppSettings.Session`; missing files are skipped with an `ErrorMessage`, indexing runs in the background, recent files are untouched by a restore. Tests: `HistoryTests`, `SessionTests` (temp settings folder).
+Not verified manually (the App has no settings-folder override, so no manual run against the real profile): the dropdown look/behaviour and the view applying the restored scroll position (`LogTabView.Scroll.cs`) once enough lines are indexed.

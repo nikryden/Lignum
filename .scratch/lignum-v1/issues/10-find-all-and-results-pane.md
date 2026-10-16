@@ -4,12 +4,17 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The `LogDocument` query returns ordered matching line numbers, with progress and cancellation (tested)
-- [ ] A query started during indexing returns the same final results as one started afterwards (tested)
-- [ ] The results pane uses the same viewer control and shows the original line numbers
-- [ ] Clicking a result scrolls the main view to that line and selects it
-- [ ] F3 / Shift+F3 navigate matches; matched text is highlighted; the match count is shown
-- [ ] The split divider can be dragged and the pane collapsed
-- [ ] Matches inside display-truncated long lines are still found
+- [x] The `LogDocument` query returns ordered matching line numbers, with progress and cancellation (tested)
+- [x] A query started during indexing returns the same final results as one started afterwards (tested)
+- [x] The results pane uses the same viewer control and shows the original line numbers
+- [x] Clicking a result scrolls the main view to that line and selects it
+- [x] F3 / Shift+F3 navigate matches; matched text is highlighted; the match count is shown
+- [x] The split divider can be dragged and the pane collapsed
+- [x] Matches inside display-truncated long lines are still found
+
+## Comments
+- Core: `Query` (include/exclude `QueryRule`s with text/regex, case, enabled; `Query.Find`) and `LogDocument.StartQuery` -> `QueryResult` (ordered growing line list, progress, cancel, `FindRow`). Parallel 2 MB chunks merged in order; follows indexing (searches complete lines only). Tested in `QueryTests`, incl. a 250 KB line (the search reads full lines, never the display text).
+- App: per-tab `SearchViewModel` (`LogTabViewModel.Search`), `FindBar`, results pane + GridSplitter in `LogTabView`, highlights/marked line in `LogView.Search.cs`, status bar search status + cancel. VM tested in `SearchViewModelTests`.
+- Going to a result moves the tab's caret (ticket 05) to the line and reveals it, and marks the line in both views (`LogView.MarkedLine`); F3 continues from the caret. Visual checks (drawing, splitter drag, click-to-jump) were not exercised: synthetic input is not allowed here; app start with a file was smoke-checked. Manual check recommended.

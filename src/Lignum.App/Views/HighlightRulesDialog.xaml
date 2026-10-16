@@ -1,0 +1,84 @@
+﻿<!--
+    View > Highlight rulesâ€¦: edit the active preset's line coloring rules and manage presets.
+    DataContext is the app-wide HighlightingViewModel. Changes apply (and are saved) immediately.
+-->
+<Window x:Class="Lignum.App.Views.HighlightRulesDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Highlight rules" Width="980" Height="460" MinWidth="600" MinHeight="300"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+    <DockPanel Margin="12">
+        <!-- Presets -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Preset:" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <ComboBox MinWidth="180" ItemsSource="{Binding Presets}" SelectedItem="{Binding ActivePreset}"
+                      DisplayMemberPath="Name" />
+            <TextBox x:Name="PresetNameBox" MinWidth="160" Margin="12,0,6,0" VerticalContentAlignment="Center"
+                     ToolTip="Name for a new preset, or the new name of this one" />
+            <Button Content="Save as new preset" Margin="0,0,6,0" Padding="8,2" Click="OnSaveAsClick" />
+            <Button Content="Rename" Margin="0,0,6,0" Padding="8,2" Click="OnRenameClick" />
+            <Button Content="Delete preset" Padding="8,2" Command="{Binding DeletePresetCommand}" />
+        </StackPanel>
+        <TextBlock x:Name="PresetError" DockPanel.Dock="Top" Margin="0,0,0,6" Visibility="Collapsed"
+                   Foreground="{DynamicResource ErrorForegroundBrush}" />
+
+        <!-- Rule actions -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Content="Close" IsCancel="True" IsDefault="True" MinWidth="80" />
+            <StackPanel Orientation="Horizontal">
+                <Button Content="Add rule" Padding="8,2" Margin="0,0,6,0" Command="{Binding NewRuleCommand}" />
+                <Button Content="Remove" Padding="8,2" Margin="0,0,6,0" Command="{Binding RemoveRuleCommand}"
+                        CommandParameter="{Binding SelectedItem, ElementName=RulesGrid}" />
+                <Button Content="Move up" Padding="8,2" Margin="0,0,6,0" Command="{Binding MoveRuleUpCommand}"
+                        CommandParameter="{Binding SelectedItem, ElementName=RulesGrid}" />
+                <Button Content="Move down" Padding="8,2" Command="{Binding MoveRuleDownCommand}"
+                        CommandParameter="{Binding SelectedItem, ElementName=RulesGrid}" />
+                <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" Opacity="0.7"
+                           Text="The first matching rule colors the line. Colors: #RRGGBB, empty for none." />
+            </StackPanel>
+        </DockPanel>
+
+        <DataGrid x:Name="RulesGrid" ItemsSource="{Binding Rules}" AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
+                  SelectionMode="Single" HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridCheckBoxColumn Header="On" Binding="{Binding IsEnabled, UpdateSourceTrigger=PropertyChanged}" />
+                <DataGridTextColumn Header="Text or regex" Width="*" Binding="{Binding Pattern}" />
+                <DataGridCheckBoxColumn Header="Regex" Binding="{Binding IsRegex, UpdateSourceTrigger=PropertyChanged}" />
+                <DataGridCheckBoxColumn Header="Case" Binding="{Binding MatchCase, UpdateSourceTrigger=PropertyChanged}" />
+                <DataGridTextColumn Header="Light text" Width="80" Binding="{Binding LightForeground}" />
+                <DataGridTextColumn Header="Light back" Width="80" Binding="{Binding LightBackground}" />
+                <DataGridTemplateColumn Header="Light" Width="70" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="#FFFFFF">
+                                <TextBlock Text="Sample" Padding="4,0" Foreground="{Binding LightForeground, TargetNullValue=#1E1E1E, FallbackValue=#1E1E1E}" Background="{Binding LightBackground, TargetNullValue=Transparent, FallbackValue=Transparent}" />
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Dark text" Width="80" Binding="{Binding DarkForeground}" />
+                <DataGridTextColumn Header="Dark back" Width="80" Binding="{Binding DarkBackground}" />
+                <DataGridTemplateColumn Header="Dark" Width="70" IsReadOnly="True">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Border Background="#1E1E1E">
+                                <TextBlock Text="Sample" Padding="4,0" Foreground="{Binding DarkForeground, TargetNullValue=#D4D4D4, FallbackValue=#D4D4D4}" Background="{Binding DarkBackground, TargetNullValue=Transparent, FallbackValue=Transparent}" />
+                            </Border>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Problem" Width="140" IsReadOnly="True" Binding="{Binding Error}">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorForegroundBrush}" />
+                            <Setter Property="ToolTip" Value="{Binding Error}" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>
