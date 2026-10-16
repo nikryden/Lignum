@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Lignum.App.Themes;
 
 namespace Lignum.App.Viewer;
 
@@ -49,6 +50,10 @@ public sealed class LogView : FrameworkElement
         nameof(LineNumberBackground), typeof(Brush), typeof(LogView),
         new FrameworkPropertyMetadata(SystemColors.ControlBrush, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty TabWidthProperty = DependencyProperty.Register(
+        nameof(TabWidth), typeof(int), typeof(LogView),
+        new FrameworkPropertyMetadata(4, FrameworkPropertyMetadataOptions.AffectsRender));
+
     // Rows read so far: _rows[i] is row _rowsFirst + i. Replaced wholesale when a read completes.
     private IReadOnlyList<DisplayRow> _rows = [];
     private long _rowsFirst;
@@ -65,6 +70,19 @@ public sealed class LogView : FrameworkElement
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+
+        // Theme brushes (ticket 13); without the theme resources (tests) the system-brush defaults stay.
+        SetResourceReference(BackgroundProperty, ThemeKeys.ViewerBackground);
+        SetResourceReference(ForegroundProperty, ThemeKeys.ViewerForeground);
+        SetResourceReference(LineNumberBackgroundProperty, ThemeKeys.LineNumberBackground);
+        SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
+    }
+
+    /// <summary>Columns between tab stops.</summary>
+    public int TabWidth
+    {
+        get => (int)GetValue(TabWidthProperty);
+        set => SetValue(TabWidthProperty, value);
     }
 
     /// <summary>The rows to show. Null shows an empty view.</summary>
@@ -174,7 +192,7 @@ public sealed class LogView : FrameworkElement
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
 
             if (row.Text.Length == 0) continue;
-            var text = row.Text.Length > maxChars ? row.Text[..maxChars] : row.Text;
+            var text = TabExpansion.Expand(row.Text, TabWidth, maxChars);
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
     }

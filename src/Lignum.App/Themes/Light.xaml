@@ -1,0 +1,24 @@
+<!-- Light theme brushes. Every key here must also exist in Dark.xaml (see ThemeKeys.cs). -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F3F3F3" />
+    <SolidColorBrush x:Key="WindowForegroundBrush" Color="#1B1B1B" />
+
+    <SolidColorBrush x:Key="ViewerBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ViewerForegroundBrush" Color="#1E1E1E" />
+    <SolidColorBrush x:Key="LineNumberBackgroundBrush" Color="#F3F3F3" />
+    <SolidColorBrush x:Key="LineNumberForegroundBrush" Color="#8A8A8A" />
+    <SolidColorBrush x:Key="SelectionBackgroundBrush" Color="#ADD6FF" />
+    <SolidColorBrush x:Key="SearchMatchBackgroundBrush" Color="#FFE680" />
+
+    <SolidColorBrush x:Key="PaneBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="PaneBorderBrush" Color="#D6D6D6" />
+
+    <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#EBEBEB" />
+    <SolidColorBrush x:Key="StatusBarForegroundBrush" Color="#1B1B1B" />
+    <SolidColorBrush x:Key="ErrorForegroundBrush" Color="#B22222" />
+
+    <SolidColorBrush x:Key="BannerBackgroundBrush" Color="#FFF4CE" />
+    <SolidColorBrush x:Key="BannerBorderBrush" Color="#E0C060" />
+    <SolidColorBrush x:Key="BannerForegroundBrush" Color="#3A2E00" />
+</ResourceDictionary>
