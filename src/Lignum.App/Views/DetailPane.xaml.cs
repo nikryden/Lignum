@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
-using Lignum.App.Settings;
 using Lignum.App.ViewModels;
 
 namespace Lignum.App.Views;
@@ -19,22 +18,12 @@ public partial class DetailPane : UserControl
         {
             if (e.OldValue is DetailPaneViewModel old) old.PropertyChanged -= OnViewModelPropertyChanged;
             if (e.NewValue is DetailPaneViewModel vm) vm.PropertyChanged += OnViewModelPropertyChanged;
-            UpdateDockButtons();
         };
     }
 
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(DetailPaneViewModel.Dock)) UpdateDockButtons();
         if (e.PropertyName == nameof(DetailPaneViewModel.Text)) LineText.ScrollToHome();
-    }
-
-    /// <summary>Only offer the dock position the pane is not in.</summary>
-    private void UpdateDockButtons()
-    {
-        var right = (DataContext as DetailPaneViewModel)?.Dock != DetailPaneDock.Bottom;
-        DockBottomButton.Visibility = right ? Visibility.Visible : Visibility.Collapsed;
-        DockRightButton.Visibility = right ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnCopyLineClick(object sender, RoutedEventArgs e)

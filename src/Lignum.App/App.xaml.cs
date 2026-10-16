@@ -33,7 +33,7 @@ public partial class App : Application
         var appearance = new AppearanceViewModel(_settings, _systemTheme);
         ThemeManager.Follow(this, appearance);
 
-        var viewModel = new MainViewModel(new DetailPaneViewModel(_settings));
+        var viewModel = new MainViewModel(_settings);
         MainWindow = new MainWindow(viewModel, appearance);
         MainWindow.Show();
 

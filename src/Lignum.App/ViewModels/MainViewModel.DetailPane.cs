@@ -1,18 +1,23 @@
-using Lignum.App.Viewer;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Lignum.App.ViewModels;
 
-// The detail pane (ticket 07): it reads full lines from whatever the main view shows.
+// The detail pane (ticket 07): the layout is app-wide; the line shown belongs to each tab (LogTabViewModel.Detail).
 public sealed partial class MainViewModel
 {
-    /// <param name="detail">The detail pane (App passes one bound to settings.json); null creates an unsaved one.</param>
-    public MainViewModel(DetailPaneViewModel? detail = null)
+    private DetailPaneLayoutViewModel? _detailPane;
+
+    /// <summary>Open/collapsed, dock position and size of the detail pane, shared by all tabs and saved.</summary>
+    public DetailPaneLayoutViewModel DetailPane => _detailPane ??= new DetailPaneLayoutViewModel(_settings);
+
+    /// <summary>
+    /// "Show full line": opens the detail pane on <paramref name="line"/> (0-based) of the selected tab, or on
+    /// that tab's current line when null.
+    /// </summary>
+    [RelayCommand]
+    public void ShowFullLine(long? line)
     {
-        Detail = detail ?? new DetailPaneViewModel();
+        if (line is { } l && SelectedTab is { } tab) tab.Detail.CurrentLine = l;
+        DetailPane.IsOpen = true;
     }
-
-    /// <summary>The detail pane: the current line in full. Selection/caret set <c>Detail.CurrentLine</c>.</summary>
-    public DetailPaneViewModel Detail { get; }
-
-    partial void OnLinesChanged(LineSource? value) => Detail.Reader = value?.Reader;
 }

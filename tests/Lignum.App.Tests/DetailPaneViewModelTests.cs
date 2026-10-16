@@ -1,4 +1,5 @@
 using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.Viewer;
 using Lignum.App.ViewModels;
 using Serilog.Core;
@@ -17,10 +18,12 @@ public sealed class DetailPaneViewModelTests : IDisposable
     private SettingsFile<AppSettings> OpenSettings() =>
         new SettingsStore(_dir, Logger.None).Open<AppSettings>(AppSettings.FileName);
 
-    private DetailPaneViewModel Create(params string[] lines) =>
-        new(OpenSettings()) { Reader = new InMemoryReader(lines) };
+    private static DetailPaneViewModel Create(params string[] lines) =>
+        UiContext.None(() => new DetailPaneViewModel { Reader = new InMemoryReader(lines) });
 
-    // ---- content ----
+    private DetailPaneLayoutViewModel CreateLayout() => UiContext.None(() => new DetailPaneLayoutViewModel(OpenSettings()));
+
+    // ---- content (per tab) ----
 
     [Fact]
     public async Task Shows_the_current_line_in_full_with_its_one_based_number()
@@ -60,6 +63,7 @@ public sealed class DetailPaneViewModelTests : IDisposable
         await vm.WhenLoaded;
 
         Assert.True(vm.IsCapped);
+        Assert.NotEqual("", vm.Notice);
         Assert.Equal(DetailPaneViewModel.MaxShownChars, vm.Text.Length);
         Assert.Equal(giant, await vm.ReadFullLineAsync());
     }
@@ -78,41 +82,26 @@ public sealed class DetailPaneViewModelTests : IDisposable
         Assert.Equal("", vm.Text);
     }
 
-    [Fact]
-    public async Task Show_full_line_opens_a_collapsed_pane_on_that_line()
-    {
-        var vm = Create("a", "b", "c");
-        vm.ToggleCommand.Execute(null);
-        Assert.False(vm.IsOpen);
-
-        vm.ShowFullLine(2);
-        await vm.WhenLoaded;
-
-        Assert.True(vm.IsOpen);
-        Assert.Equal(2, vm.CurrentLine);
-        Assert.Equal("c", vm.Text);
-    }
-
-    // ---- layout ----
+    // ---- layout (app-wide) ----
 
     [Fact]
     public void By_default_the_pane_is_open_and_docked_right()
     {
-        var vm = Create();
+        var layout = CreateLayout();
 
-        Assert.True(vm.IsOpen);
-        Assert.Equal(DetailPaneDock.Right, vm.Dock);
+        Assert.True(layout.IsOpen);
+        Assert.Equal(DetailPaneDock.Right, layout.Dock);
     }
 
     [Fact]
     public void Collapse_and_dock_position_are_remembered_across_restarts()
     {
-        var vm = new DetailPaneViewModel(OpenSettings());
-        vm.ToggleCommand.Execute(null);
-        vm.DockBottomCommand.Execute(null);
-        vm.PaneHeight = 250;
+        var layout = CreateLayout();
+        layout.ToggleCommand.Execute(null);
+        layout.DockBottomCommand.Execute(null);
+        layout.PaneHeight = 250;
 
-        var restarted = new DetailPaneViewModel(OpenSettings());
+        var restarted = CreateLayout();
 
         Assert.False(restarted.IsOpen);
         Assert.Equal(DetailPaneDock.Bottom, restarted.Dock);
@@ -122,34 +111,34 @@ public sealed class DetailPaneViewModelTests : IDisposable
     [Fact]
     public void Docking_right_again_keeps_the_remembered_width()
     {
-        var vm = Create();
-        vm.PaneWidth = 333;
-        vm.DockBottomCommand.Execute(null);
-        vm.DockRightCommand.Execute(null);
+        var layout = CreateLayout();
+        layout.PaneWidth = 333;
+        layout.DockBottomCommand.Execute(null);
+        layout.DockRightCommand.Execute(null);
 
-        Assert.Equal(DetailPaneDock.Right, vm.Dock);
-        Assert.Equal(333, vm.PaneWidth);
+        Assert.Equal(DetailPaneDock.Right, layout.Dock);
+        Assert.Equal(333, layout.PaneWidth);
     }
 
     [Theory]
-    [InlineData(-5, DetailPaneViewModel.MinPaneSize)]
+    [InlineData(-5, DetailPaneLayoutViewModel.MinPaneSize)]
     [InlineData(double.NaN, 400)]
     [InlineData(500, 500)]
     public void Pane_sizes_are_kept_sensible(double requested, double expected)
     {
-        var vm = Create();
-        vm.PaneWidth = requested;
+        var layout = CreateLayout();
+        layout.PaneWidth = requested;
 
-        Assert.Equal(expected, vm.PaneWidth);
+        Assert.Equal(expected, layout.PaneWidth);
     }
 
     [Fact]
-    public void Without_a_settings_file_the_pane_still_works()
+    public void Without_a_settings_file_the_layout_still_works()
     {
-        var vm = new DetailPaneViewModel();
-        vm.ToggleCommand.Execute(null);
+        var layout = new DetailPaneLayoutViewModel();
+        layout.ToggleCommand.Execute(null);
 
-        Assert.False(vm.IsOpen);
+        Assert.False(layout.IsOpen);
     }
 
     private sealed class InMemoryReader(string[] lines) : ILineReader

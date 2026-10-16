@@ -17,7 +17,6 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         Closed += (_, _) => _viewModel.Dispose();
-        Loaded += (_, _) => LogView.Focus(); // arrow keys and PageUp/PageDown scroll the log straight away
     }
 
     /// <summary>Theme, font, zoom and tab width; XAML binds via RelativeSource AncestorType=Window.</summary>
@@ -50,19 +49,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnExitClick(object sender, RoutedEventArgs e) => Close();
-
-    // ---- detail pane (ticket 07). Clicking a row stands in for the caret/selection until tickets 05/08. ----
-
-    private void OnLogViewLineClicked(object? sender, long line) => _viewModel.Detail.CurrentLine = line;
-
-    private void OnFullLineRequested(object? sender, long line) => _viewModel.Detail.ShowFullLine(line);
-
-    /// <summary>View > Show full line: the current line, or the top visible one if there is none yet.</summary>
-    private void OnShowFullLineClick(object sender, RoutedEventArgs e)
+    /// <summary>Accept files dragged from Explorer (Preview, so the viewer and text boxes don't refuse them).</summary>
+    private void OnPreviewDragOver(object sender, DragEventArgs e)
     {
-        var line = _viewModel.Detail.CurrentLine ?? LogView.LineAt(new Point(0, 0));
-        if (line is { } l) _viewModel.Detail.ShowFullLine(l);
-        else _viewModel.Detail.IsOpen = true;
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
     }
+
+    /// <summary>Dropping one or more files opens each in a tab (or switches to it if already open).</summary>
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        e.Handled = true;
+        _ = _viewModel.OpenFilesAsync(paths);
+        Activate();
+    }
+
+    private void OnExitClick(object sender, RoutedEventArgs e) => Close();
 }

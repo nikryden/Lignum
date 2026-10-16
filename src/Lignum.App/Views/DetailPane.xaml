@@ -1,4 +1,4 @@
-<!-- The detail pane (ticket 07). DataContext is the DetailPaneViewModel. -->
+<!-- The detail pane (ticket 07). DataContext is the tab's DetailPaneViewModel. -->
 <UserControl x:Class="Lignum.App.Views.DetailPane"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -19,14 +19,36 @@
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                     <Button Content="Copy line" ToolTip="Copy the whole line" Click="OnCopyLineClick"
                             Style="{StaticResource PaneButton}" />
+                    <!-- Layout commands are app-wide: the window's MainViewModel.DetailPane. -->
                     <Button Content="Dock bottom" ToolTip="Dock the detail pane at the bottom"
-                            Command="{Binding DockBottomCommand}" Style="{StaticResource PaneButton}"
-                            x:Name="DockBottomButton" />
+                            Command="{Binding DataContext.DetailPane.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PaneButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.DetailPane.Dock, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Value="{x:Static settings:DetailPaneDock.Bottom}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="Dock right" ToolTip="Dock the detail pane on the right"
-                            Command="{Binding DockRightCommand}" Style="{StaticResource PaneButton}"
-                            x:Name="DockRightButton" />
+                            Command="{Binding DataContext.DetailPane.DockRightCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PaneButton}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.DetailPane.Dock, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                 Value="{x:Static settings:DetailPaneDock.Right}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="✕" ToolTip="Collapse the detail pane (View menu reopens it)"
-                            Command="{Binding ToggleCommand}" Style="{StaticResource PaneButton}" />
+                            Command="{Binding DataContext.DetailPane.ToggleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Style="{StaticResource PaneButton}" />
                 </StackPanel>
                 <TextBlock Text="{Binding Header}" FontWeight="SemiBold" VerticalAlignment="Center"
                            TextTrimming="CharacterEllipsis" />

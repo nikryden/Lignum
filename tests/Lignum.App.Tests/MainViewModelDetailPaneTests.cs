@@ -1,4 +1,7 @@
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
+using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
@@ -13,6 +16,9 @@ public sealed class MainViewModelDetailPaneTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
+    private MainViewModel Create() => UiContext.None(() => new MainViewModel(
+        new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
+
     private string WriteFile(string content)
     {
         var path = Path.Combine(_dir, Guid.NewGuid().ToString("N") + ".log");
@@ -21,40 +27,36 @@ public sealed class MainViewModelDetailPaneTests : IDisposable
     }
 
     [Fact]
-    public async Task The_detail_pane_shows_full_lines_of_the_open_file()
+    public async Task Show_full_line_opens_a_collapsed_pane_on_that_line_of_the_selected_tab()
     {
         var huge = new string('j', 50_000);
-        using var vm = new MainViewModel();
+        using var vm = Create();
         await vm.OpenFileAsync(WriteFile($"a\n{huge}\n")).WaitAsync(TimeSpan.FromSeconds(30));
+        vm.DetailPane.ToggleCommand.Execute(null);
+        Assert.False(vm.DetailPane.IsOpen);
 
-        vm.Detail.ShowFullLine(1);
-        await vm.Detail.WhenLoaded;
+        vm.ShowFullLineCommand.Execute(1L);
+        await vm.SelectedTab!.Detail.WhenLoaded;
 
-        Assert.Equal(huge, vm.Detail.Text);
+        Assert.True(vm.DetailPane.IsOpen);
+        Assert.Equal(1, vm.SelectedTab.Detail.CurrentLine);
+        Assert.Equal(huge, vm.SelectedTab.Detail.Text);
     }
 
     [Fact]
-    public async Task Opening_another_file_clears_the_detail_pane()
+    public async Task Each_tab_keeps_its_own_detail_line()
     {
-        using var vm = new MainViewModel();
+        using var vm = Create();
         await vm.OpenFileAsync(WriteFile("one\n")).WaitAsync(TimeSpan.FromSeconds(30));
-        vm.Detail.CurrentLine = 0;
-        await vm.Detail.WhenLoaded;
+        var first = vm.SelectedTab!;
+        first.Detail.CurrentLine = 0;
+        await first.Detail.WhenLoaded;
 
         await vm.OpenFileAsync(WriteFile("two\n")).WaitAsync(TimeSpan.FromSeconds(30));
-        await vm.Detail.WhenLoaded;
+        await vm.SelectedTab!.Detail.WhenLoaded;
 
-        Assert.Null(vm.Detail.CurrentLine);
-        Assert.Equal("", vm.Detail.Text);
-    }
-
-    [Fact]
-    public void The_window_level_detail_pane_can_be_passed_in()
-    {
-        var detail = new DetailPaneViewModel();
-
-        using var vm = new MainViewModel(detail);
-
-        Assert.Same(detail, vm.Detail);
+        Assert.NotSame(first, vm.SelectedTab);
+        Assert.Null(vm.SelectedTab.Detail.CurrentLine);
+        Assert.Equal("one", first.Detail.Text);
     }
 }

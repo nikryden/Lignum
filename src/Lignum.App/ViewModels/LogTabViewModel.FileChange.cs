@@ -6,7 +6,7 @@ namespace Lignum.App.ViewModels;
 
 // The "File changed: Reload" banner. Kept apart from the rest of the view model so tail mode (v1.1) can
 // hook the same Grown notifications here without touching document opening.
-public sealed partial class MainViewModel
+public sealed partial class LogTabViewModel
 {
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
@@ -15,9 +15,30 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private string _fileChangeMessage = "";
 
-    /// <summary>Reopens the current path and indexes it again. Available once the file has changed.</summary>
+    /// <summary>
+    /// Reopens this tab's path and indexes it again, in the same tab. Available once the file has changed.
+    /// Completes when the new indexing stops.
+    /// </summary>
     [RelayCommand(CanExecute = nameof(IsFileChanged))]
-    private Task Reload() => _document is { } document ? OpenFileAsync(document.Path) : Task.CompletedTask;
+    private Task Reload()
+    {
+        if (_document is null) return Task.CompletedTask; // closed
+
+        LogDocument document;
+        try
+        {
+            document = LogDocument.Open(Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
+                                       or NotSupportedException)
+        {
+            ErrorMessage = $"Could not reload {Path}: {ex.Message}";
+            return Task.CompletedTask;
+        }
+
+        _document.Dispose();
+        return Attach(document);
+    }
 
     /// <summary>Called for each newly opened document, before indexing starts.</summary>
     private void AttachChangeDetection(LogDocument document)
