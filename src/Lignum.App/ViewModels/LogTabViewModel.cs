@@ -71,6 +71,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
     /// <summary>Closes the file: the handle is released once the indexer has stopped.</summary>
     public void Dispose()
     {
+        _search?.Dispose();
         _document?.Dispose();
         _document = null;
     }
@@ -83,6 +84,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts
         AttachChangeDetection(document);
         AttachNavigation(document);
+        Search.SetDocument(document);
 
         var completion = document.StartIndexing();
         Refresh(document);

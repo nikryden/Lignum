@@ -79,6 +79,7 @@ public sealed partial class LogView : FrameworkElement
         SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
         InitializeScrolling();
         InitializeLongLines();
+        InitializeSearch();
     }
 
     /// <summary>Columns between tab stops.</summary>
@@ -196,6 +197,7 @@ public sealed partial class LogView : FrameworkElement
             var number = Format((row.LineNumber + 1).ToString(CultureInfo.InvariantCulture),
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
+            DrawRowDecorations(dc, row, y, textLeft, firstColumn, maxChars);
 
             if (row.IsTruncated)
             {
