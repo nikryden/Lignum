@@ -97,6 +97,21 @@ public class LineReadingTests : IDisposable
     }
 
     [Fact]
+    public async Task Nothing_is_read_once_the_file_has_been_truncated()
+    {
+        using var doc = await OpenIndexed("one\ntwo\nthree\n");
+        Assert.Equal("two", doc.ReadLine(1));
+
+        using (var writer = new FileStream(doc.Path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+            writer.SetLength(4);
+        doc.CheckForChanges();
+
+        Assert.False(doc.IsIndexValid);
+        Assert.Empty(doc.ReadLines(0, 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => doc.ReadLine(1));
+    }
+
+    [Fact]
     public async Task The_first_lines_are_readable_before_indexing_finishes()
     {
         var builder = new StringBuilder();

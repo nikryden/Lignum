@@ -71,8 +71,8 @@ public sealed partial class LogDocument : IDisposable
     /// <summary>Indexing progress between 0 and 1. Thread-safe.</summary>
     public double IndexingProgress => TotalBytes == 0 ? 1.0 : (double)BytesIndexed / TotalBytes;
 
-    /// <summary>Lines indexed so far. Rises while indexing runs. Thread-safe.</summary>
-    public long LineCount => _index.Count;
+    /// <summary>Lines indexed so far. Rises while indexing runs; 0 once the index is invalid. Thread-safe.</summary>
+    public long LineCount => IsIndexValid ? _index.Count : 0;
 
     /// <summary>Current indexing state. Thread-safe.</summary>
     public IndexingState IndexingState => (IndexingState)Volatile.Read(ref _state);
@@ -102,6 +102,7 @@ public sealed partial class LogDocument : IDisposable
         if (Interlocked.CompareExchange(ref _state, (int)IndexingState.Running, (int)IndexingState.NotStarted)
             == (int)IndexingState.NotStarted)
         {
+            StartWatching();
             Task.Run(RunIndexing);
         }
 
@@ -114,6 +115,7 @@ public sealed partial class LogDocument : IDisposable
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        StopWatching();
         _cancel.Cancel();
         if (Interlocked.CompareExchange(ref _state, (int)IndexingState.Cancelled, (int)IndexingState.NotStarted)
             == (int)IndexingState.NotStarted)

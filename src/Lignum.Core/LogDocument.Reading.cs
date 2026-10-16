@@ -36,7 +36,8 @@ public sealed partial class LogDocument
         var available = (int)Math.Clamp(LineCount - firstLine, 0, count);
         var lines = new string[available];
         for (var i = 0; i < available; i++) lines[i] = ReadLine(firstLine + i);
-        return lines;
+        // The file may have been truncated or replaced while we read: what we got could be stale.
+        return IsIndexValid ? lines : [];
     }
 
     /// <summary>
@@ -47,7 +48,7 @@ public sealed partial class LogDocument
     private (long Start, long End) LineBounds(long line)
     {
         var indexedEnd = BytesIndexed;
-        var count = _index.Count;
+        var count = LineCount; // 0 once the file was truncated or replaced: stale offsets are never read
         ArgumentOutOfRangeException.ThrowIfNegative(line);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(line, count);
 
