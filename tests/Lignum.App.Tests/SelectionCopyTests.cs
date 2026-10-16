@@ -1,6 +1,9 @@
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.Viewer;
 using Lignum.App.ViewModels;
 using Lignum.Core;
+using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
@@ -131,34 +134,46 @@ public class SelectionCopyTests : IDisposable
         Assert.Equal(CopyOutcome.Cancelled, result.Outcome);
     }
 
+    private MainViewModel CreateMain() => UiContext.None(() =>
+        new MainViewModel(new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName))
+        {
+            Copier = new SelectionCopier(_clipboard, _prompt),
+        });
+
     [Fact]
-    public async Task The_view_model_selects_all_and_copies_the_open_file()
+    public async Task A_tab_selects_all_and_copies_its_file()
     {
-        using var vm = new MainViewModel(_clipboard, _prompt);
+        using var vm = CreateMain();
         var path = Path.Combine(_dir, "vm.log");
         File.WriteAllText(path, "one\ntwo\n");
         await vm.OpenFileAsync(path);
+        var tab = vm.SelectedTab!;
 
-        vm.SelectAllCommand.Execute(null);
-        await vm.CopyCommand.ExecuteAsync(null);
+        tab.SelectAllCommand.Execute(null);
+        await tab.CopyCommand.ExecuteAsync(null);
 
         Assert.Equal(["one\ntwo"], _clipboard.Texts);
-        Assert.False(vm.IsCopying);
-        Assert.NotNull(vm.CopyMessage);
+        Assert.False(tab.IsCopying);
+        Assert.Equal("Copied 7 characters", tab.CopyMessage);
     }
 
     [Fact]
-    public async Task Opening_another_file_clears_the_selection()
+    public async Task Each_tab_has_its_own_selection()
     {
-        using var vm = new MainViewModel(_clipboard, _prompt);
-        var path = Path.Combine(_dir, "vm.log");
-        File.WriteAllText(path, "one\ntwo\n");
-        await vm.OpenFileAsync(path);
-        vm.SelectAllCommand.Execute(null);
+        using var vm = CreateMain();
+        var first = Path.Combine(_dir, "first.log");
+        var second = Path.Combine(_dir, "second.log");
+        File.WriteAllText(first, "first\n");
+        File.WriteAllText(second, "second\n");
+        await vm.OpenFileAsync(first);
+        vm.SelectedTab!.SelectAllCommand.Execute(null);
 
-        await vm.OpenFileAsync(path);
+        await vm.OpenFileAsync(second);
+        await vm.SelectedTab!.CopyCommand.ExecuteAsync(null);
 
-        Assert.True(vm.Selection.IsEmpty);
+        Assert.True(vm.SelectedTab.Selection.IsEmpty);
+        Assert.Empty(_clipboard.Texts);
+        Assert.False(vm.Tabs[0].Selection.IsEmpty);
     }
 
     private sealed class FakeClipboard : IClipboardService

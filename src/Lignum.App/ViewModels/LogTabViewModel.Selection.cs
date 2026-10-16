@@ -1,26 +1,18 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Viewer;
-using Lignum.App.Views;
 
 namespace Lignum.App.ViewModels;
 
 // Selection and copy (ticket 08): Ctrl+A selects every line, Ctrl+C copies through the Core text-range reader.
-public sealed partial class MainViewModel
+public sealed partial class LogTabViewModel
 {
-    private readonly SelectionCopier _copier;
     private CancellationTokenSource? _copyCancel;
 
-    public MainViewModel() : this(new WpfClipboard(), new DialogCopyPrompt())
-    {
-    }
+    /// <summary>Copies selections; <see cref="MainViewModel"/> hands every tab its own (clipboard, prompts).</summary>
+    internal SelectionCopier? Copier { get; set; }
 
-    public MainViewModel(IClipboardService clipboard, ICopyPrompt copyPrompt)
-    {
-        _copier = new SelectionCopier(clipboard, copyPrompt);
-    }
-
-    /// <summary>The main view's selection, as file positions. The viewer reads and updates it.</summary>
+    /// <summary>This tab's selection, as file positions. The viewer reads and updates it.</summary>
     public TextSelection Selection { get; } = new();
 
     [ObservableProperty]
@@ -37,19 +29,20 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(CanCopy))]
     private async Task Copy()
     {
-        if (_document is not { } document || Selection.IsEmpty) return;
-        _copyCancel = new CancellationTokenSource();
+        if (_document is not { } document || Copier is not { } copier || Selection.IsEmpty) return;
+        var cancel = new CancellationTokenSource();
+        _copyCancel = cancel;
         IsCopying = true;
         CopyMessage = "Copying…";
         try
         {
-            CopyMessage = (await _copier.CopyAsync(document, Selection, _copyCancel.Token)).Message;
+            CopyMessage = (await copier.CopyAsync(document, Selection, cancel.Token)).Message;
         }
         finally
         {
             IsCopying = false;
-            _copyCancel.Dispose();
             _copyCancel = null;
+            cancel.Dispose();
         }
     }
 
@@ -58,6 +51,6 @@ public sealed partial class MainViewModel
     [RelayCommand(CanExecute = nameof(IsCopying))]
     private void CancelCopy() => _copyCancel?.Cancel();
 
-    /// <summary>A newly opened file starts with nothing selected.</summary>
+    /// <summary>A newly opened or reloaded file starts with nothing selected.</summary>
     private void ResetSelection() => Selection.MoveCaret(default, extend: false);
 }

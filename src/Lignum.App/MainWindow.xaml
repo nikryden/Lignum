@@ -1,7 +1,6 @@
 ﻿<Window x:Class="Lignum.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:viewer="clr-namespace:Lignum.App.Viewer"
         xmlns:views="clr-namespace:Lignum.App.Views"
         xmlns:settings="clr-namespace:Lignum.App.Settings"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
@@ -9,12 +8,14 @@
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource WindowForegroundBrush}"
+        AllowDrop="True" PreviewDragOver="OnPreviewDragOver" Drop="OnDrop"
         PreviewMouseWheel="OnPreviewMouseWheel">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <views:EqualityConverter x:Key="IsEqual" />
     </Window.Resources>
     <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+Add" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding Appearance.ZoomOutCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -30,12 +31,23 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_Open…" Command="ApplicationCommands.Open" InputGestureText="Ctrl+O" />
+                <MenuItem Header="Open _recent" ItemsSource="{Binding RecentFiles}"
+                          IsEnabled="{Binding HasRecentFiles}">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                            <Setter Property="Header" Value="{Binding}" />
+                            <Setter Property="Command" Value="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            <Setter Property="CommandParameter" Value="{Binding}" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                </MenuItem>
+                <MenuItem Header="_Close tab" Command="{Binding CloseTabCommand}" InputGestureText="Ctrl+W" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
             <MenuItem Header="_Edit">
-                <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
-                <MenuItem Header="Select _all" Command="{Binding SelectAllCommand}" InputGestureText="Ctrl+A" />
+                <MenuItem Header="_Copy" Command="{Binding SelectedTab.CopyCommand}" InputGestureText="Ctrl+C" />
+                <MenuItem Header="Select _all" Command="{Binding SelectedTab.SelectAllCommand}" InputGestureText="Ctrl+A" />
             </MenuItem>
             <!-- Appearance (ticket 13). DataContext is the AppearanceViewModel. -->
             <MenuItem Header="_View" DataContext="{Binding Appearance, RelativeSource={RelativeSource AncestorType=Window}}">
@@ -71,47 +83,80 @@
                 <MenuItem Header="_Reset zoom" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0" />
             </MenuItem>
         </Menu>
-        <views:FileChangedBanner DockPanel.Dock="Top" />
+        <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
+        <TabControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
+                    Padding="0" BorderThickness="0" Focusable="False">
+            <TabControl.Style>
+                <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Tabs.Count}" Value="0">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TabControl.Style>
+            <TabControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal" ToolTip="{Binding Path}">
+                        <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
+                        <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
+                                FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"
+                                ToolTip="Close (Ctrl+W)"
+                                Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                    </StackPanel>
+                </DataTemplate>
+            </TabControl.ItemTemplate>
+            <TabControl.ContentTemplate>
+                <DataTemplate />
+            </TabControl.ContentTemplate>
+        </TabControl>
         <StatusBar DockPanel.Dock="Bottom"
                    Background="{DynamicResource StatusBarBackgroundBrush}"
                    Foreground="{DynamicResource StatusBarForegroundBrush}">
             <StatusBarItem>
-                <TextBlock Text="{Binding FileName, TargetNullValue='No file open'}" />
+                <TextBlock Text="{Binding SelectedTab.FileName, FallbackValue='No file open', TargetNullValue='No file open'}" />
             </StatusBarItem>
             <Separator />
             <StatusBarItem>
-                <TextBlock Text="{Binding LineCount, StringFormat='{}{0:N0} lines'}" />
+                <TextBlock Text="{Binding SelectedTab.LineCount, StringFormat='{}{0:N0} lines', FallbackValue=''}" />
             </StatusBarItem>
             <Separator />
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SelectedTab.StatusText}" VerticalAlignment="Center" />
                     <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
-                            Command="{Binding CancelIndexingCommand}"
-                            Visibility="{Binding IsIndexing, Converter={StaticResource BoolToVisibility}}" />
+                            Command="{Binding SelectedTab.CancelIndexingCommand}"
+                            Visibility="{Binding SelectedTab.IsIndexing, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                 </StackPanel>
             </StatusBarItem>
             <StatusBarItem>
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding CopyMessage}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SelectedTab.CopyMessage}" VerticalAlignment="Center" />
                     <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
-                            Command="{Binding CancelCopyCommand}"
-                            Visibility="{Binding IsCopying, Converter={StaticResource BoolToVisibility}}" />
+                            Command="{Binding SelectedTab.CancelCopyCommand}"
+                            Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
                 </StackPanel>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding SelectedTab.ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
+                    <TextBlock Text="{Binding ErrorMessage}" Margin="8,0,0,0" Foreground="{DynamicResource ErrorForegroundBrush}" />
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
-        <Grid>
-            <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
-            <ScrollViewer CanContentScroll="True" Focusable="False"
-                          VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Selection="{Binding Selection}"
-                                FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
-                                FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
-            </ScrollViewer>
-        </Grid>
+        <!-- One LogTabView per open tab, all kept alive; only the selected one is visible. -->
+        <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <Grid />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <views:LogTabView Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
     </DockPanel>
 </Window>
