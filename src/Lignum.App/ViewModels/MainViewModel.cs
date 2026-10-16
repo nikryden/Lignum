@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Lignum.App.Viewer;
 using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
@@ -38,6 +39,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string? _errorMessage;
 
+    /// <summary>What the viewer shows: every line of the open document. Null until a file is opened.</summary>
+    [ObservableProperty]
+    private LineSource? _lines;
+
     public string Title => FileName is null ? AppName : $"{FileName} - {AppName}";
 
     /// <summary>
@@ -63,6 +68,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         FileName = document.FileName;
         document.LinesAdded += (_, _) => RequestRefresh(document);
+        Lines = LineSource.ForDocument(document); // subscribes before indexing starts
 
         var completion = document.StartIndexing();
         Refresh(document);

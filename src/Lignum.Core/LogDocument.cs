@@ -15,7 +15,7 @@ namespace Lignum.Core;
 /// A trailing newline does not start an extra empty line; text after the last newline is a line.
 /// An empty file has no lines. Encoding is UTF-8 for now.
 /// </remarks>
-public sealed class LogDocument : IDisposable
+public sealed partial class LogDocument : IDisposable
 {
     private const int ReadBufferSize = 1 << 20;
 

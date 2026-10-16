@@ -64,6 +64,27 @@ public class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Opening_a_file_gives_the_viewer_a_source_for_its_lines()
+    {
+        using var vm = new MainViewModel();
+        Assert.Null(vm.Lines);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        await vm.OpenFileAsync(WriteLog("app.log", "alpha\nbeta\n"));
+
+        Assert.NotNull(vm.Lines);
+        Assert.Contains(nameof(MainViewModel.Lines), changed);
+        Assert.Equal(2, vm.Lines.RowCount);
+        Assert.Equal(["alpha", "beta"], (await vm.Lines.ReadRowsAsync(0, 10)).Select(r => r.Text));
+
+        var first = vm.Lines;
+        await vm.OpenFileAsync(WriteLog("other.log", "gamma\n"));
+        Assert.NotSame(first, vm.Lines);
+        Assert.Equal("gamma", (await vm.Lines!.ReadRowsAsync(0, 1))[0].Text);
+    }
+
+    [Fact]
     public async Task Opening_a_missing_file_reports_an_error_and_keeps_the_previous_state()
     {
         using var vm = new MainViewModel();
