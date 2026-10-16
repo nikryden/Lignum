@@ -10,15 +10,10 @@ public partial class LogTabView : UserControl
     {
         InitializeComponent();
         IsVisibleChanged += OnIsVisibleChanged;
+        DataContextChanged += OnDataContextChanged;
     }
 
-    // ---- detail pane (ticket 07). Clicking a row stands in for the caret/selection until tickets 05/08. ----
-
-    private void OnLogViewLineClicked(object? sender, long line)
-    {
-        if (DataContext is LogTabViewModel tab) tab.Detail.CurrentLine = line;
-    }
-
+    /// <summary>The truncation marker was clicked (ticket 07): open the detail pane on that line.</summary>
     private void OnFullLineRequested(object? sender, long line)
     {
         if (DataContext is LogTabViewModel tab) tab.Detail.CurrentLine = line;
@@ -32,5 +27,18 @@ public partial class LogTabView : UserControl
         {
             Dispatcher.BeginInvoke(() => LogView.Focus(), System.Windows.Threading.DispatcherPriority.Input);
         }
+    }
+
+    /// <summary>Jumps (go to line, Ctrl+Home/End) scroll this tab's viewer to the caret (ticket 05).</summary>
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is LogTabViewModel old) old.Navigation.RevealRequested -= OnRevealRequested;
+        if (e.NewValue is LogTabViewModel tab) tab.Navigation.RevealRequested += OnRevealRequested;
+    }
+
+    private void OnRevealRequested(object? sender, EventArgs e)
+    {
+        LogView.RevealCaret();
+        if (IsVisible) LogView.Focus();
     }
 }

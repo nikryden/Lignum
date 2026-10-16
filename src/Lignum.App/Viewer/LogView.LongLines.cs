@@ -7,8 +7,7 @@ namespace Lignum.App.Viewer;
 
 /// <summary>
 /// Long lines (ticket 07): rows cut at <see cref="LineSource.DisplayLimit"/> end with a clickable marker that
-/// raises <see cref="FullLineRequested"/>. A left click on any row raises <see cref="LineClicked"/>, which feeds
-/// the detail pane until the caret/selection (tickets 05/08) take over.
+/// raises <see cref="FullLineRequested"/>. (The detail pane otherwise follows the caret; see LogTabViewModel.)
 /// </summary>
 public sealed partial class LogView
 {
@@ -22,9 +21,6 @@ public sealed partial class LogView
     // Where the markers were drawn in the last render, for hit-testing.
     private readonly List<(Rect Bounds, long Line)> _markerHits = [];
 
-    /// <summary>The user clicked a row: its 0-based file line number.</summary>
-    public event EventHandler<long>? LineClicked;
-
     /// <summary>The user clicked a truncation marker: show this 0-based file line in full.</summary>
     public event EventHandler<long>? FullLineRequested;
 
@@ -37,14 +33,6 @@ public sealed partial class LogView
 
     private void InitializeLongLines() => SetResourceReference(MarkerForegroundProperty, ThemeKeys.LineNumberForeground);
 
-    /// <summary>The 0-based file line shown in the row under <paramref name="point"/>, if it is loaded.</summary>
-    public long? LineAt(Point point)
-    {
-        if (point.Y < 0 || point.Y >= ActualHeight) return null;
-        var row = Geometry.PointToPosition(point).Row;
-        return TryGetRow(row)?.LineNumber;
-    }
-
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(e);
@@ -56,8 +44,6 @@ public sealed partial class LogView
             e.Handled = true;
             return;
         }
-
-        if (LineAt(point) is { } clicked) LineClicked?.Invoke(this, clicked);
     }
 
     protected override void OnMouseMove(MouseEventArgs e)

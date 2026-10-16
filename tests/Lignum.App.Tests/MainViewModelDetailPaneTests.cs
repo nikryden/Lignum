@@ -44,6 +44,20 @@ public sealed class MainViewModelDetailPaneTests : IDisposable
     }
 
     [Fact]
+    public async Task The_detail_pane_follows_the_caret_line()
+    {
+        using var vm = Create();
+        await vm.OpenFileAsync(WriteFile("zero\none\ntwo\n")).WaitAsync(TimeSpan.FromSeconds(30));
+        var tab = vm.SelectedTab!;
+
+        Assert.True(tab.Navigation.TryGoToLine("3", out _));
+        await tab.Detail.WhenLoaded;
+
+        Assert.Equal(2, tab.Detail.CurrentLine);
+        Assert.Equal("two", tab.Detail.Text);
+    }
+
+    [Fact]
     public async Task Each_tab_keeps_its_own_detail_line()
     {
         using var vm = Create();
