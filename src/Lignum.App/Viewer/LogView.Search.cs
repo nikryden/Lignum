@@ -89,9 +89,9 @@ public sealed partial class LogView
         var lastColumn = firstColumn + maxColumns;
         foreach (var match in query.FindMatches(row.Text))
         {
-            var start = TabExpansion.ColumnOf(row.Text, match.Start, TabWidth);
+            var start = TabExpansion.IndexToColumn(row.Text, TabWidth, match.Start);
             if (start >= lastColumn) break;
-            var end = TabExpansion.ColumnOf(row.Text, match.Start + match.Length, TabWidth);
+            var end = TabExpansion.IndexToColumn(row.Text, TabWidth, match.Start + match.Length);
             if (end <= firstColumn) continue;
             var left = textLeft + (Math.Max(start, firstColumn) - firstColumn) * _charWidth;
             var right = textLeft + (Math.Min(end, lastColumn) - firstColumn) * _charWidth;

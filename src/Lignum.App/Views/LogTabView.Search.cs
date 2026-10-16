@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using Lignum.App.ViewModels;
+using Lignum.App.Viewer;
 
 namespace Lignum.App.Views;
 
@@ -10,9 +11,14 @@ public partial class LogTabView
 {
     private GridLength _resultsHeight = new(1, GridUnitType.Star);
     private SearchViewModel? _search;
+    private LogTabViewModel? _tab;
 
     private void AttachSearch(LogTabViewModel? oldTab, LogTabViewModel? newTab)
     {
+        if (oldTab is not null) oldTab.Navigation.PropertyChanged -= OnNavigationPropertyChanged;
+        _tab = newTab;
+        if (newTab is not null) newTab.Navigation.PropertyChanged += OnNavigationPropertyChanged;
+
         if (_search is { } old)
         {
             old.NavigateRequested -= OnNavigateRequested;
@@ -71,7 +77,16 @@ public partial class LogTabView
     {
         LogView.MarkedLine = line;
         ResultsView.MarkedLine = line;
-        LogView.BringRowIntoView(line); // the main view shows every line, so row == line
+        if (_tab is { } tab)
+        {
+            tab.Navigation.Caret = new FilePosition(line, 0); // the caret (ticket 05) goes to the result's line
+            LogView.RevealCaret();
+        }
+        else
+        {
+            LogView.BringRowIntoView(line); // the main view shows every line, so row == line
+        }
+
         if (_search?.CurrentResultRow is { } row) ResultsView.BringRowIntoView(row);
     }
 
@@ -80,12 +95,12 @@ public partial class LogTabView
         if (ResultsView.RowAt(e.GetPosition(ResultsView)) is { } row) _search?.GoToResult(row);
     }
 
-    /// <summary>F3 continues from the line clicked in the main view.</summary>
-    private void OnMainViewMouseDown(object sender, MouseButtonEventArgs e)
+    /// <summary>F3 / Shift+F3 continue from wherever the caret is (a click, arrow keys, go to line).</summary>
+    private void OnNavigationPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (_search is { } search && LogView.RowAt(e.GetPosition(LogView)) is { } row && LogView.Source is { } source)
+        if (e.PropertyName == nameof(NavigationViewModel.Caret) && _tab is { } tab && _search is { } search)
         {
-            search.CurrentLine = source.Lines[row];
+            search.CurrentLine = tab.Navigation.Caret.Line;
         }
     }
 }

@@ -10,7 +10,7 @@ public partial class LogTabView : UserControl
     {
         InitializeComponent();
         IsVisibleChanged += OnIsVisibleChanged;
-        DataContextChanged += (_, e) => AttachSearch(e.OldValue as LogTabViewModel, e.NewValue as LogTabViewModel);
+        DataContextChanged += OnDataContextChanged;
     }
 
     /// <summary>When this tab becomes the visible one, give its viewer the keyboard.</summary>
@@ -20,5 +20,19 @@ public partial class LogTabView : UserControl
         {
             Dispatcher.BeginInvoke(() => LogView.Focus(), System.Windows.Threading.DispatcherPriority.Input);
         }
+    }
+
+    /// <summary>Jumps (go to line, Ctrl+Home/End) scroll this tab's viewer to the caret (ticket 05).</summary>
+    private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.OldValue is LogTabViewModel old) old.Navigation.RevealRequested -= OnRevealRequested;
+        if (e.NewValue is LogTabViewModel tab) tab.Navigation.RevealRequested += OnRevealRequested;
+        AttachSearch(e.OldValue as LogTabViewModel, e.NewValue as LogTabViewModel);
+    }
+
+    private void OnRevealRequested(object? sender, EventArgs e)
+    {
+        LogView.RevealCaret();
+        if (IsVisible) LogView.Focus();
     }
 }

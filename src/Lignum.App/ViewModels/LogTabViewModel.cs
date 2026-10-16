@@ -83,6 +83,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
         document.LinesAdded += (_, _) => RequestRefresh(document);
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts
         AttachChangeDetection(document);
+        AttachNavigation(document);
         Search.SetDocument(document);
 
         var completion = document.StartIndexing();

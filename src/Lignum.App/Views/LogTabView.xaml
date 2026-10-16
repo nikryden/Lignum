@@ -24,12 +24,17 @@
             <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
             <ScrollViewer Grid.Row="1" CanContentScroll="True" Focusable="False"
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                 Highlight="{Binding Search.Highlight}"
-                                MouseLeftButtonDown="OnMainViewMouseDown"
                                 FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                 FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <!-- Ctrl+Home/End (ticket 05): bound here because the ScrollViewer handles them before the window sees them. -->
+                    <viewer:LogView.InputBindings>
+                        <KeyBinding Gesture="Ctrl+Home" Command="{Binding Navigation.GoToStartCommand}" />
+                        <KeyBinding Gesture="Ctrl+End" Command="{Binding Navigation.GoToEndCommand}" />
+                    </viewer:LogView.InputBindings>
+                </viewer:LogView>
             </ScrollViewer>
             <!-- Results pane (find all / filter): drag the splitter to resize; ✕ or Search > Results pane collapses it. -->
             <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" ResizeDirection="Rows"

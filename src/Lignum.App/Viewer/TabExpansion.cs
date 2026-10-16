@@ -28,23 +28,35 @@ public static class TabExpansion
         return sb.ToString();
     }
 
-    /// <summary>
-    /// The display column where character <paramref name="index"/> of <paramref name="text"/> starts once tabs
-    /// are expanded (an index past the end maps to the end of the line).
-    /// </summary>
-    public static int ColumnOf(string text, int index, int tabWidth)
+    /// <summary>The display column of the gap before <paramref name="index"/> in <paramref name="text"/> (clamped to the end).</summary>
+    public static int IndexToColumn(string text, int tabWidth, int index)
     {
         tabWidth = Math.Max(1, tabWidth);
-        index = Math.Clamp(index, 0, text.Length);
-        var firstTab = text.AsSpan(0, index).IndexOf('\t');
-        if (firstTab < 0) return index;
-
-        var column = firstTab;
-        for (var i = firstTab; i < index; i++)
-        {
-            column += text[i] == '\t' ? tabWidth - column % tabWidth : 1;
-        }
-
+        var end = Math.Clamp(index, 0, text.Length);
+        var column = 0;
+        for (var i = 0; i < end; i++) column = NextColumn(text[i], column, tabWidth);
         return column;
     }
+
+    /// <summary>
+    /// The character gap nearest to display <paramref name="column"/>: a click inside a tab goes to whichever
+    /// side is closer, a column past the end of the line goes to the end.
+    /// </summary>
+    public static int ColumnToIndex(string text, int tabWidth, int column)
+    {
+        tabWidth = Math.Max(1, tabWidth);
+        var current = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (current >= column) return i;
+            var next = NextColumn(text[i], current, tabWidth);
+            if (next > column) return column - current <= next - column ? i : i + 1;
+            current = next;
+        }
+
+        return text.Length;
+    }
+
+    private static int NextColumn(char c, int column, int tabWidth) =>
+        c == '\t' ? column + tabWidth - column % tabWidth : column + 1;
 }
