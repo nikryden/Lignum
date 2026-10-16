@@ -12,8 +12,14 @@ public sealed partial class LogTabViewModel
     /// <summary>Copies selections; <see cref="MainViewModel"/> hands every tab its own (clipboard, prompts).</summary>
     internal SelectionCopier? Copier { get; set; }
 
-    /// <summary>This tab's selection, as file positions. The viewer reads and updates it.</summary>
-    public TextSelection Selection { get; } = new();
+    private TextSelection? _selection;
+
+    /// <summary>
+    /// This tab's selection, as file positions. The viewer reads and updates it. Its caret is the tab's caret
+    /// (<see cref="NavigationViewModel.Caret"/>): they are kept equal, and a caret move that did not come from
+    /// the selection (plain arrows, a click without Shift, go to line) clears it.
+    /// </summary>
+    public TextSelection Selection => _selection ??= CreateSelection();
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CopyCommand), nameof(CancelCopyCommand))]
@@ -50,6 +56,19 @@ public sealed partial class LogTabViewModel
 
     [RelayCommand(CanExecute = nameof(IsCopying))]
     private void CancelCopy() => _copyCancel?.Cancel();
+
+    private TextSelection CreateSelection()
+    {
+        var selection = new TextSelection();
+        var navigation = Navigation;
+        selection.Changed += (_, _) => navigation.Caret = selection.Caret;
+        navigation.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(NavigationViewModel.Caret) && navigation.Caret != selection.Caret)
+                selection.MoveCaret(navigation.Caret, extend: false);
+        };
+        return selection;
+    }
 
     /// <summary>A newly opened or reloaded file starts with nothing selected.</summary>
     private void ResetSelection() => Selection.MoveCaret(default, extend: false);

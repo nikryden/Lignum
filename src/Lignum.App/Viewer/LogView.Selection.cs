@@ -9,10 +9,10 @@ namespace Lignum.App.Viewer;
 
 /// <summary>
 /// Selection: the view draws and edits a <see cref="TextSelection"/> (file positions, so it survives
-/// scrolling). Drag selects, Shift+Click extends, Shift+arrows/Home/End/PageUp/PageDown move the caret
-/// and extend. Columns on screen are tab-expanded; they are mapped back to character indexes with
-/// <see cref="TabExpansion"/>. Rows map to file lines through the source's line list, so the same code
-/// works for the results pane.
+/// scrolling). Drag selects, Shift+Click extends, Shift+arrows/Home/End/PageUp/PageDown extend from the
+/// caret. The selection's caret is also written to <see cref="Caret"/>, so the caret bar and the status bar
+/// follow it; the view model collapses the selection when the caret moves on its own (plain keys, Go to line).
+/// Columns are character indexes, mapped to tab-expanded display columns with <see cref="TabExpansion"/>.
 /// </summary>
 public sealed partial class LogView
 {
@@ -28,7 +28,7 @@ public sealed partial class LogView
     private Point _dragPoint;
     private DispatcherTimer? _dragScrollTimer;
 
-    /// <summary>The selection shown and edited by this view. Null: no selection or caret.</summary>
+    /// <summary>The selection shown and edited by this view. Null: clicks only place the caret.</summary>
     public TextSelection? Selection
     {
         get => (TextSelection?)GetValue(SelectionProperty);
@@ -53,60 +53,39 @@ public sealed partial class LogView
 
     private void OnSelectionMoved(object? sender, EventArgs e) => InvalidateVisual();
 
-    // ---- drawing (called from OnRender) ----
-
-    /// <summary>Highlights the selected part of one row, behind its text.</summary>
+    /// <summary>Highlights the selected part of one row, behind its text (called from OnRender).</summary>
     private void DrawRowSelection(DrawingContext dc, DisplayRow row, double y, double textLeft, int firstColumn)
     {
         if (Selection?.ColumnsOn(row.LineNumber) is not { } range) return;
         var text = row.Text;
-        var from = TabExpansion.ToDisplayColumn(text, TabWidth, Math.Min(range.From, text.Length));
+        var from = TabExpansion.IndexToColumn(text, TabWidth, range.From);
         var to = range.To > text.Length
-            ? TabExpansion.ToDisplayColumn(text, TabWidth, text.Length) + 1 // the line break counts as one cell
-            : TabExpansion.ToDisplayColumn(text, TabWidth, range.To);
+            ? TabExpansion.IndexToColumn(text, TabWidth, text.Length) + 1 // the line break counts as one cell
+            : TabExpansion.IndexToColumn(text, TabWidth, range.To);
         var left = textLeft + Math.Max(0, from - firstColumn) * _charWidth;
         var right = textLeft + Math.Max(0, (long)to - firstColumn) * _charWidth;
         if (right > left) dc.DrawRectangle(SelectionBackground, null, new Rect(left, y, right - left, _lineHeight));
     }
 
-    /// <summary>A thin caret where the selection ends, while the view has keyboard focus.</summary>
-    private void DrawCaret(DrawingContext dc, long firstRow, int rowCount, double textLeft, int firstColumn)
+    /// <summary>Moves the selection's caret (extending or not) and the caret with it, then scrolls to it.</summary>
+    private void SetSelectionCaret(TextSelection selection, FilePosition position, bool extend)
     {
-        if (Selection is not { } selection || !IsKeyboardFocused) return;
-        var caret = selection.Caret;
-        for (var i = 0; i < rowCount; i++)
-        {
-            if (TryGetRow(firstRow + i) is not { } row || row.LineNumber != caret.Line) continue;
-            var column = TabExpansion.ToDisplayColumn(row.Text, TabWidth, Math.Min(caret.Column, row.Text.Length));
-            if (column < firstColumn) return;
-            var x = Math.Round(textLeft + (column - firstColumn) * _charWidth);
-            dc.DrawRectangle(Foreground, null, new Rect(x, i * _lineHeight, 1, _lineHeight));
-            return;
-        }
-    }
-
-    protected override void OnGotKeyboardFocus(KeyboardFocusChangedEventArgs e)
-    {
-        base.OnGotKeyboardFocus(e);
-        InvalidateVisual();
-    }
-
-    protected override void OnLostKeyboardFocus(KeyboardFocusChangedEventArgs e)
-    {
-        base.OnLostKeyboardFocus(e);
-        InvalidateVisual();
+        selection.MoveCaret(position, extend);
+        SetCurrentValue(CaretProperty, position);
+        RevealCaret();
     }
 
     // ---- mouse ----
 
-    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    /// <summary>Left button down: place or (Shift) extend the selection and start dragging. False without a selection.</summary>
+    private bool BeginSelectionDrag(MouseButtonEventArgs e)
     {
-        base.OnMouseLeftButtonDown(e);
-        Focus();
-        if (Selection is not { } selection || HitTest(e.GetPosition(this)) is not { } position) return;
-        selection.MoveCaret(position, extend: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
+        if (Selection is not { } selection) return false;
+        if (HitTest(e.GetPosition(this)) is not { } position) return true;
+        SetSelectionCaret(selection, position, extend: Keyboard.Modifiers.HasFlag(ModifierKeys.Shift));
         _dragging = CaptureMouse();
         e.Handled = true;
+        return true;
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
@@ -163,7 +142,9 @@ public sealed partial class LogView
         if (p.X < _textLeft && FirstColumn > 0) ScrollColumns(-1);
         else if (p.X > ActualWidth) ScrollColumns(1);
         var clamped = new Point(p.X, Math.Clamp(p.Y, 0, Math.Max(0, ViewportRows * LineHeight - 1)));
-        if (HitTest(clamped) is { } position) selection.MoveCaret(position, extend: true);
+        if (HitTest(clamped) is not { } position) return;
+        selection.MoveCaret(position, extend: true);
+        SetCurrentValue(CaretProperty, position);
     }
 
     /// <summary>The file position nearest to a point in the view, or null when there are no rows.</summary>
@@ -172,7 +153,11 @@ public sealed partial class LogView
         if (Source is not { } source || source.RowCount == 0) return null;
         var position = Geometry.PointToPosition(point);
         var row = Math.Clamp(position.Row, 0, source.RowCount - 1);
-        return new FilePosition(source.Lines[row], ToCharColumn(row, position.Column));
+        // A row not read yet (just scrolled in) has no text to map tabs with: assume none.
+        var column = TryGetRow(row) is { } loaded
+            ? TabExpansion.ColumnToIndex(loaded.Text, TabWidth, position.Column)
+            : position.Column;
+        return new FilePosition(source.Lines[row], column);
     }
 
     // ---- keyboard ----
@@ -184,63 +169,31 @@ public sealed partial class LogView
         if (Source is not { } source || source.RowCount == 0) return false;
 
         var caret = selection.Caret;
-        var row = RowOf(source.Lines, caret.Line);
-        var column = ClampColumn(row, caret.Column);
+        var length = LoadedText(caret.Line)?.Length;
+        var column = Math.Min(caret.Column, length ?? int.MaxValue);
+        var row = source.RowOfLine(caret.Line);
+        var page = Math.Max(1, ViewportRows);
         switch (e.Key)
         {
-            case Key.Left when column > 0: column--; break;
-            case Key.Left when row > 0: row--; column = LineLength(row) ?? int.MaxValue; break;
-            case Key.Left: break;
-            case Key.Right when column < (LineLength(row) ?? int.MaxValue): column++; break;
-            case Key.Right when row + 1 < source.RowCount: row++; column = 0; break;
-            case Key.Right: break;
-            case Key.Up: row = Math.Max(0, row - 1); break;
-            case Key.Down: row = Math.Min(source.RowCount - 1, row + 1); break;
-            case Key.PageUp: row = Math.Max(0, row - Math.Max(1, ViewportRows)); break;
-            case Key.PageDown: row = Math.Min(source.RowCount - 1, row + Math.Max(1, ViewportRows)); break;
-            case Key.Home: column = 0; break;
-            case Key.End: column = LineLength(row) ?? int.MaxValue; break;
+            case Key.Left when column > 0: caret = caret with { Column = column - 1 }; break;
+            case Key.Left when row > 0:
+                var previous = source.Lines[row - 1];
+                caret = new FilePosition(previous, LoadedText(previous)?.Length ?? 0);
+                break;
+            case Key.Right when length is null || column < length: caret = caret with { Column = column + 1 }; break;
+            case Key.Right when row + 1 < source.RowCount: caret = new FilePosition(source.Lines[row + 1], 0); break;
+            case Key.Left or Key.Right: return true; // at the start or end of the file
+            case Key.Up: caret = ByRows(source, caret, -1); break;
+            case Key.Down: caret = ByRows(source, caret, 1); break;
+            case Key.PageUp: caret = ByRows(source, caret, -page); break;
+            case Key.PageDown: caret = ByRows(source, caret, page); break;
+            case Key.Home: caret = caret with { Column = 0 }; break;
+            case Key.End when length is { } end: caret = caret with { Column = end }; break;
+            case Key.End: return true; // the line is not read yet
             default: return false;
         }
 
-        selection.MoveCaret(new FilePosition(source.Lines[row], ClampColumn(row, column)), extend: true);
-        EnsureVisible(row, column);
+        SetSelectionCaret(selection, caret, extend: true);
         return true;
     }
-
-    /// <summary>Scrolls just enough to show a row and (when its text is loaded) a character column.</summary>
-    private void EnsureVisible(long row, int column)
-    {
-        var rows = Math.Max(1, ViewportRows);
-        if (row < FirstRow) SetCurrentValue(FirstRowProperty, row);
-        else if (row >= FirstRow + rows) SetCurrentValue(FirstRowProperty, row - rows + 1);
-
-        if (TryGetRow(row) is not { } loaded) return;
-        var display = TabExpansion.ToDisplayColumn(loaded.Text, TabWidth, Math.Min(column, loaded.Text.Length));
-        var columns = Math.Max(1, ViewportColumns);
-        if (display < FirstColumn) FirstColumn = display;
-        else if (display >= FirstColumn + columns) FirstColumn = display - columns + 1;
-    }
-
-    /// <summary>The row showing <paramref name="line"/> (or the nearest one before it): rows are in line order.</summary>
-    private static long RowOf(ILineList lines, long line)
-    {
-        long lo = 0, hi = lines.Count - 1;
-        while (lo < hi)
-        {
-            var mid = lo + (hi - lo + 1) / 2;
-            if (lines[mid] <= line) lo = mid;
-            else hi = mid - 1;
-        }
-
-        return Math.Max(0, lo);
-    }
-
-    private int? LineLength(long row) => TryGetRow(row)?.Text.Length;
-
-    private int ClampColumn(long row, int column) => LineLength(row) is { } length ? Math.Min(column, length) : column;
-
-    /// <summary>A display column on a row as a character index (tabs expanded); unloaded rows assume no tabs.</summary>
-    private int ToCharColumn(long row, int displayColumn) =>
-        TryGetRow(row) is { } loaded ? TabExpansion.ToCharIndex(loaded.Text, TabWidth, displayColumn) : displayColumn;
 }

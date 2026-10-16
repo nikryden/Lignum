@@ -176,6 +176,54 @@ public class SelectionCopyTests : IDisposable
         Assert.False(vm.Tabs[0].Selection.IsEmpty);
     }
 
+    [Fact]
+    public async Task Extending_the_selection_moves_the_tab_caret()
+    {
+        using var vm = CreateMain();
+        var path = Path.Combine(_dir, "caret.log");
+        File.WriteAllText(path, "one\ntwo\nthree\n");
+        await vm.OpenFileAsync(path);
+        var tab = vm.SelectedTab!;
+
+        tab.Selection.MoveCaret(new FilePosition(2, 3), extend: true);
+
+        Assert.Equal(new FilePosition(2, 3), tab.Navigation.Caret);
+        Assert.Equal("Ln 3, Col 4", tab.Navigation.CaretText);
+        Assert.False(tab.Selection.IsEmpty);
+    }
+
+    [Fact]
+    public async Task Moving_the_caret_without_extending_clears_the_selection()
+    {
+        using var vm = CreateMain();
+        var path = Path.Combine(_dir, "caret.log");
+        File.WriteAllText(path, "one\ntwo\nthree\n");
+        await vm.OpenFileAsync(path);
+        var tab = vm.SelectedTab!;
+        tab.SelectAllCommand.Execute(null);
+
+        tab.Navigation.GoToEndCommand.Execute(null); // Ctrl+End; plain arrows and Go to line work the same way
+
+        Assert.True(tab.Selection.IsEmpty);
+        Assert.Equal(new FilePosition(2, 0), tab.Selection.Caret);
+    }
+
+    [Fact]
+    public async Task Select_all_leaves_the_caret_at_the_start_of_the_file()
+    {
+        using var vm = CreateMain();
+        var path = Path.Combine(_dir, "caret.log");
+        File.WriteAllText(path, "one\ntwo\nthree\n");
+        await vm.OpenFileAsync(path);
+        var tab = vm.SelectedTab!;
+        tab.Navigation.GoToEndCommand.Execute(null);
+
+        tab.SelectAllCommand.Execute(null);
+
+        Assert.Equal(FilePosition.Start, tab.Navigation.Caret);
+        Assert.Equal(new FilePosition(2, int.MaxValue), tab.Selection.End);
+    }
+
     private sealed class FakeClipboard : IClipboardService
     {
         public List<string> Texts { get; } = [];

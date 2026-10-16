@@ -50,6 +50,7 @@ public class TextSelectionTests
 
         Assert.Equal(new FilePosition(0, 0), selection.Start);
         Assert.Equal(new FilePosition(41, int.MaxValue), selection.End);
+        Assert.Equal(new FilePosition(0, 0), selection.Caret); // the caret stays where the user reads from
     }
 
     [Fact]

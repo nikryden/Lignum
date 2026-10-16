@@ -128,8 +128,10 @@ public sealed partial class LogView : IScrollInfo
     {
         base.OnMouseDown(e);
         Focus();
+        if (e.ChangedButton == MouseButton.Left && !BeginSelectionDrag(e)) PlaceCaret(e.GetPosition(this));
     }
 
+    /// <summary>Unmodified arrows, Home/End and PageUp/PageDown move the caret (LogView.Caret.cs) and scroll to it.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -141,18 +143,7 @@ public sealed partial class LogView : IScrollInfo
         }
 
         if (Keyboard.Modifiers != ModifierKeys.None) return;
-        switch (e.Key)
-        {
-            case Key.Up: LineUp(); break;
-            case Key.Down: LineDown(); break;
-            case Key.PageUp: PageUp(); break;
-            case Key.PageDown: PageDown(); break;
-            case Key.Left: LineLeft(); break;
-            case Key.Right: LineRight(); break;
-            default: return;
-        }
-
-        e.Handled = true;
+        if (MoveCaret(e.Key)) e.Handled = true;
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)

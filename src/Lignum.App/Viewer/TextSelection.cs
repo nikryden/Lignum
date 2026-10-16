@@ -28,11 +28,14 @@ public sealed class TextSelection
         Set(extend ? Anchor : position, position);
     }
 
-    /// <summary>Selects every line; the end column is "end of line" (<c>int.MaxValue</c>).</summary>
+    /// <summary>
+    /// Selects every line: the anchor is the end of the last line (column <c>int.MaxValue</c>, "end of line")
+    /// and the caret the start of the file, where a real column is known.
+    /// </summary>
     public void SelectAll(long lineCount)
     {
         if (lineCount <= 0) Set(default, default);
-        else Set(new FilePosition(0, 0), new FilePosition(lineCount - 1, int.MaxValue));
+        else Set(new FilePosition(lineCount - 1, int.MaxValue), new FilePosition(0, 0));
     }
 
     /// <summary>

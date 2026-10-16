@@ -7,6 +7,9 @@ namespace Lignum.Core;
 /// </summary>
 public readonly record struct FilePosition(long Line, int Column) : IComparable<FilePosition>
 {
+    /// <summary>The start of the file.</summary>
+    public static FilePosition Start => default;
+
     public int CompareTo(FilePosition other)
     {
         var byLine = Line.CompareTo(other.Line);

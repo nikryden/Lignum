@@ -205,7 +205,7 @@ public sealed partial class LogView : FrameworkElement
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
 
-        DrawCaret(dc, first, wanted, textLeft, firstColumn);
+        DrawCaret(dc, first, wanted, textLeft);
     }
 
     private FormattedText Format(string text, Brush brush, double pixelsPerDip) =>

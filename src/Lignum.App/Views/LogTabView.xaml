@@ -19,10 +19,16 @@
             <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
             <ScrollViewer CanContentScroll="True" Focusable="False"
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Selection="{Binding Selection}"
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}" Selection="{Binding Selection}"
                                 FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                 FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}">
+                    <!-- Ctrl+Home/End (ticket 05): bound here because the ScrollViewer handles them before the window sees them. -->
+                    <viewer:LogView.InputBindings>
+                        <KeyBinding Gesture="Ctrl+Home" Command="{Binding Navigation.GoToStartCommand}" />
+                        <KeyBinding Gesture="Ctrl+End" Command="{Binding Navigation.GoToEndCommand}" />
+                    </viewer:LogView.InputBindings>
+                </viewer:LogView>
             </ScrollViewer>
         </Grid>
     </DockPanel>
