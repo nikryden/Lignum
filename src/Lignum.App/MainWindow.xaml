@@ -33,6 +33,10 @@
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
+                <MenuItem Header="Select _all" Command="{Binding SelectAllCommand}" InputGestureText="Ctrl+A" />
+            </MenuItem>
             <!-- Appearance (ticket 13). DataContext is the AppearanceViewModel. -->
             <MenuItem Header="_View" DataContext="{Binding Appearance, RelativeSource={RelativeSource AncestorType=Window}}">
                 <MenuItem Header="_Theme">
@@ -87,6 +91,14 @@
                             Visibility="{Binding IsIndexing, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </StatusBarItem>
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding CopyMessage}" VerticalAlignment="Center" />
+                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                            Command="{Binding CancelCopyCommand}"
+                            Visibility="{Binding IsCopying, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
             </StatusBarItem>
@@ -95,7 +107,7 @@
             <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
             <ScrollViewer CanContentScroll="True" Focusable="False"
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Selection="{Binding Selection}"
                                 FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                 FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                 TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />

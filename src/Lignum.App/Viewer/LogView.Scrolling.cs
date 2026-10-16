@@ -133,7 +133,14 @@ public sealed partial class LogView : IScrollInfo
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled || Keyboard.Modifiers != ModifierKeys.None) return;
+        if (e.Handled) return;
+        if (HandleSelectionKey(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.None) return;
         switch (e.Key)
         {
             case Key.Up: LineUp(); break;

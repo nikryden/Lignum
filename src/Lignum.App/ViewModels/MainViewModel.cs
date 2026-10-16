@@ -66,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _document?.Dispose();
         _document = document;
         ErrorMessage = null;
+        ResetSelection();
         FileName = document.FileName;
         document.LinesAdded += (_, _) => RequestRefresh(document);
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts

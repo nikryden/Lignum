@@ -78,6 +78,7 @@ public sealed partial class LogView : FrameworkElement
         SetResourceReference(LineNumberBackgroundProperty, ThemeKeys.LineNumberBackground);
         SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
         InitializeScrolling();
+        InitializeSelection();
     }
 
     /// <summary>Columns between tab stops.</summary>
@@ -195,6 +196,7 @@ public sealed partial class LogView : FrameworkElement
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
 
+            DrawRowSelection(dc, row, y, textLeft, firstColumn);
             if (row.Text.Length == 0) continue;
             // Columns are tab-expanded display columns; expand up to the right edge, then skip the scrolled-off part.
             var expanded = TabExpansion.Expand(row.Text, TabWidth, (int)Math.Min((long)firstColumn + maxChars, int.MaxValue));
@@ -202,6 +204,8 @@ public sealed partial class LogView : FrameworkElement
             var text = firstColumn == 0 ? expanded : expanded[firstColumn..];
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
+
+        DrawCaret(dc, first, wanted, textLeft, firstColumn);
     }
 
     private FormattedText Format(string text, Brush brush, double pixelsPerDip) =>
