@@ -1,4 +1,4 @@
-﻿using Lignum.App.Settings;
+using Lignum.App.Settings;
 using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
 using Serilog.Core;
@@ -33,13 +33,17 @@ public sealed class AppearanceViewModelTests : IDisposable
     {
         var vm = Create();
         var changed = new List<string?>();
-        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        vm.PropertyChanged += (_, e) => { lock (changed) changed.Add(e.PropertyName); };
 
         _windows.IsDark = true;
         _windows.RaiseChanged();
 
         Assert.Equal(AppTheme.Dark, vm.EffectiveTheme);
-        Assert.Contains(nameof(AppearanceViewModel.EffectiveTheme), changed);
+        // xUnit runs tests under its own SynchronizationContext, so the VM posts the notification: wait for it.
+        Assert.True(SpinWait.SpinUntil(() =>
+        {
+            lock (changed) return changed.Contains(nameof(AppearanceViewModel.EffectiveTheme));
+        }, TimeSpan.FromSeconds(5)));
     }
 
     [Fact]

@@ -11,10 +11,14 @@
     <DockPanel>
         <views:FileChangedBanner DockPanel.Dock="Top" />
         <Grid>
-            <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
-                            FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
-                            FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
-                            TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+            <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
+            <ScrollViewer CanContentScroll="True" Focusable="False"
+                          VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                                FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </UserControl>
