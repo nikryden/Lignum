@@ -48,5 +48,5 @@ public sealed partial class LogDocument
     }
 
     /// <summary>Most bytes <paramref name="chars"/> UTF-16 characters can take in the file's encoding.</summary>
-    private static long MaxBytesFor(int chars) => 3L * chars + 3; // UTF-8: at most 3 bytes per UTF-16 char
+    private long MaxBytesFor(int chars) => (long)Codec.MaxBytesPerChar * (chars + 1); // 3 for UTF-8, 2 for UTF-16, 1 for 1252
 }

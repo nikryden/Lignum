@@ -109,6 +109,38 @@ public class EncodingTests : IDisposable
         Assert.Equal(lines[^1], doc.ReadLine(lines.Length - 1));
     }
 
+    [Theory]
+    [InlineData("utf-16le")]
+    [InlineData("utf-16be")]
+    public async Task Search_finds_matches_in_utf16_files(string name)
+    {
+        using var doc = await OpenIndexed(Encode(Named(name), "info ok\r\nerror: dürü\r\nwarn\r\nlast error", bom: true));
+
+        using var result = doc.StartQuery(Query.Find("ERROR"));
+        await result.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        using var anchored = doc.StartQuery(Query.Find("^warn$|ü$", isRegex: true));
+        await anchored.Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.Equal([1L, 3L], Enumerable.Range(0, (int)result.Count).Select(i => result[i]));
+        // Anchors prove the line break (two-byte \r\n) was trimmed before matching.
+        Assert.Equal([1L, 2L], Enumerable.Range(0, (int)anchored.Count).Select(i => anchored[i]));
+    }
+
+    [Theory]
+    [InlineData("utf-16le")]
+    [InlineData("utf-16be")]
+    public async Task A_utf16_line_prefix_has_the_requested_number_of_characters(string name)
+    {
+        var line = new string('x', 500);
+        using var doc = await OpenIndexed(Encode(Named(name), line + "\r\n", bom: false));
+
+        var prefix = doc.ReadLinePrefix(0, 300);
+
+        Assert.Equal(new string('x', 300), prefix.Text);
+        Assert.True(prefix.IsTruncated);
+        Assert.Equal(new LinePrefix(line, false), doc.ReadLinePrefix(0, 500));
+    }
+
     [Fact]
     public async Task Overriding_the_encoding_reindexes_the_file_with_it()
     {
