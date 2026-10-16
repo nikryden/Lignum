@@ -1,0 +1,9 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Embed PDBs in the assemblies so the single-file publish is one exe with no loose .pdb files,
+         while crash logs still get file/line information. -->
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+</Project>

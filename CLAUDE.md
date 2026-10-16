@@ -12,7 +12,7 @@ Solution `Lignum.sln` at the repo root.
 ## Commands
 - Build: `dotnet build`
 - Test: `dotnet test` (CI runs `dotnet test --filter "Category!=Manual"`; tag benchmarks and multi-GB tests with `[Trait("Category", "Manual")]`)
-- Publish: `dotnet publish src/Lignum.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true`
+- Publish: `dotnet publish src/Lignum.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true` (output: one `Lignum.exe` in `src/Lignum.App/bin/Release/net10.0-windows/win-x64/publish/`; add `-p:Version=X.Y.Z` to stamp a version). CI release build: manual `Publish` workflow (`.github/workflows/publish.yml`).
 
 ## Hard constraints
 - Never load a whole file into memory. Everything goes through the line index and positional reads (`RandomAccess`).
