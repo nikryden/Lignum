@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
+using Lignum.App.Views;
 using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
@@ -35,6 +36,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     public ObservableCollection<LogTabViewModel> Tabs { get; } = [];
+
+    /// <summary>Copies selections in every tab (the clipboard and the large-copy prompt); tests replace it.</summary>
+    public SelectionCopier Copier { get; init; } = new(new WpfClipboard(), new DialogCopyPrompt());
 
     public string Title => SelectedTab is { } tab ? $"{tab.FileName} - {AppName}" : AppName;
 
@@ -78,7 +82,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
 
         ErrorMessage = null;
-        var tab = new LogTabViewModel(document, _uiContext);
+        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier };
         Tabs.Add(tab);
         SelectedTab = tab;
         AddRecentFile(tab.Path);

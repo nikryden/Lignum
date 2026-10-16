@@ -38,6 +38,8 @@ public sealed class AppSettings
 
     public int TabWidth { get; set; } = DefaultTabWidth;
 
+    public DetailPaneSettings DetailPane { get; set; } = new();
+
     /// <summary>Full paths, most recent first (File &gt; Open recent). Capped by MainViewModel.</summary>
     public List<string> RecentFiles { get; set; } = [];
 

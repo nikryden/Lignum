@@ -128,14 +128,21 @@ public sealed partial class LogView : IScrollInfo
     {
         base.OnMouseDown(e);
         Focus();
-        if (e.ChangedButton == MouseButton.Left) PlaceCaret(e.GetPosition(this));
+        if (e.ChangedButton == MouseButton.Left && !BeginSelectionDrag(e)) PlaceCaret(e.GetPosition(this));
     }
 
     /// <summary>Unmodified arrows, Home/End and PageUp/PageDown move the caret (LogView.Caret.cs) and scroll to it.</summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Handled || Keyboard.Modifiers != ModifierKeys.None) return;
+        if (e.Handled) return;
+        if (HandleSelectionKey(e))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers != ModifierKeys.None) return;
         if (MoveCaret(e.Key)) e.Handled = true;
     }
 
@@ -178,7 +185,8 @@ public sealed partial class LogView : IScrollInfo
         {
             var text = row.Text;
             var tabs = extraPerTab == 0 ? 0 : text.AsSpan().Count('\t');
-            longest = (int)Math.Min(int.MaxValue, Math.Max(longest, text.Length + (long)tabs * extraPerTab));
+            var marker = row.IsTruncated ? TruncationMarker.Length : 0; // ticket 07: the marker can be scrolled to
+            longest = (int)Math.Min(int.MaxValue, Math.Max(longest, text.Length + (long)tabs * extraPerTab + marker));
         }
 
         if (longest == _longestLine) return;

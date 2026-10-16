@@ -78,5 +78,11 @@ public sealed partial class LogDocument
         return Blocks.Read(offset, one) == 1 ? one[0] : (byte)0;
     }
 
-    private static string Decode(ReadOnlySpan<byte> bytes) => Encoding.UTF8.GetString(bytes);
+    private static string Decode(ReadOnlySpan<byte> bytes) => TextEncoding.GetString(bytes);
+
+    /// <summary>The file's text encoding. Ticket 06 replaces this with the detected one.</summary>
+    private static Encoding TextEncoding => Encoding.UTF8;
+
+    /// <summary>A stateful decoder for streaming (characters may straddle chunk edges).</summary>
+    private static Decoder CreateDecoder() => TextEncoding.GetDecoder();
 }
