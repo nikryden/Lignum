@@ -11,14 +11,17 @@ public enum RuleKind
 
 /// <summary>
 /// One condition of a <see cref="Query"/>: plain text or a regular expression, with a case setting and an
-/// on/off switch. A rule with empty text counts as disabled.
+/// on/off switch. A rule with empty text counts as disabled. <see cref="NonBacktracking"/> runs a regex
+/// on .NET's linear-time engine, which cannot blow up on patterns like <c>(a+)+$</c> but does not
+/// support backreferences, lookarounds or atomic groups. It has no effect on plain text.
 /// </summary>
 public sealed record QueryRule(
     string Text,
     RuleKind Kind = RuleKind.Include,
     bool IsRegex = false,
     bool MatchCase = false,
-    bool IsEnabled = true);
+    bool IsEnabled = true,
+    bool NonBacktracking = false);
 
 /// <summary>A span of matched text inside one line: <see cref="Start"/> and <see cref="Length"/> in UTF-16 chars.</summary>
 public readonly record struct TextMatch(int Start, int Length);
@@ -29,8 +32,9 @@ public readonly record struct TextMatch(int Start, int Length);
 /// one of them) and it matches no enabled exclude rule. Run it with <see cref="LogDocument.StartQuery"/>.
 /// </summary>
 /// <remarks>
-/// Building a query compiles its regular expressions, so an invalid pattern throws
-/// <see cref="ArgumentException"/> here, before any search starts. Regexes always run with
+/// Building a query compiles its regular expressions, so an invalid pattern (or one the NonBacktracking
+/// engine cannot run) throws <see cref="ArgumentException"/> here, before any search starts; its
+/// message is fit to show the user. Regexes always run with
 /// <see cref="RegexTimeout"/>; a line that takes longer fails the query with a
 /// <see cref="System.Text.RegularExpressions.RegexMatchTimeoutException"/>.
 /// </remarks>
@@ -48,8 +52,8 @@ public sealed class Query
     }
 
     /// <summary>A find-all query: lines containing <paramref name="text"/>.</summary>
-    public static Query Find(string text, bool matchCase = false, bool isRegex = false) =>
-        new([new QueryRule(text, RuleKind.Include, isRegex, matchCase)]);
+    public static Query Find(string text, bool matchCase = false, bool isRegex = false, bool nonBacktracking = false) =>
+        new([new QueryRule(text, RuleKind.Include, isRegex, matchCase, NonBacktracking: nonBacktracking)]);
 
     public IReadOnlyList<QueryRule> Rules { get; }
 

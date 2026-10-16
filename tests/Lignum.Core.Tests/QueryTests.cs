@@ -207,4 +207,107 @@ public class QueryTests : IDisposable
         Assert.Equal(new long[] { 0L, 2L, 4L }, await Run(doc, excludeOnly));
         Assert.Equal(new long[] { 1L, 3L, 4L }, await Run(doc, disabledInclude));
     }
+
+    [Fact]
+    public async Task A_regex_find_honours_the_case_option()
+    {
+        using var doc = await OpenIndexed("ERROR 42\nerror 7\nerror x\n");
+
+        Assert.Equal(new long[] { 0L, 1L }, await Run(doc, Query.Find(@"error \d+", isRegex: true)));
+        Assert.Equal(new long[] { 1L }, await Run(doc, Query.Find(@"error \d+", matchCase: true, isRegex: true)));
+    }
+
+    [Fact]
+    public async Task Regex_special_characters_are_literal_when_regex_is_off()
+    {
+        using var doc = await OpenIndexed("a.c\nabc\n");
+
+        Assert.Equal(new long[] { 0L }, await Run(doc, Query.Find("a.c")));
+        Assert.Equal(new long[] { 0L, 1L }, await Run(doc, Query.Find("a.c", isRegex: true)));
+    }
+
+    [Fact]
+    public async Task A_catastrophic_regex_times_out_and_fails_the_query_instead_of_hanging()
+    {
+        var evil = new string('a', 5_000) + "!";
+        using var doc = await OpenIndexed($"ok\n{evil}\n");
+        var query = new Query([new QueryRule("^(a+)+$", IsRegex: true)], TimeSpan.FromMilliseconds(100));
+
+        using var result = doc.StartQuery(query);
+        var finished = await Task.WhenAny(result.Completion, Task.Delay(TimeSpan.FromSeconds(30)));
+
+        Assert.Same(result.Completion, finished);
+        Assert.Equal(QueryState.Failed, result.State);
+        Assert.IsType<System.Text.RegularExpressions.RegexMatchTimeoutException>(result.Error);
+    }
+
+    [Theory]
+    [InlineData("(")]
+    [InlineData("[a-")]
+    [InlineData(@"a\")]
+    public void An_invalid_pattern_is_rejected_when_the_query_is_built(string pattern)
+    {
+        var error = Record.Exception(() => Query.Find(pattern, isRegex: true));
+
+        Assert.IsAssignableFrom<ArgumentException>(error);
+    }
+
+    [Fact]
+    public void An_invalid_pattern_is_fine_as_plain_text()
+    {
+        Assert.Null(Record.Exception(() => Query.Find("(", isRegex: false)));
+    }
+
+    [Fact]
+    public async Task NonBacktracking_gives_the_same_lines_as_the_default_engine()
+    {
+        using var doc = await OpenIndexed(
+            "2024-01-01 ERROR db timeout\nINFO ok\nwarn: disk 91%\nERROR: x=1, y=22\nfoo.bar@baz.com\n\n");
+        string[] patterns = [@"\d{4}-\d\d-\d\d", "error|warn", @"\w+@\w+\.com", @"y=\d+$", "^$", "[A-Z]{4,}"];
+
+        foreach (var pattern in patterns)
+        {
+            var backtracking = await Run(doc, new Query([new QueryRule(pattern, IsRegex: true)]));
+            var nonBacktracking = await Run(doc, new Query([new QueryRule(pattern, IsRegex: true, NonBacktracking: true)]));
+            Assert.Equal(backtracking, nonBacktracking);
+        }
+    }
+
+    [Fact]
+    public void NonBacktracking_highlights_the_same_matches()
+    {
+        var line = "id=12 id=345 x";
+
+        Assert.Equal(
+            Query.Find(@"id=\d+", isRegex: true).FindMatches(line),
+            Query.Find(@"id=\d+", isRegex: true, nonBacktracking: true).FindMatches(line));
+    }
+
+    [Fact]
+    public async Task NonBacktracking_handles_a_pattern_that_is_catastrophic_for_the_default_engine()
+    {
+        var evil = new string('a', 5_000) + "!";
+        using var doc = await OpenIndexed($"aaa\n{evil}\n");
+        var query = new Query([new QueryRule("^(a+)+$", IsRegex: true, NonBacktracking: true)], TimeSpan.FromSeconds(2));
+
+        Assert.Equal(new long[] { 0L }, await Run(doc, query));
+    }
+
+    [Theory]
+    [InlineData(@"(a)\1")]
+    [InlineData("a(?=b)")]
+    [InlineData("(?>a)")]
+    public void A_pattern_NonBacktracking_cannot_run_is_rejected_with_an_ArgumentException(string pattern)
+    {
+        var error = Record.Exception(() => Query.Find(pattern, isRegex: true, nonBacktracking: true));
+
+        var argument = Assert.IsAssignableFrom<ArgumentException>(error);
+        Assert.Contains("NonBacktracking", argument.Message);
+    }
+
+    [Fact]
+    public void The_NonBacktracking_flag_is_ignored_for_plain_text()
+    {
+        Assert.Null(Record.Exception(() => Query.Find(@"(a)\1", nonBacktracking: true)));
+    }
 }

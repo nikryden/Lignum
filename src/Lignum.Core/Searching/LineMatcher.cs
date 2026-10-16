@@ -82,12 +82,32 @@ internal sealed class LineMatcher
         }
     }
 
-    /// <summary>A compiled regex that always runs with a match timeout.</summary>
+    /// <summary>
+    /// A compiled regex that always runs with a match timeout (the NonBacktracking engine honours it too).
+    /// .NET accepts <c>Compiled</c> together with <c>NonBacktracking</c> (it compiles the automaton);
+    /// only <c>RightToLeft</c>/<c>ECMAScript</c> are rejected with it, and we never set those.
+    /// </summary>
     private sealed class RegexMatcher(QueryRule rule, TimeSpan timeout) : RuleMatcher
     {
-        private readonly Regex _regex = new(rule.Text,
-            RegexOptions.Compiled | RegexOptions.CultureInvariant | (rule.MatchCase ? 0 : RegexOptions.IgnoreCase),
-            timeout);
+        private readonly Regex _regex = Build(rule, timeout);
+
+        private static Regex Build(QueryRule rule, TimeSpan timeout)
+        {
+            var options = RegexOptions.Compiled | RegexOptions.CultureInvariant
+                | (rule.MatchCase ? 0 : RegexOptions.IgnoreCase)
+                | (rule.NonBacktracking ? RegexOptions.NonBacktracking : 0);
+            try
+            {
+                return new Regex(rule.Text, options, timeout);
+            }
+            catch (NotSupportedException ex)
+            {
+                // Backreferences, lookarounds, atomic groups... under NonBacktracking. Report it like any
+                // other invalid pattern so callers handle a single exception type.
+                throw new ArgumentException(
+                    "The NonBacktracking engine does not support this pattern: " + ex.Message, nameof(rule), ex);
+            }
+        }
 
         public override bool IsMatch(ReadOnlySpan<char> line) => _regex.IsMatch(line);
 
