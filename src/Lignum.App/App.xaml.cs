@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
 using Lignum.App.Diagnostics;
+using Lignum.App.ViewModels;
 
 namespace Lignum.App;
 
@@ -20,8 +21,16 @@ public partial class App : Application
 
         base.OnStartup(e);
 
-        MainWindow = new MainWindow();
+        var viewModel = new MainViewModel();
+        MainWindow = new MainWindow(viewModel);
         MainWindow.Show();
+
+        // `Lignum.exe <path>` opens that file.
+        if (e.Args.Length > 0)
+        {
+            _log.Logger.Information("Opening {Path} from the command line", e.Args[0]);
+            _ = viewModel.OpenFileAsync(e.Args[0]);
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
