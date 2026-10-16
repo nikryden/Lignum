@@ -13,6 +13,13 @@ public partial class LogTabView : UserControl
         DataContextChanged += OnDataContextChanged;
     }
 
+    /// <summary>The truncation marker was clicked (ticket 07): open the detail pane on that line.</summary>
+    private void OnFullLineRequested(object? sender, long line)
+    {
+        if (DataContext is LogTabViewModel tab) tab.Detail.CurrentLine = line;
+        if (Window.GetWindow(this)?.DataContext is MainViewModel main) main.DetailPane.IsOpen = true;
+    }
+
     /// <summary>When this tab becomes the visible one, give its viewer the keyboard.</summary>
     private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {

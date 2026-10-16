@@ -100,6 +100,15 @@
                 <MenuItem Header="Zoom _in" Command="{Binding ZoomInCommand}" InputGestureText="Ctrl+Plus / Ctrl+Wheel" />
                 <MenuItem Header="Zoom _out" Command="{Binding ZoomOutCommand}" InputGestureText="Ctrl+Minus" />
                 <MenuItem Header="_Reset zoom" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0" />
+                <Separator />
+                <!-- Detail pane (ticket 07); layout is app-wide: MainViewModel.DetailPane. -->
+                <MenuItem Header="_Detail pane" IsCheckable="True"
+                          IsChecked="{Binding DataContext.DetailPane.IsOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <MenuItem Header="Dock detail pane _right" Command="{Binding DataContext.DetailPane.DockRightCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Right}" />
+                <MenuItem Header="Dock detail pane _bottom" Command="{Binding DataContext.DetailPane.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                          IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Bottom}" />
+                <MenuItem Header="Show _full line" Command="{Binding DataContext.ShowFullLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
             </MenuItem>
         </Menu>
         <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
