@@ -49,5 +49,21 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Accept files dragged from Explorer (Preview, so the viewer and text boxes don't refuse them).</summary>
+    private void OnPreviewDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Dropping one or more files opens each in a tab (or switches to it if already open).</summary>
+    private void OnDrop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
+        e.Handled = true;
+        _ = _viewModel.OpenFilesAsync(paths);
+        Activate();
+    }
+
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
 }

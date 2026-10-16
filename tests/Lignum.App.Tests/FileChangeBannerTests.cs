@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using Lignum.App.Settings;
+using Lignum.App.Tests.Support;
 using Lignum.App.ViewModels;
+using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
@@ -14,6 +17,9 @@ public class FileChangeBannerTests : IDisposable
     {
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
+
+    private MainViewModel Create() => UiContext.None(() =>
+        new MainViewModel(new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
 
     private string WriteLog(string content)
     {
@@ -36,8 +42,9 @@ public class FileChangeBannerTests : IDisposable
     [Fact]
     public async Task No_banner_while_the_file_is_unchanged()
     {
-        using var vm = new MainViewModel();
-        await vm.OpenFileAsync(WriteLog("a\n"));
+        using var main = Create();
+        await main.OpenFileAsync(WriteLog("a\n"));
+        var vm = main.SelectedTab!;
 
         Assert.False(vm.IsFileChanged);
         Assert.False(vm.ReloadCommand.CanExecute(null));
@@ -46,9 +53,10 @@ public class FileChangeBannerTests : IDisposable
     [Fact]
     public async Task Growth_shows_the_banner_and_keeps_the_lines()
     {
-        using var vm = new MainViewModel();
+        using var main = Create();
         var path = WriteLog("a\nb\n");
-        await vm.OpenFileAsync(path);
+        await main.OpenFileAsync(path);
+        var vm = main.SelectedTab!;
 
         File.AppendAllText(path, "c\n");
 
@@ -60,9 +68,10 @@ public class FileChangeBannerTests : IDisposable
     [Fact]
     public async Task Truncation_shows_the_banner_and_drops_the_stale_lines()
     {
-        using var vm = new MainViewModel();
+        using var main = Create();
         var path = WriteLog("a\nb\nc\n");
-        await vm.OpenFileAsync(path);
+        await main.OpenFileAsync(path);
+        var vm = main.SelectedTab!;
 
         using (var stream = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
             stream.SetLength(2);
@@ -75,9 +84,10 @@ public class FileChangeBannerTests : IDisposable
     [Fact]
     public async Task Reload_rebuilds_the_index_and_hides_the_banner()
     {
-        using var vm = new MainViewModel();
+        using var main = Create();
         var path = WriteLog("a\nb\nc\n");
-        await vm.OpenFileAsync(path);
+        await main.OpenFileAsync(path);
+        var vm = main.SelectedTab!;
         File.WriteAllText(path, "x\n"); // shrinks it
         WaitUntil(() => vm.IsFileChanged);
 
@@ -86,14 +96,17 @@ public class FileChangeBannerTests : IDisposable
         Assert.False(vm.IsFileChanged);
         Assert.Equal(1, vm.LineCount);
         Assert.Equal("app.log", vm.FileName);
+        Assert.Single(main.Tabs); // reloaded in place
+        Assert.Same(vm, main.SelectedTab);
     }
 
     [Fact]
     public async Task Reload_after_rotation_opens_the_new_file()
     {
-        using var vm = new MainViewModel();
+        using var main = Create();
         var path = WriteLog("old\n");
-        await vm.OpenFileAsync(path);
+        await main.OpenFileAsync(path);
+        var vm = main.SelectedTab!;
         File.Move(path, path + ".1");
         File.WriteAllText(path, "new 1\nnew 2\n");
         WaitUntil(() => vm.IsFileChanged);
