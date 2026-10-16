@@ -70,6 +70,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         document.LinesAdded += (_, _) => RequestRefresh(document);
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts
         AttachChangeDetection(document);
+        AttachNavigation(document);
 
         var completion = document.StartIndexing();
         Refresh(document);
