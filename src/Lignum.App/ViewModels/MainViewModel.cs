@@ -63,6 +63,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ErrorMessage = null;
         FileName = document.FileName;
         document.LinesAdded += (_, _) => RequestRefresh(document);
+        AttachChangeDetection(document);
 
         var completion = document.StartIndexing();
         Refresh(document);
