@@ -116,7 +116,8 @@ public sealed partial class LogView : IScrollInfo
     protected override void OnMouseWheel(MouseWheelEventArgs e)
     {
         base.OnMouseWheel(e);
-        if (e.Handled || Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return; // Ctrl+wheel = zoom
+        // MainWindow handles Ctrl+wheel (zoom) in PreviewMouseWheel; don't scroll if anyone else lets it through.
+        if (e.Handled || Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
         var rows = _wheel.Add(e.Delta, WheelLines);
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) ScrollColumns(rows);
         else ScrollRows(rows);
@@ -150,6 +151,12 @@ public sealed partial class LogView : IScrollInfo
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
         base.OnRenderSizeChanged(sizeInfo);
+        OnViewportChanged();
+    }
+
+    /// <summary>The view's size or font changed: re-clamp the offsets and tell the ScrollViewer.</summary>
+    private void OnViewportChanged()
+    {
         CoerceValue(FirstRowProperty);
         FirstColumn = _firstColumn;
         ScrollOwner?.InvalidateScrollInfo();
@@ -168,11 +175,21 @@ public sealed partial class LogView : IScrollInfo
     private static void OnFirstRowChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
         ((LogView)d).ScrollOwner?.InvalidateScrollInfo();
 
-    /// <summary>Widens the horizontal extent to the longest line read so far.</summary>
+    /// <summary>
+    /// Widens the horizontal extent to the longest line read so far, in display columns. Tabs count as a full
+    /// tab stop (an upper bound that avoids expanding long lines on the UI thread).
+    /// </summary>
     private void OnRowsLoaded(IReadOnlyList<DisplayRow> rows)
     {
         var longest = _longestLine;
-        foreach (var row in rows) longest = Math.Max(longest, row.Text.Length);
+        var extraPerTab = Math.Max(1, TabWidth) - 1;
+        foreach (var row in rows)
+        {
+            var text = row.Text;
+            var tabs = extraPerTab == 0 ? 0 : text.AsSpan().Count('\t');
+            longest = (int)Math.Min(int.MaxValue, Math.Max(longest, text.Length + (long)tabs * extraPerTab));
+        }
+
         if (longest == _longestLine) return;
         _longestLine = longest;
         ScrollOwner?.InvalidateScrollInfo();

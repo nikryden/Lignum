@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Lignum.App.Themes;
 
 namespace Lignum.App.Viewer;
 
@@ -50,6 +51,10 @@ public sealed partial class LogView : FrameworkElement
         nameof(LineNumberBackground), typeof(Brush), typeof(LogView),
         new FrameworkPropertyMetadata(SystemColors.ControlBrush, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty TabWidthProperty = DependencyProperty.Register(
+        nameof(TabWidth), typeof(int), typeof(LogView),
+        new FrameworkPropertyMetadata(4, FrameworkPropertyMetadataOptions.AffectsRender));
+
     // Rows read so far: _rows[i] is row _rowsFirst + i. Replaced wholesale when a read completes.
     private IReadOnlyList<DisplayRow> _rows = [];
     private long _rowsFirst;
@@ -66,7 +71,20 @@ public sealed partial class LogView : FrameworkElement
         ClipToBounds = true;
         SnapsToDevicePixels = true;
         TextOptions.SetTextFormattingMode(this, TextFormattingMode.Display);
+
+        // Theme brushes (ticket 13); without the theme resources (tests) the system-brush defaults stay.
+        SetResourceReference(BackgroundProperty, ThemeKeys.ViewerBackground);
+        SetResourceReference(ForegroundProperty, ThemeKeys.ViewerForeground);
+        SetResourceReference(LineNumberBackgroundProperty, ThemeKeys.LineNumberBackground);
+        SetResourceReference(LineNumberForegroundProperty, ThemeKeys.LineNumberForeground);
         InitializeScrolling();
+    }
+
+    /// <summary>Columns between tab stops.</summary>
+    public int TabWidth
+    {
+        get => (int)GetValue(TabWidthProperty);
+        set => SetValue(TabWidthProperty, value);
     }
 
     /// <summary>The rows to show. Null shows an empty view.</summary>
@@ -177,8 +195,11 @@ public sealed partial class LogView : FrameworkElement
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
 
-            if (row.Text.Length <= firstColumn) continue;
-            var text = row.Text.Substring(firstColumn, Math.Min(maxChars, row.Text.Length - firstColumn));
+            if (row.Text.Length == 0) continue;
+            // Columns are tab-expanded display columns; expand up to the right edge, then skip the scrolled-off part.
+            var expanded = TabExpansion.Expand(row.Text, TabWidth, (int)Math.Min((long)firstColumn + maxChars, int.MaxValue));
+            if (expanded.Length <= firstColumn) continue;
+            var text = firstColumn == 0 ? expanded : expanded[firstColumn..];
             dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
         }
     }
@@ -252,8 +273,12 @@ public sealed partial class LogView : FrameworkElement
         _lineHeight = Math.Ceiling(FontFamily.LineSpacing * FontSize);
     }
 
-    private static void OnFontChanged(DependencyObject d, DependencyPropertyChangedEventArgs e) =>
-        ((LogView)d)._typeface = null;
+    private static void OnFontChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var view = (LogView)d;
+        view._typeface = null;
+        view.OnViewportChanged(); // zoom changes how many rows and columns fit
+    }
 
     private static void OnSourceChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
     {

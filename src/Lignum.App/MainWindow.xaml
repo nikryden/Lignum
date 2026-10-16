@@ -3,11 +3,25 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:viewer="clr-namespace:Lignum.App.Viewer"
         xmlns:views="clr-namespace:Lignum.App.Views"
+        xmlns:settings="clr-namespace:Lignum.App.Settings"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         Title="{Binding Title}" Height="720" Width="1200"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}"
+        PreviewMouseWheel="OnPreviewMouseWheel">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <views:EqualityConverter x:Key="IsEqual" />
     </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Gesture="Ctrl+Add" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Gesture="Ctrl+OemMinus" Command="{Binding Appearance.ZoomOutCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Gesture="Ctrl+Subtract" Command="{Binding Appearance.ZoomOutCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Gesture="Ctrl+D0" Command="{Binding Appearance.ResetZoomCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <KeyBinding Gesture="Ctrl+NumPad0" Command="{Binding Appearance.ResetZoomCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+    </Window.InputBindings>
     <Window.CommandBindings>
         <!-- ApplicationCommands.Open carries the Ctrl+O gesture. -->
         <CommandBinding Command="ApplicationCommands.Open" Executed="OnOpenExecuted" />
@@ -19,9 +33,44 @@
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
             </MenuItem>
+            <!-- Appearance (ticket 13). DataContext is the AppearanceViewModel. -->
+            <MenuItem Header="_View" DataContext="{Binding Appearance, RelativeSource={RelativeSource AncestorType=Window}}">
+                <MenuItem Header="_Theme">
+                    <MenuItem Header="Use _Windows setting" Command="{Binding SetThemeCommand}"
+                              CommandParameter="{x:Static settings:ThemeChoice.System}"
+                              IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=System}" />
+                    <MenuItem Header="_Light" Command="{Binding SetThemeCommand}"
+                              CommandParameter="{x:Static settings:ThemeChoice.Light}"
+                              IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Light}" />
+                    <MenuItem Header="_Dark" Command="{Binding SetThemeCommand}"
+                              CommandParameter="{x:Static settings:ThemeChoice.Dark}"
+                              IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Dark}" />
+                </MenuItem>
+                <MenuItem Header="_Font…" Click="OnFontClick" />
+                <MenuItem Header="Tab _width">
+                    <MenuItem Header="_2" Command="{Binding SetTabWidthCommand}"
+                              IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">
+                        <MenuItem.CommandParameter><sys:Int32>2</sys:Int32></MenuItem.CommandParameter>
+                    </MenuItem>
+                    <MenuItem Header="_4" Command="{Binding SetTabWidthCommand}"
+                              IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=4}">
+                        <MenuItem.CommandParameter><sys:Int32>4</sys:Int32></MenuItem.CommandParameter>
+                    </MenuItem>
+                    <MenuItem Header="_8" Command="{Binding SetTabWidthCommand}"
+                              IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=8}">
+                        <MenuItem.CommandParameter><sys:Int32>8</sys:Int32></MenuItem.CommandParameter>
+                    </MenuItem>
+                </MenuItem>
+                <Separator />
+                <MenuItem Header="Zoom _in" Command="{Binding ZoomInCommand}" InputGestureText="Ctrl+Plus / Ctrl+Wheel" />
+                <MenuItem Header="Zoom _out" Command="{Binding ZoomOutCommand}" InputGestureText="Ctrl+Minus" />
+                <MenuItem Header="_Reset zoom" Command="{Binding ResetZoomCommand}" InputGestureText="Ctrl+0" />
+            </MenuItem>
         </Menu>
         <views:FileChangedBanner DockPanel.Dock="Top" />
-        <StatusBar DockPanel.Dock="Bottom">
+        <StatusBar DockPanel.Dock="Bottom"
+                   Background="{DynamicResource StatusBarBackgroundBrush}"
+                   Foreground="{DynamicResource StatusBarForegroundBrush}">
             <StatusBarItem>
                 <TextBlock Text="{Binding FileName, TargetNullValue='No file open'}" />
             </StatusBarItem>
@@ -39,14 +88,17 @@
                 </StackPanel>
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock Text="{Binding ErrorMessage}" Foreground="Firebrick" />
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
             </StatusBarItem>
         </StatusBar>
         <Grid>
             <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
             <ScrollViewer CanContentScroll="True" Focusable="False"
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                <viewer:LogView x:Name="LogView" Source="{Binding Lines}" />
+                <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                                FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
             </ScrollViewer>
         </Grid>
     </DockPanel>
