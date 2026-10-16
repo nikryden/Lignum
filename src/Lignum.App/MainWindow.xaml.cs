@@ -16,6 +16,7 @@ public partial class MainWindow : Window
         Appearance = appearance;
         DataContext = viewModel;
         InitializeComponent();
+        InitializeSearch();
         Closed += (_, _) => _viewModel.Dispose();
         Loaded += (_, _) => LogView.Focus(); // arrow keys and PageUp/PageDown scroll the log straight away
     }

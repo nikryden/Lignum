@@ -24,4 +24,16 @@ public class TabExpansionTests
         // The viewer only needs the columns that fit on screen, even for a huge line.
         Assert.Equal("a   b", TabExpansion.Expand("a\tbcdef\t\tg", 4, maxColumns: 5));
     }
+
+    [Theory]
+    [InlineData("abc", 2, 2)]
+    [InlineData("a	b", 2, 4)]
+    [InlineData("a	b", 3, 5)]
+    [InlineData("		x", 2, 8)]
+    [InlineData("ab", 5, 2)]
+    public void A_string_index_maps_to_its_display_column(string text, int index, int expected)
+    {
+        // Search matches are found in the raw text but drawn in tab-expanded columns.
+        Assert.Equal(expected, TabExpansion.ColumnOf(text, index, tabWidth: 4));
+    }
 }

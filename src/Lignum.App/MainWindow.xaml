@@ -21,10 +21,14 @@
         <KeyBinding Gesture="Ctrl+Subtract" Command="{Binding Appearance.ZoomOutCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+D0" Command="{Binding Appearance.ResetZoomCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <KeyBinding Gesture="Ctrl+NumPad0" Command="{Binding Appearance.ResetZoomCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+        <!-- Find (ticket 10). Ctrl+F is ApplicationCommands.Find's own gesture. -->
+        <KeyBinding Gesture="F3" Command="{Binding Search.FindNextCommand}" />
+        <KeyBinding Gesture="Shift+F3" Command="{Binding Search.FindPreviousCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <!-- ApplicationCommands.Open carries the Ctrl+O gesture. -->
         <CommandBinding Command="ApplicationCommands.Open" Executed="OnOpenExecuted" />
+        <CommandBinding Command="ApplicationCommands.Find" Executed="OnFindExecuted" />
     </Window.CommandBindings>
     <DockPanel>
         <Menu DockPanel.Dock="Top">
@@ -32,6 +36,14 @@
                 <MenuItem Header="_Open…" Command="ApplicationCommands.Open" InputGestureText="Ctrl+O" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="_Search">
+                <MenuItem Header="_Find…" Command="ApplicationCommands.Find" InputGestureText="Ctrl+F" />
+                <MenuItem Header="Find _next" Command="{Binding Search.FindNextCommand}" InputGestureText="F3" />
+                <MenuItem Header="Find _previous" Command="{Binding Search.FindPreviousCommand}" InputGestureText="Shift+F3" />
+                <Separator />
+                <MenuItem Header="_Results pane" IsCheckable="True"
+                          IsChecked="{Binding Search.IsResultsPaneOpen, Mode=TwoWay}" />
             </MenuItem>
             <!-- Appearance (ticket 13). DataContext is the AppearanceViewModel. -->
             <MenuItem Header="_View" DataContext="{Binding Appearance, RelativeSource={RelativeSource AncestorType=Window}}">
@@ -87,19 +99,62 @@
                             Visibility="{Binding IsIndexing, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </StatusBarItem>
+            <Separator />
+            <!-- Search (ticket 10): match count, progress and cancel. -->
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Search.SearchStatus}" VerticalAlignment="Center" />
+                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                            Command="{Binding Search.CancelSearchCommand}"
+                            Visibility="{Binding Search.IsSearching, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
             </StatusBarItem>
         </StatusBar>
         <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="2*" MinHeight="40" />
+                <RowDefinition x:Name="SplitterRow" Height="0" />
+                <RowDefinition x:Name="ResultsRow" Height="0" />
+            </Grid.RowDefinitions>
+            <views:FindBar x:Name="FindBar" Grid.Row="0" DataContext="{Binding Search}" />
             <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
-            <ScrollViewer CanContentScroll="True" Focusable="False"
+            <ScrollViewer Grid.Row="1" CanContentScroll="True" Focusable="False"
                           VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                 <viewer:LogView x:Name="LogView" Source="{Binding Lines}"
+                                Highlight="{Binding Search.Highlight}"
+                                MouseLeftButtonDown="OnMainViewMouseDown"
                                 FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                 FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                 TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
             </ScrollViewer>
+            <!-- Results pane (find all / filter): drag the splitter to resize, close or Search > Results pane to collapse. -->
+            <GridSplitter Grid.Row="2" Height="5" HorizontalAlignment="Stretch" ResizeDirection="Rows"
+                          ResizeBehavior="PreviousAndNext" Background="{DynamicResource PaneBorderBrush}"
+                          Visibility="{Binding Search.IsResultsPaneOpen, Converter={StaticResource BoolToVisibility}}" />
+            <DockPanel Grid.Row="3" Background="{DynamicResource PaneBackgroundBrush}"
+                       Visibility="{Binding Search.IsResultsPaneOpen, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel DockPanel.Dock="Top" Margin="8,2">
+                    <Button DockPanel.Dock="Right" Content="✕" ToolTip="Collapse the results pane" Padding="6,0"
+                            Command="{Binding Search.ToggleResultsPaneCommand}" />
+                    <TextBlock VerticalAlignment="Center">
+                        <Run Text="Results:" FontWeight="SemiBold" />
+                        <Run Text="{Binding Search.SearchStatus, Mode=OneWay}" />
+                    </TextBlock>
+                </DockPanel>
+                <ScrollViewer CanContentScroll="True" Focusable="False"
+                              VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
+                    <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
+                                    Highlight="{Binding Search.Highlight}"
+                                    MouseLeftButtonDown="OnResultsMouseDown"
+                                    FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </ScrollViewer>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </Window>

@@ -27,4 +27,24 @@ public static class TabExpansion
         if (sb.Length > maxColumns) sb.Length = maxColumns;
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The display column where character <paramref name="index"/> of <paramref name="text"/> starts once tabs
+    /// are expanded (an index past the end maps to the end of the line).
+    /// </summary>
+    public static int ColumnOf(string text, int index, int tabWidth)
+    {
+        tabWidth = Math.Max(1, tabWidth);
+        index = Math.Clamp(index, 0, text.Length);
+        var firstTab = text.AsSpan(0, index).IndexOf('\t');
+        if (firstTab < 0) return index;
+
+        var column = firstTab;
+        for (var i = firstTab; i < index; i++)
+        {
+            column += text[i] == '\t' ? tabWidth - column % tabWidth : 1;
+        }
+
+        return column;
+    }
 }

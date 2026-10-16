@@ -43,6 +43,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private LineSource? _lines;
 
+    /// <summary>Find all and the results pane for the open document (ticket 10).</summary>
+    public SearchViewModel Search { get; } = new();
+
     public string Title => FileName is null ? AppName : $"{FileName} - {AppName}";
 
     /// <summary>
@@ -70,6 +73,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         document.LinesAdded += (_, _) => RequestRefresh(document);
         Lines = LineSource.ForDocument(document); // subscribes before indexing starts
         AttachChangeDetection(document);
+        Search.SetDocument(document);
 
         var completion = document.StartIndexing();
         Refresh(document);
@@ -82,6 +86,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        Search.Dispose();
         _document?.Dispose();
         _document = null;
     }
