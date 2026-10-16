@@ -33,8 +33,20 @@ public partial class App : Application
         var appearance = new AppearanceViewModel(_settings, _systemTheme);
         ThemeManager.Follow(this, appearance);
 
+        // Line coloring rules and presets (ticket 14), in their own file, recolored on theme changes.
+        var highlighting = new HighlightingViewModel(
+            _settingsStore.Open<HighlightPresetsFile>(HighlightPresetsFile.FileName))
+        {
+            Theme = appearance.EffectiveTheme,
+        };
+        appearance.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(AppearanceViewModel.EffectiveTheme))
+                highlighting.Theme = appearance.EffectiveTheme;
+        };
+
         var viewModel = new MainViewModel(_settings);
-        MainWindow = new MainWindow(viewModel, appearance);
+        MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
         MainWindow.Show();
 
         // `Lignum.exe <path>` opens that file.

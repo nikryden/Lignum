@@ -22,6 +22,14 @@ public partial class MainWindow : Window
     /// <summary>Theme, font, zoom and tab width; XAML binds via RelativeSource AncestorType=Window.</summary>
     public AppearanceViewModel Appearance { get; }
 
+    /// <summary>Line coloring rules and presets (ticket 14); viewers bind <c>Highlighting.Highlighter</c>.</summary>
+    public HighlightingViewModel? Highlighting { get; init; }
+
+    private void OnHighlightRulesClick(object sender, RoutedEventArgs e)
+    {
+        if (Highlighting is not null) new HighlightRulesDialog(Highlighting) { Owner = this }.ShowDialog();
+    }
+
     /// <summary>Ctrl+mouse wheel zooms the text anywhere in the window.</summary>
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {

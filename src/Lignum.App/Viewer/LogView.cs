@@ -198,6 +198,8 @@ public sealed partial class LogView : FrameworkElement
             var number = Format((row.LineNumber + 1).ToString(CultureInfo.InvariantCulture),
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
+            var style = LineStyleFor(first + i, row);
+            DrawLineBackground(dc, style, y, textLeft); // under the search decorations
             DrawRowDecorations(dc, row, y, textLeft, firstColumn, maxChars);
 
             if (row.IsTruncated)
@@ -211,7 +213,7 @@ public sealed partial class LogView : FrameworkElement
             var expanded = TabExpansion.Expand(row.Text, TabWidth, (int)Math.Min((long)firstColumn + maxChars, int.MaxValue));
             if (expanded.Length <= firstColumn) continue;
             var text = firstColumn == 0 ? expanded : expanded[firstColumn..];
-            dc.DrawText(Format(text, Foreground, pixelsPerDip), new Point(textLeft, y));
+            dc.DrawText(Format(text, style?.Foreground ?? Foreground, pixelsPerDip), new Point(textLeft, y));
         }
 
         DrawCaret(dc, first, wanted, textLeft);
