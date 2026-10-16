@@ -27,4 +27,7 @@
     <SolidColorBrush x:Key="FilterIncludeBorderBrush" Color="#5A9E50" />
     <SolidColorBrush x:Key="FilterExcludeBackgroundBrush" Color="#FBE3E1" />
     <SolidColorBrush x:Key="FilterExcludeBorderBrush" Color="#C0504A" />
+
+    <!-- Bookmark dot in the viewer margin (ticket 17). -->
+    <SolidColorBrush x:Key="BookmarkMarkerBrush" Color="#1F6FD1" />
 </ResourceDictionary>

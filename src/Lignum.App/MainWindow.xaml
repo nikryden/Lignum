@@ -32,6 +32,10 @@
         <KeyBinding Gesture="Ctrl+G" Command="{x:Static local:MainWindow.GoToLineCommand}" />
         <KeyBinding Gesture="Ctrl+Home" Command="{Binding SelectedTab.Navigation.GoToStartCommand}" />
         <KeyBinding Gesture="Ctrl+End" Command="{Binding SelectedTab.Navigation.GoToEndCommand}" />
+        <!-- Bookmarks (ticket 17). -->
+        <KeyBinding Gesture="Ctrl+F2" Command="{Binding SelectedTab.ToggleBookmarkCommand}" />
+        <KeyBinding Gesture="F2" Command="{Binding SelectedTab.NextBookmarkCommand}" />
+        <KeyBinding Gesture="Shift+F2" Command="{Binding SelectedTab.PreviousBookmarkCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <!-- ApplicationCommands.Open carries the Ctrl+O gesture. -->
@@ -65,6 +69,10 @@
                 <MenuItem Header="_Line…" Command="{x:Static local:MainWindow.GoToLineCommand}" InputGestureText="Ctrl+G" />
                 <MenuItem Header="_Start of file" Command="{Binding SelectedTab.Navigation.GoToStartCommand}" InputGestureText="Ctrl+Home" />
                 <MenuItem Header="_End of file" Command="{Binding SelectedTab.Navigation.GoToEndCommand}" InputGestureText="Ctrl+End" />
+                <Separator />
+                <MenuItem Header="Toggle _bookmark" Command="{Binding SelectedTab.ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
+                <MenuItem Header="_Next bookmark" Command="{Binding SelectedTab.NextBookmarkCommand}" InputGestureText="F2" />
+                <MenuItem Header="_Previous bookmark" Command="{Binding SelectedTab.PreviousBookmarkCommand}" InputGestureText="Shift+F2" />
             </MenuItem>
             <MenuItem Header="_Search">
                 <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />

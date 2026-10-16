@@ -81,6 +81,7 @@ public sealed partial class LogView : FrameworkElement
         InitializeSelection();
         InitializeLongLines();
         InitializeSearch();
+        InitializeBookmarks();
     }
 
     /// <summary>Columns between tab stops.</summary>
@@ -180,7 +181,8 @@ public sealed partial class LogView : FrameworkElement
         }
 
         var digits = Math.Max(4, (lastVisibleLine + 1).ToString(CultureInfo.InvariantCulture).Length);
-        var marginWidth = Math.Ceiling(digits * _charWidth + 2 * MarginPadding);
+        // Plus the bookmark gutter (ticket 17) on the left when bookmarks are shown.
+        var marginWidth = Math.Ceiling(BookmarkGutterWidth + digits * _charWidth + 2 * MarginPadding);
         dc.DrawRectangle(LineNumberBackground, null, new Rect(0, 0, marginWidth, height));
 
         var textLeft = marginWidth + TextPadding;
@@ -198,6 +200,7 @@ public sealed partial class LogView : FrameworkElement
             var number = Format((row.LineNumber + 1).ToString(CultureInfo.InvariantCulture),
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
+            DrawBookmarkMarker(dc, row, y);
             var style = LineStyleFor(first + i, row);
             DrawLineBackground(dc, style, y, textLeft); // under the search decorations
             DrawRowDecorations(dc, row, y, textLeft, firstColumn, maxChars);
