@@ -102,12 +102,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var document = await Task.Run(() => LogDocument.Open(fullPath));
+            var document = await LogDocument.OpenAsync(fullPath);
             ErrorMessage = null;
             return document;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
+        catch (Exception ex) when (LogDocument.IsOpenFailure(ex))
         {
             ErrorMessage = $"Could not open {displayPath}: {ex.Message}";
             return null;

@@ -1,3 +1,4 @@
+using Lignum.Core.Reading;
 using System.Text;
 using Lignum.Core.Text;
 
@@ -41,13 +42,7 @@ public sealed partial class LogDocument
     private TextCodec DetectEncoding()
     {
         var sample = new byte[(int)Math.Min(EncodingDetector.SampleSize, TotalBytes)];
-        var filled = 0;
-        while (filled < sample.Length)
-        {
-            var read = RandomAccess.Read(_handle, sample.AsSpan(filled), filled);
-            if (read == 0) break;
-            filled += read;
-        }
+        var filled = FileReads.ReadFully(_handle, sample, 0);
 
         var bytes = sample.AsSpan(0, filled);
         var codec = _requestedEncoding is { } forced
