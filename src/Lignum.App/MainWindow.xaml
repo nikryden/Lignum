@@ -145,6 +145,25 @@
                           IsChecked="{Binding DataContext.Assistant.IsPanelOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
             </MenuItem>
         </Menu>
+        <!-- Quick icon bar: open and close the panes (lit = open). -->
+        <ToolBarTray DockPanel.Dock="Top" IsLocked="True" Background="{DynamicResource WindowBackgroundBrush}">
+            <ToolBar Background="{DynamicResource WindowBackgroundBrush}" Foreground="{DynamicResource WindowForegroundBrush}"
+                     TextElement.FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" TextElement.FontSize="15">
+                <Button Content="&#xE721;" ToolTip="Find (Ctrl+F)" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
+                <ToggleButton Content="&#xE71C;" ToolTip="Filter rules"
+                              IsChecked="{Binding SelectedTab.Search.IsFilterBarOpen, Mode=TwoWay, FallbackValue=False}" />
+                <Button Content="&#xE71D;" ToolTip="Find in all tabs (Ctrl+Shift+F)" Command="{Binding AllTabsSearch.OpenCommand}" />
+                <Separator />
+                <ToggleButton Content="&#xE8FD;" ToolTip="Results pane"
+                              IsChecked="{Binding SelectedTab.Search.IsResultsPaneOpen, Mode=TwoWay, FallbackValue=False}" />
+                <ToggleButton Content="&#xE734;" ToolTip="Bookmarks pane"
+                              IsChecked="{Binding SelectedTab.IsBookmarksPaneOpen, Mode=TwoWay, FallbackValue=False}" />
+                <ToggleButton Content="&#xE7C3;" ToolTip="Detail pane (full line)" IsChecked="{Binding DetailPane.IsOpen, Mode=TwoWay}" />
+                <ToggleButton Content="&#xE8F1;" ToolTip="Find in all tabs / find in files results"
+                              IsChecked="{Binding AllTabsSearch.IsPaneOpen, Mode=TwoWay}" />
+                <ToggleButton Content="&#xE8F2;" ToolTip="AI access (Ctrl+Shift+A)" IsChecked="{Binding AssistantPane.IsOpen, Mode=TwoWay}" />
+            </ToolBar>
+        </ToolBarTray>
         <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
         <TabControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
                     Padding="0" BorderThickness="0" Focusable="False">
@@ -258,16 +277,18 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
-        <!-- AI access (ticket 05): a side panel to the right of the log. -->
-        <Border DockPanel.Dock="Right" Width="380" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
-                Visibility="{Binding Assistant.IsPanelOpen, Converter={StaticResource BoolToVisibility}}">
-            <views:AssistantPanel DataContext="{Binding Assistant}" />
-        </Border>
         <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->
         <Border DockPanel.Dock="Bottom" Height="260" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
                 Visibility="{Binding AllTabsSearch.IsResultsListVisible, Converter={StaticResource BoolToVisibility}}">
             <views:AllTabsSearchPane DataContext="{Binding AllTabsSearch}" ShowControls="False" />
         </Border>
+        <!-- The tabs, with the AI panel (ticket 05) docked right or at the bottom; drag the splitter to resize it. -->
+        <views:DetailPaneLayout Dock="{Binding AssistantPane.Dock}" IsPaneOpen="{Binding AssistantPane.IsOpen}"
+                                PaneWidth="{Binding AssistantPane.PaneWidth}" PaneHeight="{Binding AssistantPane.PaneHeight}">
+            <views:DetailPaneLayout.Pane>
+                <views:AssistantPanel DataContext="{Binding Assistant}" />
+            </views:DetailPaneLayout.Pane>
+            <views:DetailPaneLayout.Main>
         <!-- One LogTabView per open tab, all kept alive; only the selected one is visible. -->
         <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False">
             <ItemsControl.ItemsPanel>
@@ -281,5 +302,7 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+            </views:DetailPaneLayout.Main>
+        </views:DetailPaneLayout>
     </DockPanel>
 </Window>

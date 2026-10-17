@@ -52,6 +52,9 @@ public sealed class AppSettings
     /// <summary>The tabs open when Lignum last exited, restored on start (ticket 18).</summary>
     public SessionSettings Session { get; set; } = new();
 
+    /// <summary>Where the AI panel sits and its size (closed by default); null until first used.</summary>
+    public DetailPaneSettings? AssistantPane { get; set; }
+
     /// <summary>AI access (ticket 05).</summary>
     public AssistantSettings Assistant { get; set; } = new();
 

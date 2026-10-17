@@ -43,9 +43,7 @@ public sealed partial class AssistantViewModel : ObservableObject
     private AiAccessServer? _server;
     private string? _pipeName;
 
-    /// <summary>Whether the side panel is shown (View > AI access, Ctrl+Shift+A).</summary>
-    [ObservableProperty]
-    private bool _isPanelOpen;
+    private readonly ViewModels.DetailPaneLayoutViewModel _layout;
 
     /// <summary>The chat's input box.</summary>
     [ObservableProperty]
@@ -60,8 +58,13 @@ public sealed partial class AssistantViewModel : ObservableObject
     private CancellationTokenSource? _cancel;
 
     internal AssistantViewModel(SettingsFile<AppSettings> settings, AssistantTools tools, SynchronizationContext? uiContext,
-                                ILogger log)
+                                ILogger log, ViewModels.DetailPaneLayoutViewModel layout)
     {
+        _layout = layout;
+        _layout.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ViewModels.DetailPaneLayoutViewModel.IsOpen)) OnPropertyChanged(nameof(IsPanelOpen));
+        };
         _settings = settings;
         _tools = tools;
         _uiContext = uiContext;
@@ -70,6 +73,16 @@ public sealed partial class AssistantViewModel : ObservableObject
     }
 
     public ObservableCollection<ChatEntry> Entries { get; } = [];
+
+    /// <summary>Whether the AI panel is shown (View > AI access, Ctrl+Shift+A); where it sits is <see cref="Layout"/>.</summary>
+    public bool IsPanelOpen
+    {
+        get => _layout.IsOpen;
+        set => _layout.IsOpen = value;
+    }
+
+    /// <summary>Docked right or at the bottom, and its size.</summary>
+    public ViewModels.DetailPaneLayoutViewModel Layout => _layout;
 
     /// <summary>Off by default: no AI tool can use Lignum until the user turns this on.</summary>
     public bool IsEnabled

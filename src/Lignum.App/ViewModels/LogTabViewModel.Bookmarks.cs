@@ -37,6 +37,9 @@ public sealed partial class LogTabViewModel
     [ObservableProperty]
     private bool _isBookmarksPaneOpen;
 
+    [RelayCommand]
+    private void ToggleBookmarksPane() => IsBookmarksPaneOpen = !IsBookmarksPaneOpen;
+
     /// <summary>A click in the bookmarks pane: moves the caret to that bookmark's line.</summary>
     [RelayCommand]
     private void GoToBookmark(BookmarkItem? item)

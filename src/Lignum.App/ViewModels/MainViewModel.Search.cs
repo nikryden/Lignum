@@ -18,9 +18,15 @@ public sealed partial class MainViewModel
     /// <summary>Where AI tool calls are logged (the app passes its diagnostics log).</summary>
     public Serilog.ILogger DiagnosticsLog { get; init; } = Serilog.Core.Logger.None;
 
+    private DetailPaneLayoutViewModel? _assistantPane;
+
+    /// <summary>Where the AI panel sits (right or bottom), its size and whether it is open; saved in settings.json.</summary>
+    public DetailPaneLayoutViewModel AssistantPane => _assistantPane ??= new DetailPaneLayoutViewModel(_settings,
+        s => s.AssistantPane ??= new Settings.DetailPaneSettings { IsOpen = false, Width = 380 });
+
     /// <summary>AI access (ticket 05): AI tools on this PC use Lignum's tools over MCP.</summary>
     public Assistant.AssistantViewModel Assistant => _assistant ??=
-        new Assistant.AssistantViewModel(_settings, new Assistant.AssistantTools(this), _uiContext, DiagnosticsLog);
+        new Assistant.AssistantViewModel(_settings, new Assistant.AssistantTools(this), _uiContext, DiagnosticsLog, AssistantPane);
 
     /// <summary>Where the Find window was last shown (settings.json); null until it has been closed once.</summary>
     internal Settings.WindowBounds? FindWindowBounds

@@ -18,9 +18,16 @@ public sealed partial class DetailPaneLayoutViewModel : ObservableObject
 
     /// <param name="settings">The app's one settings.json; null keeps the layout in memory only.</param>
     public DetailPaneLayoutViewModel(SettingsFile<AppSettings>? settings = null)
+        : this(settings, s => s.DetailPane ??= new DetailPaneSettings())
+    {
+    }
+
+    /// <param name="settings">The app's one settings.json; null keeps the layout in memory only.</param>
+    /// <param name="layout">Which pane's settings in settings.json this layout uses (the AI panel has its own).</param>
+    public DetailPaneLayoutViewModel(SettingsFile<AppSettings>? settings, Func<AppSettings, DetailPaneSettings> layout)
     {
         _settings = settings;
-        _layout = settings is null ? new DetailPaneSettings() : settings.Value.DetailPane ??= new DetailPaneSettings();
+        _layout = settings is null ? layout(new AppSettings()) : layout(settings.Value);
         _layout.Width = ClampSize(_layout.Width, DetailPaneSettings.DefaultWidth);
         _layout.Height = ClampSize(_layout.Height, DetailPaneSettings.DefaultHeight);
         if (!Enum.IsDefined(_layout.Dock)) _layout.Dock = DetailPaneDock.Right;

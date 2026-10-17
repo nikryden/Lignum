@@ -66,11 +66,66 @@ public sealed partial class LogView
         return row >= 0 && row < source.RowCount ? source.Lines[row] : null;
     }
 
-    /// <summary>Shows a bookmark's note as the tooltip while the mouse is over its margin. Called from OnMouseMove.</summary>
+    private System.Windows.Controls.Primitives.Popup? _noteBalloon;
+    private System.Windows.Controls.TextBlock? _noteText;
+    private long _noteLine = -1;
+
+    /// <summary>
+    /// Shows a bookmark's note in a balloon next to the mouse while it is over that row's margin (a tooltip would not
+    /// reopen when only its text changes). Called from OnMouseMove.
+    /// </summary>
     private void UpdateNoteToolTip(Point point)
     {
-        var note = MarginLineAt(point) is { } line && BookmarkNotes is { } notes ? notes.GetValueOrDefault(line) : null;
-        if (!Equals(ToolTip, note)) ToolTip = note;
+        var line = MarginLineAt(point);
+        var note = line is { } l && BookmarkNotes is { } notes ? notes.GetValueOrDefault(l) : null;
+        if (note is null)
+        {
+            HideNoteBalloon();
+            return;
+        }
+
+        var balloon = _noteBalloon ??= CreateNoteBalloon();
+        if (_noteLine != line || !balloon.IsOpen)
+        {
+            _noteLine = line!.Value;
+            _noteText!.Text = note;
+            balloon.HorizontalOffset = point.X + 18;
+            balloon.VerticalOffset = point.Y + 14;
+            balloon.IsOpen = true;
+        }
+    }
+
+    private void HideNoteBalloon()
+    {
+        _noteLine = -1;
+        if (_noteBalloon is { IsOpen: true } balloon) balloon.IsOpen = false;
+    }
+
+    private System.Windows.Controls.Primitives.Popup CreateNoteBalloon()
+    {
+        _noteText = new System.Windows.Controls.TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 14 };
+        _noteText.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "WindowForegroundBrush");
+        var border = new System.Windows.Controls.Border
+        {
+            Child = _noteText,
+            MaxWidth = 420,
+            Padding = new Thickness(12, 8, 12, 8),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 10, ShadowDepth = 2, Opacity = 0.3 },
+        };
+        border.SetResourceReference(System.Windows.Controls.Border.BackgroundProperty, "PaneBackgroundBrush");
+        border.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, "BookmarkMarkerBrush");
+        MouseLeave += (_, _) => HideNoteBalloon();
+        return new System.Windows.Controls.Primitives.Popup
+        {
+            Child = border,
+            AllowsTransparency = true,
+            PlacementTarget = this,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Relative,
+            StaysOpen = true,
+            IsHitTestVisible = false,
+        };
     }
 
     private void InitializeBookmarks() => SetResourceReference(BookmarkBrushProperty, ThemeKeys.BookmarkMarker);

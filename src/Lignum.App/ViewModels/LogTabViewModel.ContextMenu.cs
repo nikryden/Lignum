@@ -43,6 +43,39 @@ public sealed partial class LogTabViewModel
         Search.IsFilterBarOpen = true; // show the new rule so it can be edited or removed
     }
 
+    /// <summary>
+    /// "Copy for AI": the selected lines (or the caret line) with the file name, line numbers and a short prompt,
+    /// for pasting into any AI chat. In the results pane, or when non-matching lines are hidden, only the lines shown.
+    /// </summary>
+    [RelayCommand]
+    private async Task CopyForAi(TextSelection? selection)
+    {
+        if (_document is not { } document || Copier is not { } copier) return;
+        var chosen = selection ?? Selection;
+        var shown = selection is not null && ReferenceEquals(selection, Search.ResultsSelection) ? Search.Results : HidingView;
+        var (first, last) = chosen.IsEmpty ? (chosen.Caret.Line, chosen.Caret.Line) : (chosen.Start.Line, chosen.End.Line);
+        var text = await Task.Run<(int Count, string Text)?>(() =>
+        {
+            List<long> lines = [];
+            if (shown is null)
+            {
+                for (var line = first; line <= last && lines.Count <= AiPrompt.MaxLines; line++) lines.Add(line);
+            }
+            else if (shown.RowCount > 0)
+            {
+                for (var row = shown.RowOfLine(first); row < shown.RowCount && shown.Lines[row] <= last; row++)
+                {
+                    if (shown.Lines[row] >= first) lines.Add(shown.Lines[row]);
+                }
+            }
+
+            return lines.Count == 0 ? null : (Count: lines.Count, Text: AiPrompt.Build(FileName, document, lines));
+        });
+        if (text is not { } copied) return;
+        copier.SetText(copied.Text);
+        CopyMessage = copied.Count == 1 ? "Copied 1 line for AI" : $"Copied {Math.Min(copied.Count, AiPrompt.MaxLines):N0} lines for AI";
+    }
+
     /// <summary>"Add as highlight rule": a plain-text rule at the top of the active highlight preset.</summary>
     [RelayCommand]
     private async Task AddHighlightRule(TextSelection? selection)

@@ -22,6 +22,8 @@
              "Toggle bookmark" (ticket 17) toggles the caret line of the view the menu opened on. -->
         <ContextMenu x:Key="MainViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy for _AI" Command="{Binding CopyForAiCommand}"
+                      ToolTip="The lines with file name, line numbers and a short prompt, to paste into any AI chat" />
             <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}" InputGestureText="Ctrl+Shift+C" />
             <Separator />
             <MenuItem Header="Add as _include filter" Command="{Binding AddIncludeFilterCommand}" />
@@ -34,6 +36,8 @@
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy for _AI" Command="{Binding CopyForAiCommand}" CommandParameter="{Binding Search.ResultsSelection}"
+                      ToolTip="The selected result lines with file name, line numbers and a short prompt" />
             <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+Shift+C" />
             <Separator />
@@ -66,7 +70,11 @@
                         Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
                         Visibility="{Binding IsBookmarksPaneOpen, Converter={StaticResource BoolToVisibility}}">
                     <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Margin="8,6" FontWeight="SemiBold" Text="Bookmarks" />
+                        <DockPanel DockPanel.Dock="Top" Margin="8,6">
+                            <Button DockPanel.Dock="Right" Content="✕" Padding="6,0" ToolTip="Close the bookmarks pane"
+                                    Command="{Binding ToggleBookmarksPaneCommand}" />
+                            <TextBlock FontWeight="SemiBold" Text="Bookmarks" VerticalAlignment="Center" />
+                        </DockPanel>
                         <TextBlock DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" TextWrapping="Wrap"
                                    Text="Ctrl+F2 or double-click the margin to add one; right-click for a note." />
                         <ListBox x:Name="BookmarkList" ItemsSource="{Binding Bookmarks.Items}" BorderThickness="0"
