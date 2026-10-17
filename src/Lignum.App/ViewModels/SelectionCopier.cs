@@ -52,6 +52,9 @@ public sealed class SelectionCopier(IClipboardService clipboard, ICopyPrompt pro
 
     public long Threshold { get; } = threshold;
 
+    /// <summary>Puts ready-made text on the clipboard (Copy for AI). Call on the UI thread.</summary>
+    public void SetText(string text) => clipboard.SetText(text);
+
     public Task<CopyResult> CopyAsync(LogDocument document, TextSelection selection,
         CancellationToken cancellationToken = default)
     {

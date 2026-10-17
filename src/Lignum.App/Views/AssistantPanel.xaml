@@ -22,6 +22,10 @@
         <DockPanel DockPanel.Dock="Top" Margin="8,6">
             <Button DockPanel.Dock="Right" Content="✕" ToolTip="Close (Ctrl+Shift+A)" Padding="6,0"
                     Command="{Binding TogglePanelCommand}" />
+            <Button DockPanel.Dock="Right" Content="&#xE90E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
+                    ToolTip="Dock at the bottom" Command="{Binding Layout.DockBottomCommand}" />
+            <Button DockPanel.Dock="Right" Content="&#xE90D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
+                    ToolTip="Dock on the right" Command="{Binding Layout.DockRightCommand}" />
             <TextBlock Text="AI access" FontWeight="SemiBold" VerticalAlignment="Center" />
         </DockPanel>
 

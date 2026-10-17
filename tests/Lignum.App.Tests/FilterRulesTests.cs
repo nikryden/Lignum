@@ -299,6 +299,38 @@ public class FilterRulesTests : IDisposable
         Assert.Equal($"error health check{nl}INFO health check", Assert.Single(_clipboard.Texts));
     }
 
+    [Fact]
+    public async Task Copy_for_AI_wraps_the_selected_lines_with_file_name_and_line_numbers()
+    {
+        var tab = await OpenLog();
+        tab.Selection.MoveCaret(new FilePosition(1, 0), extend: false);
+        tab.Selection.MoveCaret(new FilePosition(2, 3), extend: true);
+
+        await tab.CopyForAiCommand.ExecuteAsync(null);
+
+        var text = Assert.Single(_clipboard.Texts);
+        Assert.Contains("\"app.log\"", text);
+        Assert.Contains("2: ERROR db timeout\r\n3: error health check\r\n```", text.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        Assert.EndsWith("My question: ", text);
+        Assert.Equal("Copied 2 lines for AI", tab.CopyMessage);
+    }
+
+    [Fact]
+    public async Task Copy_for_AI_from_the_results_pane_takes_only_the_result_lines()
+    {
+        var tab = await OpenLog();
+        tab.Search.AddFilterRule(new QueryRule("health"));
+        Shown(tab.Search);
+        tab.Search.SelectAllResultsCommand.Execute(null);
+
+        await tab.CopyForAiCommand.ExecuteAsync(tab.Search.ResultsSelection);
+
+        var text = Assert.Single(_clipboard.Texts);
+        Assert.Contains("3: error health check", text);
+        Assert.Contains("5: INFO health check", text);
+        Assert.DoesNotContain("4: WARN", text);
+    }
+
     private sealed class FakeClipboard : IClipboardService
     {
         public List<string> Texts { get; } = [];
