@@ -14,6 +14,7 @@ public partial class App : Application
     private SettingsStore? _settingsStore;
     private SettingsFile<AppSettings>? _settings;
     private WindowsSystemTheme? _systemTheme;
+    private SingleInstance? _instance;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -30,6 +31,18 @@ public partial class App : Application
 
         // Settings (ticket 13). Later features share this one store and this one settings.json file.
         var commandLine = CommandLine.Parse(e.Args);
+
+        // Single instance (ticket 07): if Lignum already runs for this settings folder, hand it the file and exit.
+        var instanceName = SingleInstance.NameFor(commandLine.SettingsDirectory ?? SettingsStore.DefaultDirectory);
+        _instance = SingleInstance.TryAcquire(instanceName);
+        if (_instance is null
+            && SingleInstance.TrySend(instanceName, commandLine.FilePath is { } file ? Path.GetFullPath(file) : null))
+        {
+            _log.Logger.Information("Lignum is already running; handed it {Path}", commandLine.FilePath);
+            Shutdown();
+            return;
+        }
+
         _settingsStore = new SettingsStore(commandLine.SettingsDirectory ?? SettingsStore.DefaultDirectory, _log.Logger);
         _settings = _settingsStore.Open<AppSettings>(AppSettings.FileName);
         _systemTheme = new WindowsSystemTheme();
@@ -51,6 +64,13 @@ public partial class App : Application
         var viewModel = new MainViewModel(_settings) { Highlighting = highlighting };
         MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
         MainWindow.Show();
+        var mainWindow = MainWindow;
+        _instance?.Listen(message => mainWindow.Dispatcher.BeginInvoke(() =>
+        {
+            if (mainWindow.WindowState == WindowState.Minimized) mainWindow.WindowState = WindowState.Normal;
+            mainWindow.Activate();
+            if (message.Length > 0) _ = viewModel.OpenFileAsync(message);
+        }));
 
         // Reopen the last session's tabs (ticket 18) once the window has painted; files re-index in the
         // background. `Lignum.exe <path>` then opens (and selects) that file.
@@ -70,6 +90,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _systemTheme?.Dispose();
+        _instance?.Dispose();
         _settings?.Save();
         SettingsStore.Flush();
         _log?.Logger.Information("Lignum exiting with code {ExitCode}", e.ApplicationExitCode);
