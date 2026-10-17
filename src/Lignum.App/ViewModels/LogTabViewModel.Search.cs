@@ -6,7 +6,7 @@ public sealed partial class LogTabViewModel
     private SearchViewModel? _search;
 
     /// <summary>The find box, the result set shown in the results pane and F3 navigation.</summary>
-    public SearchViewModel Search => _search ??= new SearchViewModel(_uiContext) { History = History };
+    public SearchViewModel Search => _search ??= CreateSearch();
 
     /// <summary>The app-wide find / filter history; null in isolation.</summary>
     public SearchHistory? History => _services.History;

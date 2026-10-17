@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Lignum.Core.Searching;
 
 namespace Lignum.Core;
@@ -58,8 +59,8 @@ public sealed class Query
 
     /// <summary>
     /// This query run inside <paramref name="filter"/> (ticket 08): lines that pass the filter's rules and match
-    /// this query, found in one pass over the file. <see cref="FindMatches"/> still returns only this query's
-    /// matches, so the views highlight the search, not the filter.
+    /// this query, found in one pass over the file. <see cref="FindMatches"/> returns only this query's
+    /// matches (the views highlight the search, not the filter), and none on lines the filter hides.
     /// </summary>
     public Query Inside(Query filter)
     {
@@ -87,5 +88,17 @@ public sealed class Query
     /// The places in <paramref name="line"/> matched by the enabled include rules, ordered by start, for
     /// highlighting. Never throws: a regex that times out just contributes fewer matches.
     /// </summary>
-    public IReadOnlyList<TextMatch> FindMatches(string line) => Matcher.FindMatches(line);
+    public IReadOnlyList<TextMatch> FindMatches(string line)
+    {
+        try
+        {
+            if (Filter is { } filter && !filter.IsMatch(line)) return [];
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return [];
+        }
+
+        return Matcher.FindMatches(line);
+    }
 }

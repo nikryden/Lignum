@@ -86,6 +86,10 @@
                           IsChecked="{Binding SelectedTab.Search.IsFilterBarOpen, Mode=TwoWay, FallbackValue=False}" />
                 <MenuItem Header="Search _inside filter" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.Search.SearchInsideFilter, Mode=TwoWay, FallbackValue=True}" />
+                <MenuItem Header="_Hide non-matching lines" IsCheckable="True"
+                          IsChecked="{Binding SelectedTab.HideNonMatchingLines, Mode=TwoWay, FallbackValue=False}" />
+                <MenuItem Header="Highlight matches _outside the filter" IsCheckable="True"
+                          IsChecked="{Binding HighlightMatchesOutsideFilter, Mode=TwoWay}" />
                 <Separator />
                 <MenuItem Header="_Results pane" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.Search.IsResultsPaneOpen, Mode=TwoWay, FallbackValue=False}" />

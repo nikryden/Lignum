@@ -40,6 +40,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
 
     /// <summary>What the viewer shows: every line of the document.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ViewLines))]
     private LineSource? _lines;
 
     /// <summary>True while this is the tab shown in the window (kept in sync by <see cref="MainViewModel"/>).</summary>
