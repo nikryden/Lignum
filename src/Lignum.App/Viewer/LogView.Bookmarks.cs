@@ -15,6 +15,10 @@ public sealed partial class LogView
         nameof(Bookmarks), typeof(IReadOnlySet<long>), typeof(LogView),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty BookmarkNotesProperty = DependencyProperty.Register(
+        nameof(BookmarkNotes), typeof(IReadOnlyDictionary<long, string>), typeof(LogView),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public static readonly DependencyProperty BookmarkBrushProperty = DependencyProperty.Register(
         nameof(BookmarkBrush), typeof(Brush), typeof(LogView),
         new FrameworkPropertyMetadata(Brushes.SteelBlue, FrameworkPropertyMetadataOptions.AffectsRender));
@@ -24,6 +28,13 @@ public sealed partial class LogView
     {
         get => (IReadOnlySet<long>?)GetValue(BookmarksProperty);
         set => SetValue(BookmarksProperty, value);
+    }
+
+    /// <summary>Notes by 0-based file line (ticket 06): a noted bookmark gets a square marker and a tooltip.</summary>
+    public IReadOnlyDictionary<long, string>? BookmarkNotes
+    {
+        get => (IReadOnlyDictionary<long, string>?)GetValue(BookmarkNotesProperty);
+        set => SetValue(BookmarkNotesProperty, value);
     }
 
     public Brush BookmarkBrush
@@ -41,14 +52,25 @@ public sealed partial class LogView
     /// <summary>A left double-click on a row's line-number margin raises <see cref="MarginDoubleClicked"/>.</summary>
     private bool HandleMarginDoubleClick(MouseButtonEventArgs e)
     {
-        if (e.ClickCount != 2 || Source is not { } source) return false;
-        var point = e.GetPosition(this);
-        if (point.X >= _textLeft - TextPadding) return false; // in the text: normal click behaviour
-        var row = Geometry.PointToPosition(point).Row;
-        if (row < 0 || row >= source.RowCount) return false;
-        MarginDoubleClicked?.Invoke(this, source.Lines[row]);
+        if (e.ClickCount != 2 || MarginLineAt(e.GetPosition(this)) is not { } line) return false;
+        MarginDoubleClicked?.Invoke(this, line);
         e.Handled = true;
         return true;
+    }
+
+    /// <summary>The 0-based file line of the row whose line-number margin is under <paramref name="point"/>, or null.</summary>
+    private long? MarginLineAt(Point point)
+    {
+        if (Source is not { } source || point.X >= _textLeft - TextPadding) return null;
+        var row = Geometry.PointToPosition(point).Row;
+        return row >= 0 && row < source.RowCount ? source.Lines[row] : null;
+    }
+
+    /// <summary>Shows a bookmark's note as the tooltip while the mouse is over its margin. Called from OnMouseMove.</summary>
+    private void UpdateNoteToolTip(Point point)
+    {
+        var note = MarginLineAt(point) is { } line && BookmarkNotes is { } notes ? notes.GetValueOrDefault(line) : null;
+        if (!Equals(ToolTip, note)) ToolTip = note;
     }
 
     private void InitializeBookmarks() => SetResourceReference(BookmarkBrushProperty, ThemeKeys.BookmarkMarker);
@@ -62,6 +84,15 @@ public sealed partial class LogView
         if (Bookmarks is not { } bookmarks || !bookmarks.Contains(row.LineNumber)) return;
         var gutter = BookmarkGutterWidth;
         var radius = Math.Max(2, Math.Min(gutter, _lineHeight) * 0.3);
-        dc.DrawEllipse(BookmarkBrush, null, new Point(gutter / 2 + 2, y + _lineHeight / 2), radius, radius);
+        var center = new Point(gutter / 2 + 2, y + _lineHeight / 2);
+        if (BookmarkNotes?.ContainsKey(row.LineNumber) == true)
+        {
+            // A noted bookmark: a slightly larger square, so it stands out from the plain dots.
+            var half = radius * 1.2;
+            dc.DrawRectangle(BookmarkBrush, null, new Rect(center.X - half, center.Y - half, 2 * half, 2 * half));
+            return;
+        }
+
+        dc.DrawEllipse(BookmarkBrush, null, center, radius, radius);
     }
 }

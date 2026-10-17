@@ -35,11 +35,15 @@ public sealed class BookmarksFile
     }
 }
 
-/// <summary>One bookmarked line. Add optional fields (e.g. <c>Note</c>) here; old files stay valid.</summary>
+/// <summary>One bookmarked line. Add optional fields here; old files stay valid.</summary>
 public sealed class BookmarkEntry
 {
     /// <summary>0-based file line.</summary>
     public long Line { get; set; }
+
+    /// <summary>The user's note on this line (ticket 06); null (and not written) when there is none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Note { get; set; }
 
     /// <summary>Fields written by a newer build (e.g. a note), kept so a save here does not drop them.</summary>
     [JsonExtensionData]

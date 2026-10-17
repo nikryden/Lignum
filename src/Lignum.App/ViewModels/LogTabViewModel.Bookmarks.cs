@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
 using Lignum.App.Viewer;
@@ -27,6 +28,17 @@ public sealed partial class LogTabViewModel
     /// <summary>Double-click in the line-number margin (ticket 04): toggles that 0-based file line.</summary>
     [RelayCommand]
     private void ToggleBookmarkAt(long line) => Bookmarks.Toggle(line);
+
+    /// <summary>Whether the bookmarks pane (every bookmark and note in this file) is shown.</summary>
+    [ObservableProperty]
+    private bool _isBookmarksPaneOpen;
+
+    /// <summary>A click in the bookmarks pane: moves the caret to that bookmark's line.</summary>
+    [RelayCommand]
+    private void GoToBookmark(BookmarkItem? item)
+    {
+        if (item is not null) Navigation.GoToLine(item.Line);
+    }
 
     /// <summary>F2: the next bookmark after the caret, wrapping to the first.</summary>
     [RelayCommand]

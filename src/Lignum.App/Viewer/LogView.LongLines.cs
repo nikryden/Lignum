@@ -51,6 +51,7 @@ public sealed partial class LogView
         base.OnMouseMove(e);
         OnSelectionMouseMove(e);
         var point = e.GetPosition(this);
+        UpdateNoteToolTip(point);
         Cursor = _markerHits.Exists(h => h.Bounds.Contains(point)) ? Cursors.Hand : null;
     }
 

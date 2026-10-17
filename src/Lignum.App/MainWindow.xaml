@@ -73,6 +73,8 @@
                 <MenuItem Header="Toggle _bookmark" Command="{Binding SelectedTab.ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
                 <MenuItem Header="_Next bookmark" Command="{Binding SelectedTab.NextBookmarkCommand}" InputGestureText="F2" />
                 <MenuItem Header="_Previous bookmark" Command="{Binding SelectedTab.PreviousBookmarkCommand}" InputGestureText="Shift+F2" />
+                <MenuItem Header="Bookmarks _pane" IsCheckable="True"
+                          IsChecked="{Binding SelectedTab.IsBookmarksPaneOpen, Mode=TwoWay, FallbackValue=False}" />
             </MenuItem>
             <MenuItem Header="_Search">
                 <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />
