@@ -39,6 +39,15 @@ public sealed class AssistantTools(MainViewModel main)
                 "add_highlight_rule" => AddHighlightRule(call.Input),
                 "add_bookmark" => AddBookmark(call.Input),
                 "go_to_line" => GoToLine(call.Input),
+                "select_tab" => SelectTab(call.Input),
+                "search_all_tabs" => await SearchAllTabsAsync(call.Input, cancellationToken),
+                "find_in_files" => await FindInFilesAsync(call.Input, cancellationToken),
+                "show_search" => await ShowSearchAsync(call.Input),
+                "list_filter_rules" => ListFilterRules(call.Input),
+                "remove_filter_rule" => RemoveFilterRule(call.Input),
+                "set_filter_rule_enabled" => SetFilterRuleEnabled(call.Input),
+                "clear_filter_rules" => ClearFilterRules(call.Input),
+                "list_bookmarks" => ListBookmarks(call.Input),
                 _ => new ToolOutcome($"Unknown tool {call.Name}.", IsError: true),
             };
         }
@@ -64,7 +73,7 @@ public sealed class AssistantTools(MainViewModel main)
 
     private async Task<ToolOutcome> SearchAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken token)
     {
-        var (tab, document) = Selected();
+        var (tab, document) = Selected(input);
         var pattern = String(input, "pattern");
         var max = Math.Clamp(Int(input, "max_lines", 50), 1, MaxSearchLines);
         var query = Query.Find(pattern, Bool(input, "match_case"), Bool(input, "is_regex"));
@@ -94,7 +103,7 @@ public sealed class AssistantTools(MainViewModel main)
 
     private ToolOutcome ReadLines(IReadOnlyDictionary<string, JsonElement> input)
     {
-        var (tab, document) = Selected();
+        var (tab, document) = Selected(input);
         var first = Int(input, "first_line", 1) - 1;
         var count = Math.Clamp(Int(input, "count", 50), 1, MaxReadLines);
         if (first < 0 || first >= tab.LineCount)
@@ -110,7 +119,7 @@ public sealed class AssistantTools(MainViewModel main)
 
     private ToolOutcome AddFilterRule(IReadOnlyDictionary<string, JsonElement> input)
     {
-        var (tab, _) = Selected();
+        var (tab, _) = Selected(input);
         var kind = String(input, "kind").ToLowerInvariant() switch
         {
             "include" => RuleKind.Include,
@@ -136,7 +145,7 @@ public sealed class AssistantTools(MainViewModel main)
 
     private ToolOutcome AddBookmark(IReadOnlyDictionary<string, JsonElement> input)
     {
-        var (tab, _) = Selected();
+        var (tab, _) = Selected(input);
         var line = LineIn(tab, Int(input, "line", 0));
         var note = input.TryGetValue("note", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
         if (!string.IsNullOrWhiteSpace(note)) tab.Bookmarks.SetNote(line, note);
@@ -146,16 +155,185 @@ public sealed class AssistantTools(MainViewModel main)
 
     private ToolOutcome GoToLine(IReadOnlyDictionary<string, JsonElement> input)
     {
-        var (tab, _) = Selected();
+        var (tab, _) = Selected(input);
         var line = LineIn(tab, Int(input, "line", 0));
         tab.Navigation.GoToLine(line);
         return new ToolOutcome($"Moved to line {line + 1}.");
     }
 
-    private (LogTabViewModel Tab, LogDocument Document) Selected() =>
-        main.SelectedTab is { Document: { } document } tab
+    /// <summary>The tab named by the optional "tab" input (index from list_tabs, or file name), else the selected one.</summary>
+    private (LogTabViewModel Tab, LogDocument Document) Selected(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var tab = main.SelectedTab;
+        if (input.TryGetValue("tab", out var which) && which.ValueKind is JsonValueKind.Number or JsonValueKind.String)
+        {
+            var key = which.ValueKind == JsonValueKind.Number ? which.GetRawText() : which.GetString() ?? "";
+            tab = int.TryParse(key, out var index) && index >= 0 && index < main.Tabs.Count
+                ? main.Tabs[index]
+                : main.Tabs.FirstOrDefault(t => string.Equals(t.FileName, key, StringComparison.OrdinalIgnoreCase))
+                  ?? throw new ToolInputException($"No open tab \"{key}\". Use list_tabs to see them.");
+        }
+
+        return tab is { Document: { } document }
             ? (tab, document)
             : throw new ToolInputException("No log file is open in Lignum.");
+    }
+
+    private ToolOutcome SelectTab(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        main.SelectedTab = tab;
+        return new ToolOutcome($"Selected {tab.FileName}.");
+    }
+
+    private async Task<ToolOutcome> SearchAllTabsAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken token)
+    {
+        var query = Query.Find(String(input, "pattern"), Bool(input, "match_case"), Bool(input, "is_regex"));
+        var max = Math.Clamp(Int(input, "max_lines_per_tab", 20), 0, 100);
+        var text = new StringBuilder();
+        var tabs = main.Tabs.Where(t => t.Document is not null).ToList();
+        if (tabs.Count == 0) return new ToolOutcome("No log files are open.");
+        for (var i = 0; i < tabs.Count; i++)
+        {
+            var (count, lines) = await MatchesAsync(tabs[i].Document!, query, max, token);
+            text.AppendLine($"[{main.Tabs.IndexOf(tabs[i])}] {tabs[i].FileName}: {count:N0} matching lines");
+            foreach (var (line, lineText) in lines) text.AppendLine($"  {line + 1}: {lineText}");
+            if (lines.Count > 0) LinesRead?.Invoke(tabs[i].FileName, lines.Count);
+        }
+
+        return new ToolOutcome(text.ToString());
+    }
+
+    private async Task<ToolOutcome> FindInFilesAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken token)
+    {
+        var folder = String(input, "folder");
+        if (!Directory.Exists(folder)) return new ToolOutcome($"Folder not found: {folder}", IsError: true);
+        var query = Query.Find(String(input, "pattern"), Bool(input, "match_case"), Bool(input, "is_regex"));
+        var patterns = input.TryGetValue("file_patterns", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString()! : "*.log;*.txt";
+        var subfolders = !input.TryGetValue("include_subfolders", out var sub) || sub.ValueKind != JsonValueKind.False;
+        var max = Math.Clamp(Int(input, "max_lines_per_file", 10), 0, 50);
+        var maxFiles = Math.Clamp(Int(input, "max_files", 200), 1, 1000);
+        var (files, _) = await Task.Run(() => Lignum.Core.Searching.FileFinder.Find(folder, subfolders, patterns, token), token);
+        var text = new StringBuilder();
+        int searched = 0, withMatches = 0, binary = 0;
+        foreach (var file in files.Take(maxFiles))
+        {
+            token.ThrowIfCancellationRequested();
+            if (Lignum.Core.Searching.FileFinder.LooksBinary(file))
+            {
+                binary++;
+                continue;
+            }
+
+            searched++;
+            using var document = LogDocument.Open(file);
+            var indexing = document.StartIndexing();
+            var (count, lines) = await MatchesAsync(document, query, max, token);
+            await indexing;
+            if (count == 0) continue;
+            withMatches++;
+            text.AppendLine($"{file}: {count:N0} matching lines");
+            foreach (var (line, lineText) in lines) text.AppendLine($"  {line + 1}: {lineText}");
+            if (lines.Count > 0) LinesRead?.Invoke(Path.GetFileName(file), lines.Count);
+        }
+
+        text.Insert(0, $"{withMatches} of {searched} files match" + (binary > 0 ? $" ({binary} binary skipped)" : "")
+                       + (files.Count > maxFiles ? $"; only the first {maxFiles} of {files.Count} files were searched" : "") + ".\n");
+        return new ToolOutcome(text.ToString());
+    }
+
+    /// <summary>Runs <paramref name="query"/> over a whole document; the match count and the first lines.</summary>
+    private static async Task<(long Count, List<(long Line, string Text)> Lines)> MatchesAsync(
+        LogDocument document, Query query, int max, CancellationToken token)
+    {
+        using var result = document.StartQuery(query);
+        using (token.Register(result.Cancel)) await result.Completion;
+        token.ThrowIfCancellationRequested();
+        if (result.State == QueryState.Failed) throw new ToolInputException($"Search failed: {result.Error?.Message}");
+        var shown = (int)Math.Min(result.Count, max);
+        var lines = await Task.Run(() =>
+        {
+            var found = new List<(long, string)>(shown);
+            for (var i = 0; i < shown; i++) found.Add((result[i], Prefix(document, result[i])));
+            return found;
+        }, token);
+        return (result.Count, lines);
+    }
+
+    private async Task<ToolOutcome> ShowSearchAsync(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var search = tab.Search;
+        search.IsRegex = Bool(input, "is_regex");
+        search.MatchCase = Bool(input, "match_case");
+        search.SearchInsideFilter = !input.TryGetValue("inside_filter", out var inside) || inside.ValueKind != JsonValueKind.False;
+        search.FindText = input.TryGetValue("pattern", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString()! : "";
+        search.IsResultsPaneOpen = true;
+        main.SelectedTab = tab;
+        await search.FindAllCommand.ExecuteAsync(null);
+        if (search.FindTextError is { } error) return new ToolOutcome(error, IsError: true);
+        return new ToolOutcome(search.FindText.Length == 0
+            ? $"Cleared the search in {tab.FileName}; the results pane shows the filter's lines."
+            : $"Searching in {tab.FileName}'s results pane: {search.ResultsHeader}");
+    }
+
+    private ToolOutcome ListFilterRules(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var rules = tab.Search.GetFilterRules();
+        if (rules.Count == 0) return new ToolOutcome($"{tab.FileName} has no filter rules.");
+        var text = new StringBuilder($"Filter rules of {tab.FileName} (a line is shown when it matches an enabled include rule, if any, and no enabled exclude rule):\n");
+        for (var i = 0; i < rules.Count; i++)
+        {
+            var r = rules[i];
+            text.AppendLine($"{i + 1}. {r.Kind.ToString().ToLowerInvariant()} \"{r.Text}\"{(r.IsRegex ? " regex" : "")}{(r.MatchCase ? " match-case" : "")}{(r.IsEnabled ? "" : " (off)")}");
+        }
+
+        return new ToolOutcome(text.ToString());
+    }
+
+    private ToolOutcome RemoveFilterRule(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var rule = Rule(tab, input);
+        tab.Search.FilterRules.Remove(rule);
+        return new ToolOutcome($"Removed the filter rule \"{rule.Text}\" from {tab.FileName}.");
+    }
+
+    private ToolOutcome SetFilterRuleEnabled(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var rule = Rule(tab, input);
+        rule.IsEnabled = input.TryGetValue("enabled", out var on) ? on.ValueKind == JsonValueKind.True
+            : throw new ToolInputException("\"enabled\" is required (true or false).");
+        return new ToolOutcome($"Turned the filter rule \"{rule.Text}\" {(rule.IsEnabled ? "on" : "off")}.");
+    }
+
+    private ToolOutcome ClearFilterRules(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        tab.Search.SetFilterRules([]);
+        return new ToolOutcome($"Removed every filter rule from {tab.FileName}.");
+    }
+
+    private ToolOutcome ListBookmarks(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var items = tab.Bookmarks.Items;
+        if (items.Count == 0) return new ToolOutcome($"{tab.FileName} has no bookmarks.");
+        var text = new StringBuilder($"Bookmarks of {tab.FileName}:\n");
+        foreach (var item in items) text.AppendLine($"line {item.DisplayLine}{(item.Note is { } note ? $": {note}" : "")}");
+        return new ToolOutcome(text.ToString());
+    }
+
+    /// <summary>The filter rule at the 1-based "index" from list_filter_rules.</summary>
+    private static FilterRuleViewModel Rule(LogTabViewModel tab, IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var index = Int(input, "index", 0);
+        return index >= 1 && index <= tab.Search.FilterRules.Count
+            ? tab.Search.FilterRules[index - 1]
+            : throw new ToolInputException($"There is no filter rule {index}; use list_filter_rules (1 - {tab.Search.FilterRules.Count}).");
+    }
 
     private static long LineIn(LogTabViewModel tab, int oneBased) =>
         oneBased >= 1 && oneBased <= tab.LineCount

@@ -73,6 +73,73 @@ public sealed class AiAccessTests : IDisposable
     }
 
     [Fact]
+    public async Task The_AI_can_search_all_tabs_and_work_on_any_tab()
+    {
+        var main = await Open();
+        var other = Path.Combine(_dir, "b.log");
+        File.WriteAllLines(other, ["BuSsBBNDR started", "ok", "error BuSsBBNDR"]);
+        await main.OpenFileAsync(other); // b.log is now selected
+
+        var all = await main.Assistant.HandleToolCallAsync(Call("search_all_tabs", new { pattern = "error" }), default);
+        var inA = await main.Assistant.HandleToolCallAsync(Call("search", new { pattern = "timeout", tab = "app.log" }), default);
+        var byIndex = await main.Assistant.HandleToolCallAsync(Call("read_lines", new { first_line = 1, count = 1, tab = 0 }), default);
+        await main.Assistant.HandleToolCallAsync(Call("select_tab", new { tab = "app.log" }), default);
+
+        Assert.Contains("[0] app.log: 2 matching lines", all.Content);
+        Assert.Contains("[1] b.log: 1 matching lines", all.Content);
+        Assert.Contains("  3: error BuSsBBNDR", all.Content);
+        Assert.Contains("1 matching lines in app.log", inA.Content);
+        Assert.Contains("1: start", byIndex.Content);
+        Assert.Equal("app.log", main.SelectedTab!.FileName);
+        var missing = await main.Assistant.HandleToolCallAsync(Call("search", new { pattern = "x", tab = "nope.log" }), default);
+        Assert.True(missing.IsError);
+    }
+
+    [Fact]
+    public async Task The_AI_can_list_change_and_clear_filter_rules_and_show_a_search()
+    {
+        var main = await Open();
+        var tab = main.SelectedTab!;
+        await main.Assistant.HandleToolCallAsync(Call("add_filter_rule", new { text = "ERROR", kind = "include" }), default);
+        await main.Assistant.HandleToolCallAsync(Call("add_filter_rule", new { text = "disk", kind = "exclude" }), default);
+
+        var list = await main.Assistant.HandleToolCallAsync(Call("list_filter_rules", new { }), default);
+        await main.Assistant.HandleToolCallAsync(Call("set_filter_rule_enabled", new { index = 2, enabled = false }), default);
+        var shown = await main.Assistant.HandleToolCallAsync(Call("show_search", new { pattern = "timeout" }), default);
+        await main.Assistant.HandleToolCallAsync(Call("remove_filter_rule", new { index = 1 }), default);
+
+        Assert.Contains("1. include \"ERROR\"", list.Content);
+        Assert.Contains("2. exclude \"disk\"", list.Content);
+        Assert.Contains("Filter: 1 rule · Search: timeout · 1 match", shown.Content);
+        Assert.True(tab.Search.IsResultsPaneOpen);
+        var remaining = Assert.Single(tab.Search.FilterRules);
+        Assert.Equal("disk", remaining.Text);
+        Assert.False(remaining.IsEnabled);
+
+        await main.Assistant.HandleToolCallAsync(Call("clear_filter_rules", new { }), default);
+        Assert.Empty(tab.Search.FilterRules);
+    }
+
+    [Fact]
+    public async Task The_AI_can_find_in_files_and_list_bookmarks()
+    {
+        var main = await Open();
+        var folder = Path.Combine(_dir, "logs");
+        Directory.CreateDirectory(folder);
+        File.WriteAllLines(Path.Combine(folder, "x.log"), ["fine", "ERROR in x"]);
+        File.WriteAllLines(Path.Combine(folder, "y.log"), ["nothing"]);
+        main.SelectedTab!.Bookmarks.SetNote(1, "disk problem");
+
+        var files = await main.Assistant.HandleToolCallAsync(Call("find_in_files", new { folder, pattern = "error" }), default);
+        var bookmarks = await main.Assistant.HandleToolCallAsync(Call("list_bookmarks", new { }), default);
+
+        Assert.StartsWith("1 of 2 files match", files.Content);
+        Assert.Contains("x.log: 1 matching lines", files.Content);
+        Assert.Contains("  2: ERROR in x", files.Content);
+        Assert.Contains("line 2: disk problem", bookmarks.Content);
+    }
+
+    [Fact]
     public async Task Calls_are_refused_while_ai_access_is_off()
     {
         var main = await Open(enabled: false);

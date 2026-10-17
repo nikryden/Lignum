@@ -14,7 +14,8 @@ public abstract class CliAgent
     /// <summary>What the agent is told about where it runs (Claude Code gets it as a system prompt addition).</summary>
     protected const string Instructions =
         "You are the assistant in Lignum, a read-only viewer for very large log files. The user is looking at log " +
-        "files open in Lignum. Use the lignum MCP tools to look at them (list_tabs, search, read_lines) instead of " +
+        "files open in Lignum. Use the lignum MCP tools to look at them (list_tabs, search, search_all_tabs, read_lines, " +
+        "find_in_files for folders) instead of " +
         "guessing, and never invent log content. Line numbers are 1-based. Search with a precise pattern first, then " +
         "read the lines around what matters. Write regular expressions in .NET syntax and check them with search. You " +
         "may add filter rules, highlight rules and bookmarks and go to lines when that helps; say what you changed. " +

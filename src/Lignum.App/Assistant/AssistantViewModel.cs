@@ -346,6 +346,15 @@ public sealed partial class AssistantViewModel : ObservableObject
         "add_bookmark" => $"Bookmarking line {Arg(call, "line")}",
         "go_to_line" => $"Going to line {Arg(call, "line")}",
         "list_tabs" => "Listing the open files",
+        "select_tab" => $"Switching to tab {Arg(call, "tab")}",
+        "search_all_tabs" => $"Searching all tabs for \"{Arg(call, "pattern")}\"",
+        "find_in_files" => $"Searching files in {Arg(call, "folder")} for \"{Arg(call, "pattern")}\"",
+        "show_search" => $"Showing a search for \"{Arg(call, "pattern")}\"",
+        "list_filter_rules" => "Listing the filter rules",
+        "remove_filter_rule" => $"Removing filter rule {Arg(call, "index")}",
+        "set_filter_rule_enabled" => $"Turning filter rule {Arg(call, "index")} {(Arg(call, "enabled") == "True" ? "on" : "off")}",
+        "clear_filter_rules" => "Removing every filter rule",
+        "list_bookmarks" => "Listing the bookmarks",
         _ => call.Name,
     };
 
