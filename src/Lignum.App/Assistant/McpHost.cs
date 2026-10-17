@@ -70,20 +70,43 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         Call("add_highlight_rule", new() { ["pattern"] = E(pattern), ["is_regex"] = E(isRegex), ["match_case"] = E(matchCase) },
             cancellationToken);
 
-    [McpServerTool(Name = "add_bookmark"), Description("Bookmark a line in Lignum's selected tab, optionally with a short note.")]
+    [McpServerTool(Name = "add_bookmark"), Description("Bookmark a line in a Lignum tab (default the selected one), optionally with a short note and a color.")]
     public Task<string> AddBookmark(
         [Description("1-based line number.")] int line,
         [Description("Optional note shown on the bookmark.")] string? note = null,
+        [Description("Optional marker color: Blue (default), Red, Yellow, Green or Purple.")] string? color = null,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
         CancellationToken cancellationToken = default)
     {
         var arguments = new Dictionary<string, JsonElement> { ["line"] = E(line) };
         if (note is not null) arguments["note"] = E(note);
-        return Call("add_bookmark", arguments, cancellationToken);
+        if (color is not null) arguments["color"] = E(color);
+        return Call("add_bookmark", WithTab(arguments, tab), cancellationToken);
     }
 
-    [McpServerTool(Name = "go_to_line"), Description("Scroll Lignum's selected tab to a 1-based line and put the caret there.")]
-    public Task<string> GoToLine([Description("1-based line number.")] int line, CancellationToken cancellationToken = default) =>
-        Call("go_to_line", new() { ["line"] = E(line) }, cancellationToken);
+    [McpServerTool(Name = "go_to_line"), Description("Scroll a Lignum tab (default the selected one) to a 1-based line and put the caret there.")]
+    public Task<string> GoToLine([Description("1-based line number.")] int line,
+                                 [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+                                 CancellationToken cancellationToken = default) =>
+        Call("go_to_line", WithTab(new() { ["line"] = E(line) }, tab), cancellationToken);
+
+    [McpServerTool(Name = "select_text"), Description("Select text in Lignum's main view and scroll to it, so the user sees it highlighted (Ctrl+C copies it, the detail pane shows it). Give \"text\" to select its first occurrence on the line, or columns, or \"endLine\" for whole lines; with only \"line\" the whole line is selected.")]
+    public Task<string> SelectText(
+        [Description("1-based line number.")] int line,
+        [Description("Text on that line to select (first occurrence; exact case preferred).")] string? text = null,
+        [Description("1-based first column to select.")] int? startColumn = null,
+        [Description("1-based last column to select (inclusive).")] int? endColumn = null,
+        [Description("1-based last line, to select whole lines from line to endLine.")] int? endLine = null,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+        CancellationToken cancellationToken = default)
+    {
+        var arguments = new Dictionary<string, JsonElement> { ["line"] = E(line) };
+        if (text is not null) arguments["text"] = E(text);
+        if (startColumn is { } from) arguments["start_column"] = E(from);
+        if (endColumn is { } to) arguments["end_column"] = E(to);
+        if (endLine is { } last) arguments["end_line"] = E(last);
+        return Call("select_text", WithTab(arguments, tab), cancellationToken);
+    }
 
     [McpServerTool(Name = "select_tab"), Description("Switch Lignum to another open tab (index from list_tabs, or file name).")]
     public Task<string> SelectTab([Description("Tab index from list_tabs, or the file name.")] string tab,
@@ -151,10 +174,104 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
                                          CancellationToken cancellationToken = default) =>
         Call("clear_filter_rules", WithTab(new(), tab), cancellationToken);
 
-    [McpServerTool(Name = "list_bookmarks"), Description("List a tab's bookmarks and their notes.")]
+    [McpServerTool(Name = "list_bookmarks"), Description("List a tab's bookmarks with their colors and notes.")]
     public Task<string> ListBookmarks([Description("Tab index or file name; default the selected tab.")] string? tab = null,
                                       CancellationToken cancellationToken = default) =>
         Call("list_bookmarks", WithTab(new(), tab), cancellationToken);
+
+    [McpServerTool(Name = "remove_bookmark"), Description("Remove the bookmark (with its note and color) on a line, or every bookmark of the tab with all=true.")]
+    public Task<string> RemoveBookmark(
+        [Description("1-based line number of the bookmark.")] int line = 0,
+        [Description("true to remove every bookmark of the tab.")] bool all = false,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+        CancellationToken cancellationToken = default) =>
+        Call("remove_bookmark", WithTab(new() { ["line"] = E(line), ["all"] = E(all) }, tab), cancellationToken);
+
+    [McpServerTool(Name = "edit_bookmark"), Description("Change the note and / or color of an existing bookmark.")]
+    public Task<string> EditBookmark(
+        [Description("1-based line number of the bookmark.")] int line,
+        [Description("New note; an empty string removes the note.")] string? note = null,
+        [Description("New color: Blue, Red, Yellow, Green or Purple.")] string? color = null,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+        CancellationToken cancellationToken = default)
+    {
+        var arguments = new Dictionary<string, JsonElement> { ["line"] = E(line) };
+        if (note is not null) arguments["note"] = E(note);
+        if (color is not null) arguments["color"] = E(color);
+        return Call("edit_bookmark", WithTab(arguments, tab), cancellationToken);
+    }
+
+    [McpServerTool(Name = "get_selection"), Description("What the user has selected in Lignum's main view (and where the caret is), with the selected text (at most 200 lines). Use it when the user refers to \"this\" or \"the selected lines\".")]
+    public Task<string> GetSelection([Description("Tab index or file name; default the selected tab.")] string? tab = null, CancellationToken cancellationToken = default) =>
+        Call("get_selection", WithTab(new(), tab), cancellationToken);
+
+    [McpServerTool(Name = "set_hide_non_matching"), Description("Turn \"Hide non-matching lines\" on or off: when on, the main view shows only the lines matching the filter rules / search.")]
+    public Task<string> SetHideNonMatching(
+        [Description("true to show only matching lines, false to show every line.")] bool enabled,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+        CancellationToken cancellationToken = default) =>
+        Call("set_hide_non_matching", WithTab(new() { ["enabled"] = E(enabled) }, tab), cancellationToken);
+
+    [McpServerTool(Name = "list_highlight_rules"), Description("List the highlight rules (they apply to every tab) with their numbers, options and on/off state.")]
+    public Task<string> ListHighlightRules(CancellationToken cancellationToken = default) =>
+        Call("list_highlight_rules", new(), cancellationToken);
+
+    [McpServerTool(Name = "remove_highlight_rule"), Description("Remove a highlight rule by its number from list_highlight_rules.")]
+    public Task<string> RemoveHighlightRule([Description("1-based rule number from list_highlight_rules.")] int index,
+                                            CancellationToken cancellationToken = default) =>
+        Call("remove_highlight_rule", new() { ["index"] = E(index) }, cancellationToken);
+
+    [McpServerTool(Name = "clear_highlight_rules"), Description("Remove every highlight rule.")]
+    public Task<string> ClearHighlightRules(CancellationToken cancellationToken = default) =>
+        Call("clear_highlight_rules", new(), cancellationToken);
+
+    [McpServerTool(Name = "show_full_line"), Description("Open Lignum's detail pane on a line, to show a very long line in full, wrapped.")]
+    public Task<string> ShowFullLine([Description("1-based line number.")] int line, [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+                                     CancellationToken cancellationToken = default) =>
+        Call("show_full_line", WithTab(new() { ["line"] = E(line) }, tab), cancellationToken);
+
+    [McpServerTool(Name = "open_file"), Description("Open a log file or .lm package in a new Lignum tab (or switch to it if open). Returns once the tab is there; big files keep indexing in the background.")]
+    public Task<string> OpenFile([Description("Full path of the file.")] string path, CancellationToken cancellationToken = default) =>
+        Call("open_file", new() { ["path"] = E(path) }, cancellationToken);
+
+    [McpServerTool(Name = "close_tab"), Description("Close a Lignum tab. Its bookmarks stay saved.")]
+    public Task<string> CloseTab([Description("Tab index or file name; default the selected tab.")] string? tab = null, CancellationToken cancellationToken = default) =>
+        Call("close_tab", WithTab(new(), tab), cancellationToken);
+
+    [McpServerTool(Name = "export_package"), Description("Export a tab's log with its bookmarks, notes and colors to a new .lm package (File > Export with notes). Never overwrites an existing file. Can take a while for big logs.")]
+    public Task<string> ExportPackage(
+        [Description("Full path of the new package; must end in .lm and its folder must exist.")] string path,
+        [Description("false stores the log uncompressed (faster for huge logs, bigger file). Default true.")] bool compress = true,
+        [Description("Tab index or file name; default the selected tab.")] string? tab = null,
+        CancellationToken cancellationToken = default) =>
+        Call("export_package", WithTab(new() { ["path"] = E(path), ["compress"] = E(compress) }, tab), cancellationToken);
+
+    [McpServerTool(Name = "list_skills"), Description("List the user's Lignum skills (saved instructions, global or next to the selected log) with their descriptions.")]
+    public Task<string> ListSkills(CancellationToken cancellationToken = default) =>
+        Call("list_skills", new(), cancellationToken);
+
+    [McpServerTool(Name = "get_skill"), Description("Get the instructions of a Lignum skill by name. When the user's message says they chose a skill, call this first and follow what it returns.")]
+    public Task<string> GetSkill([Description("The skill's name, as in list_skills (without the /).")] string name,
+                                 CancellationToken cancellationToken = default) =>
+        Call("get_skill", new() { ["name"] = E(name) }, cancellationToken);
+
+    [McpServerTool(Name = "save_skill"), Description("Save a Lignum skill (instructions the user runs with /name). Local skills go in .lignum\\skills next to the selected log; global ones are for every log. Use this when the user asks for a skill instead of telling them to save a file.")]
+    public Task<string> SaveSkill(
+        [Description("Short name to type after /, e.g. first-error.")] string name,
+        [Description("The instructions the AI follows when the skill is used (Markdown).")] string instructions,
+        [Description("One line shown in the / list.")] string? description = null,
+        [Description("\"local\" (default, next to the selected log) or \"global\" (every log).")] string? scope = null,
+        [Description("true to replace an existing skill of that name; ask the user first.")] bool overwrite = false,
+        CancellationToken cancellationToken = default)
+    {
+        var arguments = new Dictionary<string, JsonElement>
+        {
+            ["name"] = E(name), ["instructions"] = E(instructions), ["overwrite"] = E(overwrite),
+        };
+        if (description is not null) arguments["description"] = E(description);
+        if (scope is not null) arguments["scope"] = E(scope);
+        return Call("save_skill", arguments, cancellationToken);
+    }
 
     private static Dictionary<string, JsonElement> WithTab(Dictionary<string, JsonElement> arguments, string? tab)
     {

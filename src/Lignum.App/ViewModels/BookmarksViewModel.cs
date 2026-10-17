@@ -4,15 +4,15 @@ using Lignum.App.Settings;
 
 namespace Lignum.App.ViewModels;
 
-/// <summary>One row of the bookmarks pane: a bookmarked 0-based line and its note, if any.</summary>
-public sealed record BookmarkItem(long Line, string? Note)
+/// <summary>One row of the bookmarks pane: a bookmarked 0-based line, its note, if any, and its color.</summary>
+public sealed record BookmarkItem(long Line, string? Note, BookmarkColor Color = BookmarkColor.Blue)
 {
     /// <summary>1-based, as the margin shows it.</summary>
     public long DisplayLine => Line + 1;
 }
 
 /// <summary>
-/// The bookmarked lines of one file (ticket 17), with optional notes (ticket 06). Every change saves the file's <see cref="BookmarksFile"/> at once.
+/// The bookmarked lines of one file (ticket 17), with optional notes (ticket 06) and colors. Every change saves the file's <see cref="BookmarksFile"/> at once.
 /// <see cref="Lines"/> is replaced (not mutated) on every change, so a binding to it repaints the margin markers.
 /// </summary>
 public sealed partial class BookmarksViewModel : ObservableObject
@@ -27,6 +27,13 @@ public sealed partial class BookmarksViewModel : ObservableObject
     [ObservableProperty]
     private ImmutableDictionary<long, string> _notes;
 
+    /// <summary>
+    /// Colors by 0-based line; every key is also in <see cref="Lines"/>, and a line that is not a key is
+    /// <see cref="BookmarkColor.Blue"/>. Replaced on every change.
+    /// </summary>
+    [ObservableProperty]
+    private ImmutableDictionary<long, BookmarkColor> _colors;
+
     /// <param name="file">Where the bookmarks are loaded from and saved to; null keeps them in memory only.</param>
     /// <param name="path">The log file's full path, written into the file for people reading it.</param>
     public BookmarksViewModel(SettingsFile<BookmarksFile>? file, string path)
@@ -38,14 +45,33 @@ public sealed partial class BookmarksViewModel : ObservableObject
         _notes = file?.Value.Bookmarks.Where(b => b.Line >= 0 && !string.IsNullOrWhiteSpace(b.Note))
                      .GroupBy(b => b.Line).ToImmutableDictionary(g => g.Key, g => g.First().Note!)
                  ?? ImmutableDictionary<long, string>.Empty;
+        _colors = file?.Value.Bookmarks.Where(b => b.Line >= 0 && b.Color is { } c && c != BookmarkColor.Blue)
+                      .GroupBy(b => b.Line).ToImmutableDictionary(g => g.Key, g => g.First().Color!.Value)
+                  ?? ImmutableDictionary<long, BookmarkColor>.Empty;
     }
 
     /// <summary>The bookmarks with their notes, ascending (the bookmarks pane).</summary>
-    public IReadOnlyList<BookmarkItem> Items => [.. Lines.Select(l => new BookmarkItem(l, Notes.GetValueOrDefault(l)))];
+    public IReadOnlyList<BookmarkItem> Items =>
+        [.. Lines.Select(l => new BookmarkItem(l, Notes.GetValueOrDefault(l), ColorFor(l)))];
 
     partial void OnLinesChanged(ImmutableSortedSet<long> value) => OnPropertyChanged(nameof(Items));
 
     partial void OnNotesChanged(ImmutableDictionary<long, string> value) => OnPropertyChanged(nameof(Items));
+
+    partial void OnColorsChanged(ImmutableDictionary<long, BookmarkColor> value) => OnPropertyChanged(nameof(Items));
+
+    /// <summary>The color of the bookmark on <paramref name="line"/> (<see cref="BookmarkColor.Blue"/> by default).</summary>
+    public BookmarkColor ColorFor(long line) => Colors.GetValueOrDefault(line, BookmarkColor.Blue);
+
+    /// <summary>Sets the color of the bookmark on <paramref name="line"/>, bookmarking the line if it is not yet.</summary>
+    public void SetColor(long line, BookmarkColor color)
+    {
+        if (line < 0) return;
+        if (Lines.Contains(line) && ColorFor(line) == color) return;
+        if (!Lines.Contains(line)) Lines = Lines.Add(line);
+        Colors = color == BookmarkColor.Blue ? Colors.Remove(line) : Colors.SetItem(line, color);
+        Save();
+    }
 
     /// <summary>The note on <paramref name="line"/>, or null.</summary>
     public string? NoteFor(long line) => Notes.GetValueOrDefault(line);
@@ -79,7 +105,8 @@ public sealed partial class BookmarksViewModel : ObservableObject
         if (Lines.Contains(line))
         {
             Lines = Lines.Remove(line);
-            Notes = Notes.Remove(line); // the note goes with its bookmark
+            Notes = Notes.Remove(line); // the note and color go with their bookmark
+            Colors = Colors.Remove(line);
         }
         else
         {
@@ -123,7 +150,11 @@ public sealed partial class BookmarksViewModel : ObservableObject
         var existing = value.Bookmarks.GroupBy(b => b.Line).ToDictionary(g => g.Key, g => g.First());
         value.Bookmarks = Lines.Select(l => existing.TryGetValue(l, out var entry) ? entry : new BookmarkEntry { Line = l })
             .ToList();
-        foreach (var entry in value.Bookmarks) entry.Note = Notes.GetValueOrDefault(entry.Line);
+        foreach (var entry in value.Bookmarks)
+        {
+            entry.Note = Notes.GetValueOrDefault(entry.Line);
+            entry.Color = Colors.TryGetValue(entry.Line, out var color) ? color : null;
+        }
         _file.Save();
     }
 }

@@ -90,11 +90,55 @@
             <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
                 <Button DockPanel.Dock="Right" Content="Send" Padding="10,1" Command="{Binding SendCommand}" />
                 <Button DockPanel.Dock="Right" Content="Stop" Padding="10,1" Margin="0,0,4,0" Command="{Binding StopCommand}" />
-                <TextBlock />
+                <!-- Skills: saved instructions used with /name (global, or next to the selected log). -->
+                <Button Content="Skills ▾" Padding="8,1" HorizontalAlignment="Left" Click="OnSkillsClick"
+                        ToolTip="Open the skills folders; type / in the message to use a skill, or ask the AI to make one">
+                    <Button.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Open _global skills folder" Command="{Binding OpenGlobalSkillsFolderCommand}"
+                                      ToolTip="For every log: %APPDATA%\Lignum\skills" />
+                            <MenuItem Header="Open _local skills folder" Command="{Binding OpenLocalSkillsFolderCommand}"
+                                      ToolTip="Next to the selected log: .lignum\skills" />
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
             </DockPanel>
-            <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
-                     TextWrapping="Wrap" MinHeight="48" MaxHeight="160" VerticalScrollBarVisibility="Auto"
-                     ToolTip="Ask about the open logs. Enter sends; Shift+Enter starts a new line" PreviewKeyDown="OnInputKeyDown" />
+            <Grid>
+                <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                         TextWrapping="Wrap" MinHeight="48" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                         ToolTip="Ask about the open logs. Enter sends; Shift+Enter starts a new line; / lists your skills"
+                         PreviewKeyDown="OnInputKeyDown" LostKeyboardFocus="OnInputLostFocus" />
+                <!-- Skill suggestions while a "/name" is typed at the start of the message. -->
+                <Popup IsOpen="{Binding IsSkillListOpen}" PlacementTarget="{Binding ElementName=InputBox}" Placement="Top"
+                       StaysOpen="True" AllowsTransparency="True" Focusable="False"
+                       Width="{Binding ActualWidth, ElementName=InputBox}">
+                    <Border Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
+                            BorderThickness="1" CornerRadius="4" Padding="2">
+                        <ListBox x:Name="SkillList" ItemsSource="{Binding SkillSuggestions}" MaxHeight="220"
+                                 SelectedItem="{Binding SelectedSkillSuggestion}" Focusable="False" BorderThickness="0"
+                                 Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 PreviewMouseLeftButtonUp="OnSkillListClick">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Focusable" Value="False" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="2,1">
+                                        <TextBlock>
+                                            <Run Text="/" FontWeight="SemiBold" /><Run Text="{Binding Name, Mode=OneWay}" FontWeight="SemiBold" />
+                                            <Run Text="{Binding ScopeText, Mode=OneWay}" Foreground="Gray" />
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding Description}" TextWrapping="Wrap" Opacity="0.8" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
+                </Popup>
+            </Grid>
         </DockPanel>
 
         <!-- Off: what turning it on means. -->

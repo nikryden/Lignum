@@ -1,5 +1,7 @@
 using System.Text;
 using System.Text.Json;
+using Lignum.App.Packaging;
+using Lignum.App.Settings;
 using Lignum.App.ViewModels;
 using Lignum.Core;
 
@@ -22,6 +24,15 @@ public sealed class AssistantTools(MainViewModel main)
     internal const int MaxReadLines = 200;
     private const int MaxLineChars = 2000;
 
+    /// <summary>The global skills folder (tests use a temp folder).</summary>
+    public string GlobalSkillsFolder { get; set; } = SkillLibrary.DefaultGlobalFolder;
+
+    /// <summary>The local skills folder of the selected tab's log (or package), or null without one.</summary>
+    public string? LocalSkillsFolder => SkillLibrary.LocalFolderFor(main.SelectedTab?.SourcePath);
+
+    /// <summary>The skills for the selected tab: global ones, and local ones next to its log.</summary>
+    public IReadOnlyList<Skill> LoadSkills() => SkillLibrary.Load(GlobalSkillsFolder, LocalSkillsFolder);
+
     /// <summary>Raised after a tool read log lines: (file name, number of lines).</summary>
     public event Action<string, int>? LinesRead;
 
@@ -39,6 +50,7 @@ public sealed class AssistantTools(MainViewModel main)
                 "add_highlight_rule" => AddHighlightRule(call.Input),
                 "add_bookmark" => AddBookmark(call.Input),
                 "go_to_line" => GoToLine(call.Input),
+                "select_text" => SelectText(call.Input),
                 "select_tab" => SelectTab(call.Input),
                 "search_all_tabs" => await SearchAllTabsAsync(call.Input, cancellationToken),
                 "find_in_files" => await FindInFilesAsync(call.Input, cancellationToken),
@@ -48,6 +60,20 @@ public sealed class AssistantTools(MainViewModel main)
                 "set_filter_rule_enabled" => SetFilterRuleEnabled(call.Input),
                 "clear_filter_rules" => ClearFilterRules(call.Input),
                 "list_bookmarks" => ListBookmarks(call.Input),
+                "remove_bookmark" => RemoveBookmark(call.Input),
+                "edit_bookmark" => EditBookmark(call.Input),
+                "get_selection" => GetSelection(call.Input),
+                "set_hide_non_matching" => SetHideNonMatching(call.Input),
+                "list_highlight_rules" => ListHighlightRules(),
+                "remove_highlight_rule" => RemoveHighlightRule(call.Input),
+                "clear_highlight_rules" => ClearHighlightRules(),
+                "show_full_line" => ShowFullLine(call.Input),
+                "open_file" => await OpenFileAsync(call.Input),
+                "close_tab" => CloseTab(call.Input),
+                "export_package" => await ExportPackageAsync(call.Input),
+                "list_skills" => ListSkills(),
+                "get_skill" => GetSkill(call.Input),
+                "save_skill" => SaveSkill(call.Input),
                 _ => new ToolOutcome($"Unknown tool {call.Name}.", IsError: true),
             };
         }
@@ -148,9 +174,231 @@ public sealed class AssistantTools(MainViewModel main)
         var (tab, _) = Selected(input);
         var line = LineIn(tab, Int(input, "line", 0));
         var note = input.TryGetValue("note", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString() : null;
+        var color = Color(input);
+
         if (!string.IsNullOrWhiteSpace(note)) tab.Bookmarks.SetNote(line, note);
         else if (!tab.Bookmarks.Lines.Contains(line)) tab.Bookmarks.Toggle(line);
-        return new ToolOutcome($"Bookmarked line {line + 1} of {tab.FileName}.");
+        if (color is { } chosen) tab.Bookmarks.SetColor(line, chosen);
+        return new ToolOutcome($"Bookmarked line {line + 1} of {tab.FileName} ({tab.Bookmarks.ColorFor(line)}).");
+    }
+
+    /// <summary>The optional "color" input, or null when it is not given.</summary>
+    private static BookmarkColor? Color(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        if (!input.TryGetValue("color", out var c) || c.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(c.GetString()))
+            return null;
+        return Enum.TryParse<BookmarkColor>(c.GetString(), ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : throw new ToolInputException($"Unknown bookmark color \"{c.GetString()}\"; use one of {string.Join(", ", Enum.GetNames<BookmarkColor>())}.");
+    }
+
+    /// <summary>Removes the bookmark on "line" (with its note and color), or every bookmark with "all".</summary>
+    private ToolOutcome RemoveBookmark(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        if (Bool(input, "all"))
+        {
+            var lines = tab.Bookmarks.Lines;
+            foreach (var bookmarked in lines) tab.Bookmarks.Toggle(bookmarked);
+            return new ToolOutcome($"Removed {lines.Count:N0} bookmarks from {tab.FileName}.");
+        }
+
+        var line = Int(input, "line", 0) - 1;
+        if (!tab.Bookmarks.Lines.Contains(line))
+            throw new ToolInputException($"Line {line + 1} has no bookmark; use list_bookmarks to see them.");
+        tab.Bookmarks.Toggle(line);
+        return new ToolOutcome($"Removed the bookmark on line {line + 1} of {tab.FileName}.");
+    }
+
+    /// <summary>Changes the note ("" removes it) and / or color of an existing bookmark.</summary>
+    private ToolOutcome EditBookmark(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var line = Int(input, "line", 0) - 1;
+        if (!tab.Bookmarks.Lines.Contains(line))
+            throw new ToolInputException($"Line {line + 1} has no bookmark; use add_bookmark first.");
+        var color = Color(input);
+        var hasNote = input.TryGetValue("note", out var n) && n.ValueKind == JsonValueKind.String;
+        if (!hasNote && color is null) throw new ToolInputException("Give a \"note\" (empty removes it) and / or a \"color\".");
+        if (hasNote) tab.Bookmarks.SetNote(line, n.GetString());
+        if (color is { } chosen) tab.Bookmarks.SetColor(line, chosen);
+        var note = tab.Bookmarks.NoteFor(line);
+        return new ToolOutcome($"Bookmark on line {line + 1}: {tab.Bookmarks.ColorFor(line)}{(note is null ? ", no note" : $", note \"{note}\"")}.");
+    }
+
+    /// <summary>The caret and the user's selection in the tab's main view, with the selected text (capped).</summary>
+    private ToolOutcome GetSelection(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, document) = Selected(input);
+        var selection = tab.Selection;
+        var caret = tab.Navigation.Caret;
+        var text = new StringBuilder($"{tab.FileName}: caret at line {caret.Line + 1}, column {caret.Column + 1}.\n");
+        if (selection.IsEmpty)
+        {
+            text.Append("Nothing is selected.");
+            return new ToolOutcome(text.ToString());
+        }
+
+        var (start, end) = (selection.Start, selection.End);
+        var last = end.Column == 0 && end.Line > start.Line ? end.Line - 1 : end.Line;
+        var count = (int)Math.Min(last - start.Line + 1, MaxReadLines);
+        text.AppendLine($"Selected: line {start.Line + 1}, column {start.Column + 1} to line {last + 1}" +
+                        (last == end.Line && end.Column != int.MaxValue ? $", column {end.Column}." : " (end of line)."));
+        if (tab.Search.Results is not null && tab.HideNonMatchingLines)
+            text.AppendLine("The main view hides non-matching lines; the lines below include any hidden ones in the range.");
+        var lines = document.ReadLinePrefixes(start.Line, count, MaxLineChars);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = start.Line + i;
+            var value = lines[i].Text;
+            if (line == end.Line && end.Column < value.Length) value = value[..end.Column];
+            if (line == start.Line) value = start.Column < value.Length ? value[start.Column..] : "";
+            text.AppendLine($"{line + 1}: {value}{(lines[i].IsTruncated ? " …" : "")}");
+        }
+
+        if (last - start.Line + 1 > count) text.AppendLine($"(first {count} of {last - start.Line + 1:N0} lines)");
+        LinesRead?.Invoke(tab.FileName, lines.Length);
+        return new ToolOutcome(text.ToString());
+    }
+
+    /// <summary>Turns "Hide non-matching lines" (the main view shows only the filter / search results) on or off.</summary>
+    private ToolOutcome SetHideNonMatching(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        tab.HideNonMatchingLines = Bool(input, "enabled");
+        return new ToolOutcome(!tab.HideNonMatchingLines
+            ? $"{tab.FileName} shows every line."
+            : tab.Search.Results is null
+                ? $"Hiding non-matching lines in {tab.FileName}, but there is no filter or search yet, so every line still shows."
+                : $"{tab.FileName} now shows only the matching lines.");
+    }
+
+    private ToolOutcome ListHighlightRules()
+    {
+        if (main.Highlighting is not { } highlighting) return new ToolOutcome("Highlighting is not available.", IsError: true);
+        var rules = highlighting.Rules;
+        if (rules.Count == 0) return new ToolOutcome("There are no highlight rules.");
+        var text = new StringBuilder($"Highlight rules (preset \"{highlighting.ActivePreset?.Name}\", first match wins):\n");
+        for (var i = 0; i < rules.Count; i++)
+        {
+            var r = rules[i];
+            text.AppendLine($"{i + 1}. \"{r.Pattern}\"{(r.IsRegex ? " regex" : "")}{(r.MatchCase ? " match-case" : "")}{(r.IsEnabled ? "" : " (off)")}");
+        }
+
+        return new ToolOutcome(text.ToString());
+    }
+
+    /// <summary>Removes the highlight rule at the 1-based "index" from list_highlight_rules.</summary>
+    private ToolOutcome RemoveHighlightRule(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        if (main.Highlighting is not { } highlighting) return new ToolOutcome("Highlighting is not available.", IsError: true);
+        var index = Int(input, "index", 0);
+        if (index < 1 || index > highlighting.Rules.Count)
+            throw new ToolInputException($"There is no highlight rule {index}; use list_highlight_rules (1 - {highlighting.Rules.Count}).");
+        var rule = highlighting.Rules[index - 1];
+        highlighting.Rules.RemoveAt(index - 1);
+        return new ToolOutcome($"Removed highlight rule \"{rule.Pattern}\".");
+    }
+
+    private ToolOutcome ClearHighlightRules()
+    {
+        if (main.Highlighting is not { } highlighting) return new ToolOutcome("Highlighting is not available.", IsError: true);
+        var count = highlighting.Rules.Count;
+        highlighting.Rules.Clear();
+        return new ToolOutcome($"Removed {count} highlight rules.");
+    }
+
+    /// <summary>Opens the detail pane on a line, for lines too long to read in the view.</summary>
+    private ToolOutcome ShowFullLine(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var line = LineIn(tab, Int(input, "line", 0));
+        main.SelectedTab = tab;
+        tab.Navigation.GoToLine(line);
+        main.ShowFullLine(line);
+        return new ToolOutcome($"Showing line {line + 1} in the detail pane.");
+    }
+
+    /// <summary>Opens a log file or .lm package in a new tab (or selects its tab); returns once the tab is there.</summary>
+    private async Task<ToolOutcome> OpenFileAsync(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var path = String(input, "path");
+        if (!File.Exists(path)) throw new ToolInputException($"There is no file \"{path}\".");
+        main.ErrorMessage = null;
+        await main.OpenFileCoreAsync(path); // indexing goes on in the background
+        var full = Path.GetFullPath(path);
+        return main.SelectedTab is { } tab && string.Equals(tab.SourcePath, full, StringComparison.OrdinalIgnoreCase)
+            ? new ToolOutcome($"Opened {tab.FileName} as tab {main.Tabs.IndexOf(tab)} (it may still be indexing).")
+            : new ToolOutcome(main.ErrorMessage ?? $"Could not open {path}.", IsError: true);
+    }
+
+    private ToolOutcome CloseTab(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var name = tab.FileName;
+        main.CloseTabCommand.Execute(tab);
+        return new ToolOutcome($"Closed {name}.");
+    }
+
+    /// <summary>
+    /// Exports the tab's log with its bookmarks and notes to a new .lm package at "path". Never overwrites a file.
+    /// </summary>
+    private async Task<ToolOutcome> ExportPackageAsync(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, _) = Selected(input);
+        var path = Path.GetFullPath(String(input, "path"));
+        if (!LogPackage.IsPackage(path)) throw new ToolInputException("The export path must end in .lm.");
+        if (File.Exists(path)) throw new ToolInputException($"{path} already exists; choose another name.");
+        if (Path.GetDirectoryName(path) is not { } folder || !Directory.Exists(folder))
+            throw new ToolInputException($"The folder for {path} does not exist.");
+        var compress = !input.TryGetValue("compress", out var c) || c.ValueKind != JsonValueKind.False;
+        main.SelectedTab = tab;
+        return await main.ExportPackageAsync(path, compress)
+            ? new ToolOutcome($"Exported {tab.FileName} with {tab.Bookmarks.Lines.Count:N0} bookmarks to {path}.")
+            : new ToolOutcome(main.ErrorMessage ?? "The export was cancelled.", IsError: true);
+    }
+
+    private ToolOutcome ListSkills()
+    {
+        var skills = LoadSkills();
+        if (skills.Count == 0) return new ToolOutcome("There are no skills. The user can add them in the AI panel (Skills).");
+        var text = new StringBuilder("Skills (the user starts a message with /name to use one; get_skill returns its instructions):\n");
+        foreach (var skill in skills) text.AppendLine($"{skill.Name} ({skill.ScopeText}): {skill.Description}");
+        return new ToolOutcome(text.ToString());
+    }
+
+    /// <summary>
+    /// Saves a skill: "scope" local (default; .lignum\skills next to the selected log) or global (every log).
+    /// An existing skill of that name is replaced only with "overwrite".
+    /// </summary>
+    private ToolOutcome SaveSkill(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var scope = input.TryGetValue("scope", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString()?.Trim().ToLowerInvariant() : null;
+        var global = scope switch
+        {
+            null or "" or "local" => false,
+            "global" => true,
+            _ => throw new ToolInputException("\"scope\" must be \"local\" or \"global\"."),
+        };
+        var folder = global
+            ? GlobalSkillsFolder
+            : LocalSkillsFolder ?? throw new ToolInputException("No log is open, so there is no local skills folder; open a log or save it as global.");
+        var description = input.TryGetValue("description", out var d) && d.ValueKind == JsonValueKind.String ? d.GetString() ?? "" : "";
+        var file = SkillLibrary.Save(folder, String(input, "name"), description, String(input, "instructions"), Bool(input, "overwrite"));
+        var name = SkillLibrary.Normalize(String(input, "name"));
+        return new ToolOutcome($"Saved skill /{name} ({(global ? "global" : "local")}) to {file}. The user can run it with /{name}.");
+    }
+
+    /// <summary>The instructions of the skill named "name", to follow for the user's request.</summary>
+    private ToolOutcome GetSkill(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var name = SkillLibrary.Normalize(String(input, "name").TrimStart('/'));
+        var skill = LoadSkills().FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                    ?? throw new ToolInputException($"There is no skill \"{name}\"; use list_skills to see them.");
+        var instructions = skill.ReadInstructions();
+        if (instructions.Length > SkillLibrary.MaxInstructionChars)
+            instructions = instructions[..SkillLibrary.MaxInstructionChars] + "\n(The rest of the skill was cut.)";
+        return new ToolOutcome($"Skill \"{skill.Name}\" ({skill.ScopeText}). Follow these instructions:\n\n{instructions}");
     }
 
     private ToolOutcome GoToLine(IReadOnlyDictionary<string, JsonElement> input)
@@ -159,6 +407,53 @@ public sealed class AssistantTools(MainViewModel main)
         var line = LineIn(tab, Int(input, "line", 0));
         tab.Navigation.GoToLine(line);
         return new ToolOutcome($"Moved to line {line + 1}.");
+    }
+
+    /// <summary>
+    /// Selects text in the tab's main view and scrolls to it: the first occurrence of "text" on "line", the 1-based
+    /// columns "start_column" to "end_column" (inclusive) on it, or whole lines "line" to "end_line".
+    /// </summary>
+    private ToolOutcome SelectText(IReadOnlyDictionary<string, JsonElement> input)
+    {
+        var (tab, document) = Selected(input);
+        var line = LineIn(tab, Int(input, "line", 0));
+        FilePosition start, end;
+        string what;
+        if (input.TryGetValue("text", out var t) && t.ValueKind == JsonValueKind.String && t.GetString() is { Length: > 0 } text)
+        {
+            var lineText = document.ReadLines(line, 1) is [var read] ? read : "";
+            var column = lineText.IndexOf(text, StringComparison.Ordinal);
+            if (column < 0) column = lineText.IndexOf(text, StringComparison.OrdinalIgnoreCase);
+            if (column < 0) throw new ToolInputException($"\"{text}\" is not on line {line + 1}; use read_lines to check the line.");
+            start = new FilePosition(line, column);
+            end = new FilePosition(line, column + text.Length);
+            what = $"\"{lineText.Substring(column, text.Length)}\" on line {line + 1} (columns {column + 1}–{column + text.Length})";
+        }
+        else if (input.ContainsKey("start_column") || input.ContainsKey("end_column"))
+        {
+            var length = document.ReadLines(line, 1) is [var read] ? read.Length : 0;
+            var from = Int(input, "start_column", 1);
+            var to = Int(input, "end_column", length);
+            if (from < 1 || to < from || to > length)
+                throw new ToolInputException($"Columns {from}–{to} are not on line {line + 1}, which has {length:N0} characters.");
+            start = new FilePosition(line, from - 1);
+            end = new FilePosition(line, to);
+            what = $"columns {from}–{to} of line {line + 1}";
+        }
+        else
+        {
+            var last = input.ContainsKey("end_line") ? LineIn(tab, Int(input, "end_line", 0)) : line;
+            if (last < line) throw new ToolInputException("\"end_line\" must not be before \"line\".");
+            start = new FilePosition(line, 0);
+            end = new FilePosition(last, int.MaxValue); // to the end of the last line
+            what = last == line ? $"line {line + 1}" : $"lines {line + 1}–{last + 1}";
+        }
+
+        main.SelectedTab = tab;
+        tab.Navigation.GoToLine(line); // scrolls the line into view
+        tab.Selection.MoveCaret(start, extend: false);
+        tab.Selection.MoveCaret(end, extend: true);
+        return new ToolOutcome($"Selected {what} in {tab.FileName}.");
     }
 
     /// <summary>The tab named by the optional "tab" input (index from list_tabs, or file name), else the selected one.</summary>
@@ -322,7 +617,7 @@ public sealed class AssistantTools(MainViewModel main)
         var items = tab.Bookmarks.Items;
         if (items.Count == 0) return new ToolOutcome($"{tab.FileName} has no bookmarks.");
         var text = new StringBuilder($"Bookmarks of {tab.FileName}:\n");
-        foreach (var item in items) text.AppendLine($"line {item.DisplayLine}{(item.Note is { } note ? $": {note}" : "")}");
+        foreach (var item in items) text.AppendLine($"line {item.DisplayLine} [{item.Color}]{(item.Note is { } note ? $": {note}" : "")}");
         return new ToolOutcome(text.ToString());
     }
 

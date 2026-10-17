@@ -22,4 +22,10 @@ public sealed class DetailPaneSettings
 
     /// <summary>Height when docked at the bottom, in device-independent pixels.</summary>
     public double Height { get; set; } = DefaultHeight;
+
+    /// <summary>
+    /// A selection over several lines also shows the lines the main view hides between its ends (off: only the
+    /// selected rows).
+    /// </summary>
+    public bool IncludeHiddenLines { get; set; }
 }

@@ -17,7 +17,11 @@
         <DockPanel>
             <DockPanel DockPanel.Dock="Top" Margin="6,4">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="Copy line" ToolTip="Copy the whole line" Click="OnCopyLineClick"
+                    <!-- App-wide: a multi-line selection also shows the lines the main view hides between its ends. -->
+                    <CheckBox Content="Hidden lines" VerticalAlignment="Center" Margin="4,0" Focusable="False"
+                              ToolTip="When several lines are selected, also show the lines the filter hides between them"
+                              IsChecked="{Binding DataContext.DetailPane.IncludeHiddenLines, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    <Button Content="{Binding CopyLabel}" ToolTip="Copy what the pane shows, in full" Click="OnCopyLineClick"
                             Style="{StaticResource PaneButton}" />
                     <!-- Layout commands are app-wide: the window's MainViewModel.DetailPane. -->
                     <Button Content="Dock bottom" ToolTip="Dock the detail pane at the bottom"

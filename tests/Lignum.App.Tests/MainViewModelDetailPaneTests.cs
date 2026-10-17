@@ -59,6 +59,35 @@ public sealed class MainViewModelDetailPaneTests : IDisposable
     }
 
     [Fact]
+    public async Task Selecting_several_lines_shows_them_all_in_the_detail_pane()
+    {
+        using var vm = Create();
+        await vm.OpenFileAsync(WriteFile("zero\none\ntwo\nthree\n")).WaitAsync(TimeSpan.FromSeconds(30));
+        var tab = vm.SelectedTab!;
+
+        tab.Selection.MoveCaret(new Lignum.Core.FilePosition(1, 0), extend: false);
+        tab.Selection.MoveCaret(new Lignum.Core.FilePosition(2, 2), extend: true);
+        await tab.Detail.WhenLoaded;
+        Assert.Equal("one\ntwo", tab.Detail.Text);
+
+        tab.Selection.MoveCaret(new Lignum.Core.FilePosition(3, 1), extend: false);
+        await tab.Detail.WhenLoaded;
+        Assert.Equal("three", tab.Detail.Text);
+    }
+
+    [Fact]
+    public async Task The_hidden_lines_setting_reaches_every_tab()
+    {
+        using var vm = Create();
+        await vm.OpenFileAsync(WriteFile("one\n")).WaitAsync(TimeSpan.FromSeconds(30));
+
+        vm.DetailPane.IncludeHiddenLines = true;
+        await vm.OpenFileAsync(WriteFile("two\n")).WaitAsync(TimeSpan.FromSeconds(30));
+
+        Assert.All(vm.Tabs, tab => Assert.True(tab.Detail.IncludeHiddenLines));
+    }
+
+    [Fact]
     public async Task Each_tab_keeps_its_own_detail_line()
     {
         using var vm = Create();

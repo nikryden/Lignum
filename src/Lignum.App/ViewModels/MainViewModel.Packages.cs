@@ -27,16 +27,22 @@ public sealed partial class MainViewModel
 
     /// <summary>
     /// Writes the selected tab's log, bookmarks and notes to <paramref name="destination"/> in the background.
-    /// <paramref name="compress"/> false stores the log uncompressed (faster for huge logs).
+    /// <paramref name="compress"/> false stores the log uncompressed (faster for huge logs). True when it was written.
     /// </summary>
-    public async Task ExportPackageAsync(string destination, bool compress)
+    public async Task<bool> ExportPackageAsync(string destination, bool compress)
     {
-        if (SelectedTab is not { } tab) return;
+        if (SelectedTab is not { } tab) return false;
         var name = Path.GetFileName(destination);
         var bookmarks = new BookmarksFile
         {
             Path = tab.FileName,
-            Bookmarks = [.. tab.Bookmarks.Items.Select(b => new BookmarkEntry { Line = b.Line, Note = b.Note })],
+            Bookmarks =
+            [
+                .. tab.Bookmarks.Items.Select(b => new BookmarkEntry
+                {
+                    Line = b.Line, Note = b.Note, Color = b.Color == BookmarkColor.Blue ? null : b.Color,
+                }),
+            ],
         };
         try
         {
@@ -47,6 +53,7 @@ public sealed partial class MainViewModel
                 return true;
             });
             PackageStatus = $"Exported {name}";
+            return true;
         }
         catch (OperationCanceledException)
         {
@@ -56,6 +63,8 @@ public sealed partial class MainViewModel
         {
             ErrorMessage = $"Could not export {name}: {ex.Message}";
         }
+
+        return false;
     }
 
     /// <summary>Extracts a package for a new tab; null (and <see cref="ErrorMessage"/> set unless cancelled) on failure.</summary>

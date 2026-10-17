@@ -142,6 +142,86 @@ public sealed class DetailPaneViewModelTests : IDisposable
         Assert.False(layout.IsOpen);
     }
 
+    // ---- several selected lines ----
+
+    [Fact]
+    public async Task A_range_shows_every_line_and_copies_them_all()
+    {
+        var vm = Create("a", "b", "c", "d");
+
+        vm.ShowRange(1, 3);
+        await vm.WhenLoaded;
+
+        Assert.Equal("b\nc\nd", vm.Text);
+        Assert.Equal("Lines 2–4 (3 lines)", vm.Header);
+        Assert.True(vm.IsMultiLine);
+        Assert.Equal("Copy lines", vm.CopyLabel);
+        Assert.Equal(string.Join(Environment.NewLine, "b", "c", "d"), await vm.ReadFullLineAsync());
+    }
+
+    [Fact]
+    public async Task A_range_shows_only_the_shown_rows_unless_hidden_lines_are_included()
+    {
+        var vm = Create("a", "b", "c", "d", "e");
+        vm.ShownLines = new Rows(0, 2, 4);
+
+        vm.ShowRange(0, 4);
+        await vm.WhenLoaded;
+        Assert.Equal("a\nc\ne", vm.Text);
+        Assert.Equal("Lines 1–5 (3 lines)", vm.Header);
+
+        vm.IncludeHiddenLines = true;
+        await vm.WhenLoaded;
+        Assert.Equal("a\nb\nc\nd\ne", vm.Text);
+    }
+
+    [Fact]
+    public async Task A_huge_range_is_capped_with_a_notice()
+    {
+        var vm = Create([.. Enumerable.Range(0, DetailPaneViewModel.MaxShownLines + 5).Select(i => $"l{i}")]);
+
+        vm.ShowRange(0, DetailPaneViewModel.MaxShownLines + 4);
+        await vm.WhenLoaded;
+
+        Assert.Equal(DetailPaneViewModel.MaxShownLines, vm.Text.Split('\n').Length);
+        Assert.True(vm.IsCapped);
+        Assert.Contains("Ctrl+C", vm.Notice);
+    }
+
+    [Fact]
+    public async Task Setting_the_current_line_goes_back_to_one_line()
+    {
+        var vm = Create("a", "b", "c");
+        vm.ShowRange(0, 2);
+        await vm.WhenLoaded;
+
+        vm.CurrentLine = 1;
+        await vm.WhenLoaded;
+
+        Assert.Equal("b", vm.Text);
+        Assert.Equal("Line 2", vm.Header);
+        Assert.False(vm.IsMultiLine);
+    }
+
+    [Fact]
+    public void Including_hidden_lines_is_off_by_default_and_remembered()
+    {
+        Assert.False(CreateLayout().IncludeHiddenLines);
+        CreateLayout().IncludeHiddenLines = true;
+        SettingsStore.Flush();
+
+        Assert.True(CreateLayout().IncludeHiddenLines);
+    }
+
+    private sealed class Rows(params long[] lines) : ILineList
+    {
+        public long Count => lines.Length;
+
+        public long this[long row] => lines[row];
+
+        public event EventHandler? Changed { add { } remove { } }
+    }
+
     private sealed class InMemoryReader(string[] lines) : ILineReader
     {
         public string[] ReadLines(long firstLine, int count) =>

@@ -8,7 +8,7 @@ namespace Lignum.App.Settings;
 /// <summary>
 /// The bookmarks of one log file: <c>bookmarks/&lt;hash&gt;.json</c> in the <see cref="SettingsStore"/>, where
 /// the hash is of the file's full path (see <see cref="RelativePathFor"/>). Example:
-/// <code>{ "path": "C:\\logs\\app.log", "bookmarks": [ { "line": 122 }, { "line": 4096 } ] }</code>
+/// <code>{ "path": "C:\\logs\\app.log", "bookmarks": [ { "line": 122 }, { "line": 4096, "color": "Red" } ] }</code>
 /// Each bookmark is an object, not a bare number, so fields can be added later (a planned <c>note</c>) without a
 /// migration: old files simply lack them, and fields this build does not know are kept and written back.
 /// </summary>
@@ -45,7 +45,21 @@ public sealed class BookmarkEntry
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Note { get; set; }
 
+    /// <summary>The marker color; null (and not written) for the default, <see cref="BookmarkColor.Blue"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public BookmarkColor? Color { get; set; }
+
     /// <summary>Fields written by a newer build (e.g. a note), kept so a save here does not drop them.</summary>
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>The colors a bookmark can have; <see cref="Blue"/> is the default.</summary>
+public enum BookmarkColor
+{
+    Blue,
+    Red,
+    Yellow,
+    Green,
+    Purple,
 }
