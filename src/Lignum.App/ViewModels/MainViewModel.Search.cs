@@ -31,6 +31,12 @@ public sealed partial class MainViewModel
         {
             SelectedTab = tab;
             if (line >= 0) tab.Navigation.GoToLine(line);
+        }, async (path, line) =>
+        {
+            await OpenFileAsync(path); // find in files: open (or switch to) the file, then go to the line
+            if (FindTab(System.IO.Path.GetFullPath(path)) is not { } tab) return;
+            SelectedTab = tab;
+            if (line >= 0) tab.Navigation.GoToLine(line);
         });
 
     partial void OnHighlightMatchesOutsideFilterChanged(bool value)

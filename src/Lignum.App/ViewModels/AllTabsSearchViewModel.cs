@@ -5,14 +5,21 @@ using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
 
-/// <summary>A row of the all-tabs results: a file heading or one matching line.</summary>
-public abstract class AllTabsRow(LogTabViewModel tab) : ObservableObject
+/// <summary>A row of the shared results: a file heading or one matching line, from an open tab or a file on disk.</summary>
+public abstract class AllTabsRow(LogTabViewModel? tab, string path) : ObservableObject
 {
-    public LogTabViewModel Tab { get; } = tab;
+    /// <summary>The open tab the match is in, or null for a file found by find in files (ticket 02).</summary>
+    public LogTabViewModel? Tab { get; } = tab;
+
+    /// <summary>The file's full path.</summary>
+    public string Path { get; } = path;
+
+    public string FileName => System.IO.Path.GetFileName(Path);
 }
 
 /// <summary>The heading of one file's matches, e.g. "app.log: 12 matches"; collapses to hide them.</summary>
-public sealed partial class AllTabsFileRow(LogTabViewModel tab, long matchCount, bool isCapped) : AllTabsRow(tab)
+public sealed partial class AllTabsFileRow(LogTabViewModel? tab, string path, long matchCount, bool isCapped)
+    : AllTabsRow(tab, path)
 {
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Arrow))]
@@ -28,7 +35,7 @@ public sealed partial class AllTabsFileRow(LogTabViewModel tab, long matchCount,
     public string Arrow => IsExpanded ? "▾" : "▸";
 
     public string Header =>
-        $"{Tab.FileName}: {(MatchCount == 1 ? "1 match" : $"{MatchCount:N0} matches")}"
+        $"{FileName}: {(MatchCount == 1 ? "1 match" : $"{MatchCount:N0} matches")}"
         + (IsCapped ? $" (first {AllTabsSearchViewModel.MaxRowsPerFile:N0} shown)" : "");
 }
 
@@ -36,8 +43,8 @@ public sealed partial class AllTabsFileRow(LogTabViewModel tab, long matchCount,
 public sealed record TextSegment(string Text, bool IsMatch);
 
 /// <summary>One matching line: its 0-based file line and (the start of) its text, split for highlighting.</summary>
-public sealed class AllTabsMatchRow(LogTabViewModel tab, long line, string text, IReadOnlyList<TextSegment> segments)
-    : AllTabsRow(tab)
+public sealed class AllTabsMatchRow(LogTabViewModel? tab, string path, long line, string text,
+                                   IReadOnlyList<TextSegment> segments) : AllTabsRow(tab, path)
 {
     public long Line => line;
 
@@ -96,7 +103,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     private bool _showResultsPerTab = true;
 
     /// <summary>Whether the main window shows the shared results list (not in per-tab mode).</summary>
-    public bool IsResultsListVisible => IsPaneOpen && !ShowResultsPerTab;
+    public bool IsResultsListVisible => IsPaneOpen && (!ShowResultsPerTab || IsShowingFolderResults);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
@@ -107,13 +114,17 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
 
     /// <param name="tabs">The open tabs, read when a search starts.</param>
     /// <param name="goTo">Selects a tab and moves its caret to a 0-based line.</param>
+    /// <param name="openAt">Opens a file (find in files) and moves to a 0-based line (-1: just open it).</param>
     internal AllTabsSearchViewModel(SynchronizationContext? uiContext, Func<IReadOnlyList<LogTabViewModel>> tabs,
-                                    Action<LogTabViewModel, long> goTo)
+                                    Action<LogTabViewModel, long> goTo, Func<string, long, Task>? openAt = null)
     {
         _uiContext = uiContext;
         _tabs = tabs;
         _goTo = goTo;
+        _openAt = openAt;
     }
+
+    private readonly Func<string, long, Task>? _openAt;
 
     /// <summary>File headings and, under each expanded one, its matching lines; in tab order. Replaced on change.</summary>
     [ObservableProperty]
@@ -161,6 +172,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         }
 
         FindTextError = null;
+        IsShowingFolderResults = false;
         if (ShowResultsPerTab)
         {
             await SearchEachTab();
@@ -183,7 +195,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
 
         // Each file's rows go in as it finishes, but always in tab order (a finished file waits for the ones before it).
         var highlight = new Query(query.Rules, SearchViewModel.HighlightRegexTimeout);
-        var reads = searches.Select(s => ReadRows(s.Tab, s.Document, s.Result, highlight)).ToList();
+        var reads = searches.Select(s => ReadRows(s.Tab, s.Tab.Path, s.Document, s.Result, highlight)).ToList();
         foreach (var read in reads)
         {
             var file = await read;
@@ -228,6 +240,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     {
         _generation++;
         foreach (var result in _running) result.Cancel();
+        _folderCancel?.Cancel();
         if (ShowResultsPerTab && IsSearching)
         {
             foreach (var tab in _tabs()) tab.Search.CancelSearchCommand.Execute(null);
@@ -241,12 +254,22 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         }
     }
 
-    /// <summary>A click on a row: switches to its tab at its line (a heading goes to the tab only).</summary>
+    /// <summary>
+    /// A click on a row: switches to its tab at its line (a heading goes to the tab only). A file found by find
+    /// in files is opened in a tab first.
+    /// </summary>
     [RelayCommand]
-    private void GoTo(AllTabsRow? row)
+    private async Task GoTo(AllTabsRow? row)
     {
-        if (row is null || !_tabs().Contains(row.Tab)) return; // the tab was closed since
-        _goTo(row.Tab, row is AllTabsMatchRow match ? match.Line : -1);
+        if (row is null) return;
+        var line = row is AllTabsMatchRow match ? match.Line : -1;
+        if (row.Tab is { } tab)
+        {
+            if (_tabs().Contains(tab)) _goTo(tab, line); // else the tab was closed since
+            return;
+        }
+
+        if (_openAt is { } open) await open(row.Path, line);
     }
 
     /// <summary>A click on a file heading: hides or shows that file's matching lines.</summary>
@@ -291,15 +314,15 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     partial void OnFindTextChanged(string value) => FindTextError = null;
 
     /// <summary>Waits for one file's search, then reads its matching lines' text in the background.</summary>
-    private static async Task<AllTabsFileRow?> ReadRows(LogTabViewModel tab, LogDocument document, QueryResult result,
-                                                        Query highlight)
+    private static async Task<AllTabsFileRow?> ReadRows(LogTabViewModel? tab, string path, LogDocument document,
+                                                        QueryResult result, Query highlight)
     {
         await result.Completion.ConfigureAwait(false);
         if (result.State != QueryState.Completed || result.Count == 0) return null;
         return await Task.Run(() =>
         {
             var shown = (int)Math.Min(result.Count, MaxRowsPerFile);
-            var file = new AllTabsFileRow(tab, result.Count, shown < result.Count);
+            var file = new AllTabsFileRow(tab, path, result.Count, shown < result.Count);
             var rows = file.Matches;
             try
             {
@@ -308,7 +331,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
                     var line = result[i];
                     var prefix = document.ReadLinePrefixes(line, 1, MaxTextLength);
                     var text = prefix.Length > 0 ? prefix[0].Text + (prefix[0].IsTruncated ? " …" : "") : "";
-                    rows.Add(new AllTabsMatchRow(tab, line, text, Split(text, highlight)));
+                    rows.Add(new AllTabsMatchRow(tab, path, line, text, Split(text, highlight)));
                 }
             }
             catch (Exception ex) when (ex is IOException or ObjectDisposedException)

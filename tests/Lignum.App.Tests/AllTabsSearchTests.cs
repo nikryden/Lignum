@@ -117,7 +117,7 @@ public sealed class AllTabsSearchTests : IDisposable
         main.AllTabsSearch.GoToCommand.Execute(inA);
 
         Assert.Same(inA.Tab, main.SelectedTab);
-        Assert.Equal(3, inA.Tab.Navigation.Caret.Line);
+        Assert.Equal(3, inA.Tab!.Navigation.Caret.Line);
     }
 
     [Fact]
@@ -141,10 +141,10 @@ public sealed class AllTabsSearchTests : IDisposable
         var main = await OpenTwo();
         await Search(main.AllTabsSearch, "error");
         var inB = main.AllTabsSearch.Rows.OfType<AllTabsMatchRow>().Last();
-        main.CloseTabCommand.Execute(inB.Tab);
+        main.CloseTabCommand.Execute(inB.Tab!);
 
         main.AllTabsSearch.GoToCommand.Execute(inB); // nothing happens
-        Assert.DoesNotContain(inB.Tab, main.Tabs);
+        Assert.DoesNotContain(inB.Tab!, main.Tabs);
 
         main.AllTabsSearch.CancelCommand.Execute(null);
         Assert.False(main.AllTabsSearch.IsSearching);

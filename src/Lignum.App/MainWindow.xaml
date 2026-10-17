@@ -82,6 +82,7 @@
             <MenuItem Header="_Search">
                 <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />
                 <MenuItem Header="Find in _all tabs…" Command="{Binding AllTabsSearch.OpenCommand}" InputGestureText="Ctrl+Shift+F" />
+                <MenuItem Header="Find in f_iles…" Command="{Binding AllTabsSearch.OpenFindInFilesCommand}" />
                 <MenuItem Header="Find _next" Command="{Binding SelectedTab.Search.FindNextCommand}" InputGestureText="F3" />
                 <MenuItem Header="Find _previous" Command="{Binding SelectedTab.Search.FindPreviousCommand}" InputGestureText="Shift+F3" />
                 <MenuItem Header="Fi_lter rules" IsCheckable="True"
