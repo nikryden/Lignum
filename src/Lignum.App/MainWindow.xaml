@@ -21,6 +21,7 @@
         <!-- Find (ticket 10) acts on the selected tab. -->
         <KeyBinding Gesture="Ctrl+F" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding AllTabsSearch.OpenCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding Assistant.TogglePanelCommand}" />
         <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
         <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -139,6 +140,9 @@
                 <MenuItem Header="Dock detail pane _bottom" Command="{Binding DataContext.DetailPane.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Bottom}" />
                 <MenuItem Header="Show _full line" Command="{Binding DataContext.ShowFullLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <Separator />
+                <MenuItem Header="_Assistant" IsCheckable="True" InputGestureText="Ctrl+Shift+A"
+                          IsChecked="{Binding DataContext.Assistant.IsPanelOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
             </MenuItem>
         </Menu>
         <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
@@ -254,6 +258,11 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
+        <!-- The assistant (ticket 05): a side panel to the right of the log. -->
+        <Border DockPanel.Dock="Right" Width="380" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
+                Visibility="{Binding Assistant.IsPanelOpen, Converter={StaticResource BoolToVisibility}}">
+            <views:AssistantPanel DataContext="{Binding Assistant}" />
+        </Border>
         <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->
         <Border DockPanel.Dock="Bottom" Height="260" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
                 Visibility="{Binding AllTabsSearch.IsResultsListVisible, Converter={StaticResource BoolToVisibility}}">

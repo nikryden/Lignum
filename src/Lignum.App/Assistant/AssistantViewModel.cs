@@ -67,6 +67,10 @@ public sealed partial class AssistantViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand))]
     private bool _isBusy;
 
+    /// <summary>Whether the side panel is shown (View > Assistant, Ctrl+Shift+A).</summary>
+    [ObservableProperty]
+    private bool _isPanelOpen;
+
     internal AssistantViewModel(SettingsFile<AppSettings> settings, AssistantTools tools,
                                 Func<string?, IClaudeChat> chatFactory, ILogger log)
     {
@@ -230,6 +234,21 @@ public sealed partial class AssistantViewModel : ObservableObject
 
     [RelayCommand(CanExecute = nameof(IsBusy))]
     private void Stop() => _cancel?.Cancel();
+
+    [RelayCommand]
+    private void TogglePanel() => IsPanelOpen = !IsPanelOpen;
+
+    /// <summary>The panel's button, after it has said what gets sent.</summary>
+    [RelayCommand]
+    private void TurnOn() => IsEnabled = true;
+
+    /// <summary>Stops anything running and sends nothing more.</summary>
+    [RelayCommand]
+    private void TurnOff()
+    {
+        _cancel?.Cancel();
+        IsEnabled = false;
+    }
 
     /// <summary>Starts a new conversation.</summary>
     [RelayCommand]

@@ -140,6 +140,20 @@ public sealed class AssistantTests : IDisposable
     }
 
     [Fact]
+    public async Task Turning_it_off_stops_sending_and_the_choice_is_saved()
+    {
+        var main = await Open();
+        main.Assistant.TurnOffCommand.Execute(null);
+        main.Assistant.Input = "hello";
+
+        Assert.False(main.Assistant.SendCommand.CanExecute(null));
+        main.Assistant.TurnOnCommand.Execute(null);
+        Assert.True(main.Assistant.SendCommand.CanExecute(null));
+        main.Assistant.TogglePanelCommand.Execute(null);
+        Assert.True(main.Assistant.IsPanelOpen);
+    }
+
+    [Fact]
     public async Task The_api_key_is_saved_encrypted_and_read_back()
     {
         var main = await Open();
