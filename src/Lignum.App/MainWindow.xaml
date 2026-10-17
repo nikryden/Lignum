@@ -20,6 +20,7 @@
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}" />
         <!-- Find (ticket 10) acts on the selected tab. -->
         <KeyBinding Gesture="Ctrl+F" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding AllTabsSearch.OpenCommand}" />
         <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
         <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -80,6 +81,7 @@
             </MenuItem>
             <MenuItem Header="_Search">
                 <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />
+                <MenuItem Header="Find in _all tabs…" Command="{Binding AllTabsSearch.OpenCommand}" InputGestureText="Ctrl+Shift+F" />
                 <MenuItem Header="Find _next" Command="{Binding SelectedTab.Search.FindNextCommand}" InputGestureText="F3" />
                 <MenuItem Header="Find _previous" Command="{Binding SelectedTab.Search.FindPreviousCommand}" InputGestureText="Shift+F3" />
                 <MenuItem Header="Fi_lter rules" IsCheckable="True"
@@ -251,6 +253,11 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
+        <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->
+        <Border DockPanel.Dock="Bottom" Height="260" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
+                Visibility="{Binding AllTabsSearch.IsPaneOpen, Converter={StaticResource BoolToVisibility}}">
+            <views:AllTabsSearchPane DataContext="{Binding AllTabsSearch}" />
+        </Border>
         <!-- One LogTabView per open tab, all kept alive; only the selected one is visible. -->
         <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False">
             <ItemsControl.ItemsPanel>
