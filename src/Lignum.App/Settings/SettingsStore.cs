@@ -10,6 +10,7 @@ namespace Lignum.App.Settings;
 /// The folder is passed in so tests can point it at a temp directory; the app uses
 /// <see cref="DefaultDirectory"/>. Reading never throws: a missing or unreadable file gives
 /// defaults and is logged. Writing never throws either: a failed save is logged.
+/// Saves write in the background, in order per file; loading a file waits for its pending writes.
 /// </summary>
 public sealed class SettingsStore
 {
@@ -23,6 +24,9 @@ public sealed class SettingsStore
     };
 
     private readonly ILogger _log;
+
+    // Pending background writes by full path, shared by all stores so a load always sees the last save.
+    private static readonly Dictionary<string, Task> PendingWrites = new(StringComparer.OrdinalIgnoreCase);
 
     public SettingsStore(string directory, ILogger log)
     {
@@ -46,9 +50,25 @@ public sealed class SettingsStore
 
     internal string PathOf(string relativePath) => Path.Combine(Directory, relativePath);
 
+    /// <summary>Waits until every save so far is on disk (call before the app exits).</summary>
+    public static void Flush()
+    {
+        Task[] pending;
+        lock (PendingWrites) pending = [.. PendingWrites.Values];
+        Task.WaitAll(pending);
+    }
+
+    private static void WaitForPendingWrite(string path)
+    {
+        Task? pending;
+        lock (PendingWrites) PendingWrites.TryGetValue(path, out pending);
+        pending?.Wait();
+    }
+
     private T Load<T>(string relativePath) where T : class, new()
     {
         var path = PathOf(relativePath);
+        WaitForPendingWrite(path);
         if (!File.Exists(path))
         {
             _log.Information("No {File} in {Folder}; using defaults", relativePath, Directory);
@@ -68,23 +88,42 @@ public sealed class SettingsStore
         }
     }
 
+    /// <summary>
+    /// Serializes <paramref name="value"/> now (so later changes to it don't race the write) and writes it on a
+    /// background thread, after any earlier write to the same file.
+    /// </summary>
     internal void Save<T>(string relativePath, T value)
     {
         var path = PathOf(relativePath);
+        byte[] json;
+        try
+        {
+            json = JsonSerializer.SerializeToUtf8Bytes(value, JsonOptions);
+        }
+        catch (Exception ex) when (ex is NotSupportedException or JsonException)
+        {
+            _log.Warning(ex, "Could not save {Path}", path);
+            return;
+        }
+
+        lock (PendingWrites)
+        {
+            var previous = PendingWrites.GetValueOrDefault(path, Task.CompletedTask);
+            PendingWrites[path] = previous.ContinueWith(_ => Write(path, json), TaskScheduler.Default);
+        }
+    }
+
+    private void Write(string path, byte[] json)
+    {
         var temp = path + ".tmp";
         try
         {
             System.IO.Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             // Write a temp file and swap it in, so a crash mid-write never leaves a half-written file.
-            using (var stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                JsonSerializer.Serialize(stream, value, JsonOptions);
-            }
-
+            File.WriteAllBytes(temp, json);
             File.Move(temp, path, overwrite: true);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException
-                                       or JsonException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             _log.Warning(ex, "Could not save {Path}", path);
             try { File.Delete(temp); } catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { }
@@ -111,7 +150,7 @@ public sealed class SettingsFile<T> where T : class
     /// <summary>The store this file came from (to open related files, e.g. per-file bookmarks).</summary>
     internal SettingsStore Store => _store;
 
-    /// <summary>Writes <see cref="Value"/> to disk now. Thread-safe; failures are logged, not thrown.</summary>
+    /// <summary>Writes <see cref="Value"/> to disk in the background. Thread-safe; failures are logged, not thrown.</summary>
     public void Save()
     {
         lock (_saveLock) _store.Save(_relativePath, Value);

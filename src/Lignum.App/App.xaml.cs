@@ -68,6 +68,7 @@ public partial class App : Application
     {
         _systemTheme?.Dispose();
         _settings?.Save();
+        SettingsStore.Flush();
         _log?.Logger.Information("Lignum exiting with code {ExitCode}", e.ApplicationExitCode);
         _log?.Dispose();
         base.OnExit(e);
