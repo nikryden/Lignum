@@ -1,0 +1,37 @@
+<!--
+    The Find window (like Notepad++'s): find, filter rules and find in all tabs, outside the main window so
+    they take no room from the log. DataContext is the MainViewModel: every page works on the selected tab.
+    Closing only hides it; the results stay in the main window.
+-->
+<Window x:Class="Lignum.App.Views.FindWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:Lignum.App.Views"
+        Title="Find" Width="620" Height="300" MinWidth="360" MinHeight="160"
+        ShowInTaskbar="False" WindowStyle="ToolWindow" ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+    <Window.InputBindings>
+        <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
+        <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
+    </Window.InputBindings>
+    <TabControl x:Name="Pages" Margin="4">
+        <TabItem Header="_Find">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Margin="8" Opacity="0.7" Text="Open a log file to search it."
+                           Visibility="{Binding SelectedTab, Converter={StaticResource NullToVisible}}" />
+                <views:FindBar x:Name="FindBar" DockPanel.Dock="Top" DataContext="{Binding SelectedTab.Search}" />
+                <TextBlock Margin="8" Opacity="0.7" TextWrapping="Wrap"
+                           Text="Results show in the tab's results pane. F3 / Shift+F3: next / previous match. With filter rules active, the search runs inside them (In filter)." />
+            </DockPanel>
+        </TabItem>
+        <TabItem Header="Fi_lter rules">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <views:FilterBar x:Name="FilterBar" DataContext="{Binding SelectedTab.Search}" />
+            </ScrollViewer>
+        </TabItem>
+        <TabItem Header="Find in _all tabs">
+            <views:AllTabsSearchPane x:Name="AllTabs" DataContext="{Binding AllTabsSearch}" ShowResults="False" />
+        </TabItem>
+    </TabControl>
+</Window>

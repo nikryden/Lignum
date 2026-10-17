@@ -52,9 +52,24 @@ public sealed class AppSettings
     /// <summary>The tabs open when Lignum last exited, restored on start (ticket 18).</summary>
     public SessionSettings Session { get; set; } = new();
 
+    /// <summary>Where the Find window was last shown; null: centred on the main window.</summary>
+    public WindowBounds? FindWindow { get; set; }
+
     /// <summary>Highlight search matches on lines the filter rules hide too (ticket 08).</summary>
     public bool HighlightMatchesOutsideFilter { get; set; } = true;
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>A window's position and size, in device-independent pixels.</summary>
+public sealed class WindowBounds
+{
+    public double Left { get; set; }
+
+    public double Top { get; set; }
+
+    public double Width { get; set; }
+
+    public double Height { get; set; }
 }

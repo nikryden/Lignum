@@ -7,17 +7,27 @@ namespace Lignum.App.Views;
 
 public partial class AllTabsSearchPane : UserControl
 {
-    public AllTabsSearchPane()
+    public AllTabsSearchPane() => InitializeComponent();
+
+    /// <summary>The find box and options (the Find window shows them; the main window's list does not).</summary>
+    public bool ShowControls
     {
-        InitializeComponent();
-        DataContextChanged += (_, e) =>
-        {
-            if (e.OldValue is AllTabsSearchViewModel old) old.FindBoxFocusRequested -= OnFocusRequested;
-            if (e.NewValue is AllTabsSearchViewModel search) search.FindBoxFocusRequested += OnFocusRequested;
-        };
+        get => ControlsPanel.Visibility == Visibility.Visible;
+        set => ControlsPanel.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void OnFocusRequested(object? sender, EventArgs e) =>
+    /// <summary>The results list (the main window shows it; the Find window does not).</summary>
+    public bool ShowResults
+    {
+        get => ResultList.Visibility == Visibility.Visible;
+        set
+        {
+            ResultList.Visibility = value ? Visibility.Visible : Visibility.Collapsed;
+            CloseListButton.Visibility = ResultList.Visibility;
+        }
+    }
+
+    public void FocusFindBox() =>
         Dispatcher.BeginInvoke(() =>
         {
             FindBox.Focus();

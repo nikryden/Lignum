@@ -7,12 +7,9 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <views:NullToCollapsedConverter x:Key="NullToCollapsed" />
     </UserControl.Resources>
-    <Border Visibility="{Binding IsFindBarOpen, Converter={StaticResource BoolToVisibility}}"
-            Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
+    <Border Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
             BorderThickness="0,0,0,1" Padding="8,4">
         <DockPanel>
-            <Button DockPanel.Dock="Right" Content="✕" ToolTip="Close (Esc)" Padding="8,1" Margin="4,0,0,0"
-                    Command="{Binding CloseFindBarCommand}" />
             <Button DockPanel.Dock="Right" Content="Next" ToolTip="Next match (F3)" Padding="8,1" Margin="4,0,0,0"
                     Command="{Binding FindNextCommand}" />
             <Button DockPanel.Dock="Right" Content="Previous" ToolTip="Previous match (Shift+F3)" Padding="8,1" Margin="4,0,0,0"

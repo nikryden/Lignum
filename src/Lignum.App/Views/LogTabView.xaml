@@ -92,8 +92,7 @@
                         <RowDefinition x:Name="SplitterRow" Height="0" />
                         <RowDefinition x:Name="ResultsRow" Height="0" />
                     </Grid.RowDefinitions>
-                    <views:FindBar x:Name="FindBar" Grid.Row="0" DataContext="{Binding Search}" />
-                    <views:FilterBar x:Name="FilterBar" Grid.Row="1" DataContext="{Binding Search}" />
+                    <!-- Rows 0 and 1 held the find and filter bars; they are in the Find window now (MainWindow.FindWindow.cs). -->
                     <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
                     <ScrollViewer Grid.Row="2" CanContentScroll="True" Focusable="False"
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">

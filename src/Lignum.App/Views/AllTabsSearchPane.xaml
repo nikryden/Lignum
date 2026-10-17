@@ -6,9 +6,7 @@
              Background="{DynamicResource PaneBackgroundBrush}"
              Foreground="{DynamicResource WindowForegroundBrush}">
     <DockPanel>
-        <DockPanel DockPanel.Dock="Top" Margin="8,4">
-            <Button DockPanel.Dock="Right" Content="✕" ToolTip="Close (Esc)" Padding="6,0" Margin="8,0,0,0"
-                    Command="{Binding CloseCommand}" />
+        <DockPanel x:Name="ControlsPanel" DockPanel.Dock="Top" Margin="8,4">
             <Button DockPanel.Dock="Right" Content="Cancel" Padding="6,0" Margin="4,0,0,0"
                     Command="{Binding CancelCommand}" />
             <Button DockPanel.Dock="Right" Content="Search all tabs" Padding="6,0" Margin="4,0,0,0"
@@ -30,11 +28,12 @@
             <TextBox x:Name="FindBox" Text="{Binding FindText, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
                     <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
-                    <KeyBinding Key="Escape" Command="{Binding CloseCommand}" />
                 </TextBox.InputBindings>
             </TextBox>
         </DockPanel>
         <DockPanel DockPanel.Dock="Top" Margin="8,0,8,4">
+            <Button x:Name="CloseListButton" DockPanel.Dock="Right" Content="✕" ToolTip="Close the results"
+                    Padding="6,0" Margin="8,0,0,0" Command="{Binding CloseCommand}" />
             <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,0" Margin="4,0,0,0" Command="{Binding ExpandAllCommand}" />
             <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,0" Command="{Binding CollapseAllCommand}" />
             <TextBlock Text="{Binding Status}" Opacity="0.8" VerticalAlignment="Center" />

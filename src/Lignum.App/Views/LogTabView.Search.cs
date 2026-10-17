@@ -25,7 +25,6 @@ public partial class LogTabView
         {
             old.NavigateRequested -= OnNavigateRequested;
             old.PropertyChanged -= OnSearchPropertyChanged;
-            old.FindBoxFocusRequested -= OnFindBoxFocusRequested;
         }
 
         _search = newTab?.Search;
@@ -33,13 +32,10 @@ public partial class LogTabView
         {
             search.NavigateRequested += OnNavigateRequested;
             search.PropertyChanged += OnSearchPropertyChanged;
-            search.FindBoxFocusRequested += OnFindBoxFocusRequested;
         }
 
         UpdateResultsPaneLayout();
     }
-
-    private void OnFindBoxFocusRequested(object? sender, EventArgs e) => FindBar.FocusFindBox();
 
     private void OnSearchPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -51,9 +47,8 @@ public partial class LogTabView
             case nameof(SearchViewModel.IsFindBarOpen) when _search is { IsFindBarOpen: false }:
                 LogView.Focus(); // Esc in the find box goes back to the log
                 break;
-            case nameof(SearchViewModel.IsFilterBarOpen) when _search is { } search:
-                if (search.IsFilterBarOpen) FilterBar.FocusNewRuleBox();
-                else LogView.Focus();
+            case nameof(SearchViewModel.IsFilterBarOpen) when _search is { IsFilterBarOpen: false }:
+                LogView.Focus();
                 break;
             case nameof(SearchViewModel.CurrentLine) when _search is { CurrentLine: null }:
                 LogView.MarkedLine = -1;
