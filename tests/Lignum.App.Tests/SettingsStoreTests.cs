@@ -39,6 +39,7 @@ public sealed class SettingsStoreTests : IDisposable
         file.Value.TabWidth = 8;
         file.Save();
 
+        SettingsStore.Flush(); // saves write in the background
         Assert.True(File.Exists(Path.Combine(_dir, "settings.json")));
         var loaded = new SettingsStore(_dir, _log).Open<AppSettings>(AppSettings.FileName).Value;
         Assert.Equal(ThemeChoice.Dark, loaded.Theme);
@@ -93,6 +94,7 @@ public sealed class SettingsStoreTests : IDisposable
         file.Value.TabWidth = 2;
         file.Save();
 
+        SettingsStore.Flush();
         var json = File.ReadAllText(path);
         Assert.Contains("futureThing", json);
         Assert.Contains("\"tabWidth\": 2", json);
@@ -119,6 +121,7 @@ public sealed class SettingsStoreTests : IDisposable
         var file = new SettingsStore(_dir, _log).Open<AppSettings>(AppSettings.FileName);
 
         var ex = Record.Exception(file.Save);
+        SettingsStore.Flush(); // the write runs in the background
 
         Assert.Null(ex);
         Assert.Contains(_sink.Events, e => e.Level >= LogEventLevel.Warning && e.Exception is not null);

@@ -176,6 +176,7 @@ public sealed class BookmarkTests : IDisposable
         var tab = await Open(Start(), a);
         ToggleAt(tab, 12);
 
+        SettingsStore.Flush(); // saves write in the background
         var file = Assert.Single(Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json"));
         var json = File.ReadAllText(file);
         // Objects, not bare numbers, so a "note" can be added to each bookmark later without a migration.
@@ -190,6 +191,7 @@ public sealed class BookmarkTests : IDisposable
         var a = WriteLog("a.log");
         var tab = await Open(Start(), a);
         ToggleAt(tab, 12);
+        SettingsStore.Flush();
         var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
         File.WriteAllText(file, File.ReadAllText(file).Replace("\"line\": 12", "\"line\": 12, \"note\": \"look here\""));
 
@@ -197,6 +199,7 @@ public sealed class BookmarkTests : IDisposable
         Assert.Equal([12L], reopened.Bookmarks.Lines);
         ToggleAt(reopened, 40); // saves again
 
+        SettingsStore.Flush();
         Assert.Contains("\"note\": \"look here\"", File.ReadAllText(file));
     }
 
@@ -206,6 +209,7 @@ public sealed class BookmarkTests : IDisposable
         var a = WriteLog("a.log");
         var tab = await Open(Start(), a);
         ToggleAt(tab, 12);
+        SettingsStore.Flush();
         var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
         File.WriteAllText(file, "{ not json");
 
