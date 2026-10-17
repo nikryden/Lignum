@@ -27,7 +27,8 @@ public partial class App : Application
         base.OnStartup(e);
 
         // Settings (ticket 13). Later features share this one store and this one settings.json file.
-        _settingsStore = new SettingsStore(SettingsStore.DefaultDirectory, _log.Logger);
+        var commandLine = CommandLine.Parse(e.Args);
+        _settingsStore = new SettingsStore(commandLine.SettingsDirectory ?? SettingsStore.DefaultDirectory, _log.Logger);
         _settings = _settingsStore.Open<AppSettings>(AppSettings.FileName);
         _systemTheme = new WindowsSystemTheme();
         var appearance = new AppearanceViewModel(_settings, _systemTheme);
@@ -51,15 +52,15 @@ public partial class App : Application
 
         // Reopen the last session's tabs (ticket 18) once the window has painted; files re-index in the
         // background. `Lignum.exe <path>` then opens (and selects) that file.
-        var args = e.Args;
+        var filePath = commandLine.FilePath;
         var logger = _log.Logger;
         MainWindow.Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
         {
             _ = viewModel.RestoreSession();
-            if (args.Length > 0)
+            if (filePath is not null)
             {
-                logger.Information("Opening {Path} from the command line", args[0]);
-                _ = viewModel.OpenFileAsync(args[0]);
+                logger.Information("Opening {Path} from the command line", filePath);
+                _ = viewModel.OpenFileAsync(filePath);
             }
         });
     }
