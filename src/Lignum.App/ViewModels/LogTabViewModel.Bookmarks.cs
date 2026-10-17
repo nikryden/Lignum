@@ -24,6 +24,10 @@ public sealed partial class LogTabViewModel
     private void ToggleBookmark(TextSelection? selection) =>
         Bookmarks.Toggle((selection ?? Selection).Caret.Line);
 
+    /// <summary>Double-click in the line-number margin (ticket 04): toggles that 0-based file line.</summary>
+    [RelayCommand]
+    private void ToggleBookmarkAt(long line) => Bookmarks.Toggle(line);
+
     /// <summary>F2: the next bookmark after the caret, wrapping to the first.</summary>
     [RelayCommand]
     private void NextBookmark() => JumpToBookmark(Bookmarks.Next(Navigation.Caret.Line, LineCount));
