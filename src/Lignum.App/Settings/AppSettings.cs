@@ -81,4 +81,7 @@ public sealed class WindowBounds
 public sealed class AssistantSettings
 {
     public bool Enabled { get; set; }
+
+    /// <summary>The agent the in-app chat runs: 0 = Claude Code, 1 = GitHub Copilot CLI.</summary>
+    public int Agent { get; set; }
 }

@@ -41,6 +41,25 @@
             </StackPanel>
         </Expander>
 
+        <!-- On: the chat. The selected agent CLI runs on the user's own subscription with Lignum's tools. -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="8,4,8,0" Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <Button DockPanel.Dock="Right" Content="New conversation" Padding="6,0" Command="{Binding NewConversationCommand}" />
+                <ComboBox ItemsSource="{Binding AgentNames}" SelectedIndex="{Binding SelectedAgent}" Margin="0,0,4,0"
+                          ToolTip="The AI agent installed on this PC that answers here" />
+            </DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="{Binding AgentStatus}" TextWrapping="Wrap" Margin="0,0,0,4"
+                       Foreground="{DynamicResource ErrorForegroundBrush}" />
+            <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                <Button DockPanel.Dock="Right" Content="Send" Padding="10,1" Command="{Binding SendCommand}" />
+                <Button DockPanel.Dock="Right" Content="Stop" Padding="10,1" Margin="0,0,4,0" Command="{Binding StopCommand}" />
+                <TextBlock />
+            </DockPanel>
+            <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
+                     TextWrapping="Wrap" MinHeight="48" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                     ToolTip="Ask about the open logs. Enter sends; Shift+Enter starts a new line" PreviewKeyDown="OnInputKeyDown" />
+        </DockPanel>
+
         <!-- Off: what turning it on means. -->
         <StackPanel DockPanel.Dock="Top" Margin="8" Style="{StaticResource ShownWhenOff}">
             <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
@@ -55,17 +74,32 @@
             <Button DockPanel.Dock="Right" Content="Turn off" Padding="6,0" Command="{Binding TurnOffCommand}"
                     ToolTip="Stop AI tools from using Lignum" />
             <Button DockPanel.Dock="Right" Content="Clear" Padding="6,0" Margin="0,0,4,0" Command="{Binding ClearCommand}" />
-            <TextBlock Text="On: what AI tools did" VerticalAlignment="Center" Opacity="0.8" />
+            <TextBlock Text="On: ask here, or from your AI tool" VerticalAlignment="Center" Opacity="0.8" />
         </DockPanel>
         <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" ScrollChanged="OnScrollChanged"
                       Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
             <ItemsControl ItemsSource="{Binding Entries}" Margin="8,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
-                                 BorderThickness="0" Background="Transparent" Padding="0" Margin="0,1"
-                                 Foreground="{DynamicResource WindowForegroundBrush}" />
+                        <StackPanel Margin="0,2">
+                            <TextBlock x:Name="Who" FontWeight="SemiBold" Visibility="Collapsed" />
+                            <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                     BorderThickness="0" Background="Transparent" Padding="0"
+                                     Foreground="{DynamicResource WindowForegroundBrush}" />
+                        </StackPanel>
                         <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Kind}" Value="User">
+                                <Setter TargetName="Who" Property="Text" Value="You" />
+                                <Setter TargetName="Who" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Kind}" Value="Assistant">
+                                <Setter TargetName="Who" Property="Text" Value="AI" />
+                                <Setter TargetName="Who" Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Kind}" Value="Activity">
+                                <Setter TargetName="Body" Property="Opacity" Value="0.65" />
+                                <Setter TargetName="Body" Property="FontStyle" Value="Italic" />
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding Kind}" Value="Error">
                                 <Setter TargetName="Body" Property="Foreground" Value="{DynamicResource ErrorForegroundBrush}" />
                             </DataTrigger>

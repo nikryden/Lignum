@@ -26,6 +26,16 @@ public partial class AssistantPanel : UserControl
         }
     }
 
+    /// <summary>Enter sends; Shift+Enter adds a line.</summary>
+    private void OnInputKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter
+            || System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Shift)) return;
+        e.Handled = true;
+        if (DataContext is AssistantViewModel assistant && assistant.SendCommand.CanExecute(null))
+            _ = assistant.SendCommand.ExecuteAsync(null);
+    }
+
     /// <summary>Keeps the newest entry in view, unless the user scrolled up.</summary>
     private void OnScrollChanged(object sender, ScrollChangedEventArgs e)
     {
