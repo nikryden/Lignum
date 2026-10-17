@@ -20,7 +20,10 @@ Keep Lignum open with your logs; then ask your AI tool things like "Which errors
 
 ## Tools
 
-`list_tabs`, `search`, `read_lines` (at most 200 lines per call), `add_filter_rule`, `add_highlight_rule`, `add_bookmark` (with an optional note), `go_to_line`. They work on the selected tab. None of them change a log file.
+- Looking: `list_tabs`, `select_tab`, `search`, `search_all_tabs` (every open tab at once), `find_in_files` (files in a folder that are not open), `read_lines` (at most 200 lines per call), `list_bookmarks`, `list_filter_rules`.
+- Changing what you see: `show_search` (runs a search in the tab's results pane, inside the filter or on the whole file), `add_filter_rule`, `remove_filter_rule`, `set_filter_rule_enabled`, `clear_filter_rules`, `add_highlight_rule`, `add_bookmark` (with an optional note), `go_to_line`.
+
+Tools that work on one tab take an optional `tab` (its index from `list_tabs`, or its file name) and use the selected tab otherwise. None of them change a log file.
 
 ## How it works
 
