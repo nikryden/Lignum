@@ -132,7 +132,7 @@ public sealed class AgentChatTests : IDisposable
     }
 
     [Fact]
-    public void Sign_in_opens_the_installed_agent_in_a_terminal()
+    public async Task Sign_in_opens_the_installed_agent_in_a_terminal()
     {
         var exe = FakeClaude();
         var main = Start();
@@ -141,12 +141,37 @@ public sealed class AgentChatTests : IDisposable
         main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
             { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
 
-        Assert.True(main.Assistant.IsAgentInstalled);
-        Assert.StartsWith("Claude Code is installed", main.Assistant.AgentStatus);
+        await main.Assistant.RefreshAgentCommand.ExecuteAsync(null);
+        Assert.Equal(AgentState.Ready, main.Assistant.AgentState); // the fake answers `auth status` with exit code 0
+        Assert.True(main.Assistant.ShowAgentIcons);
+        Assert.False(main.Assistant.ShowAgentSetup);
         main.Assistant.SignInAgentCommand.Execute(null);
 
         Assert.Equal(exe, Assert.Single(started).FileName);
         Assert.Contains(main.Assistant.Entries, e => e.Text.StartsWith("Claude Code opens in a terminal"));
+    }
+
+    [Fact]
+    public async Task Not_signed_in_shows_the_warning_and_a_login_error_brings_it_back()
+    {
+        var notSignedIn = Path.Combine(_dir, "claude-out.cmd");
+        File.WriteAllLines(notSignedIn, ["@echo off", "more > nul", "exit /b 1"]); // `auth status` says: not signed in
+        var main = Start();
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = notSignedIn };
+
+        await main.Assistant.RefreshAgentCommand.ExecuteAsync(null);
+        Assert.Equal(AgentState.NotSignedIn, main.Assistant.AgentState);
+        Assert.True(main.Assistant.ShowAgentSetup);
+        Assert.StartsWith("You are not signed in to Claude Code", main.Assistant.AgentStatus);
+
+        var exe = FakeClaude("{\"type\":\"result\",\"subtype\":\"error\",\"is_error\":true,\"result\":\"Invalid API key - Please run /login\"}");
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+        await main.Assistant.RefreshAgentCommand.ExecuteAsync(null);
+        Assert.Equal(AgentState.Ready, main.Assistant.AgentState);
+        await Ask(main.Assistant, "hi");
+        Assert.Equal(AgentState.NotSignedIn, main.Assistant.AgentState);
     }
 
     [Fact]

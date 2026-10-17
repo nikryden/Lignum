@@ -63,7 +63,9 @@ public sealed partial class AssistantViewModel : ObservableObject
         _layout = layout;
         _layout.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(ViewModels.DetailPaneLayoutViewModel.IsOpen)) OnPropertyChanged(nameof(IsPanelOpen));
+            if (e.PropertyName != nameof(ViewModels.DetailPaneLayoutViewModel.IsOpen)) return;
+            OnPropertyChanged(nameof(IsPanelOpen));
+            OnPanelShown();
         };
         _settings = settings;
         _tools = tools;
@@ -96,6 +98,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             OnPropertyChanged();
             UpdateServer();
             Add(ChatEntryKind.Activity, value ? "AI access is on." : "AI access is off.");
+            OnPanelShown();
         }
     }
 
@@ -127,22 +130,37 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Save();
             _agent = null;
             OnPropertyChanged();
-            RefreshAgent();
+            _ = RefreshAgentAsync();
         }
     }
 
-    /// <summary>Whether the selected agent is installed on this PC.</summary>
-    public bool IsAgentInstalled => CreateAgent(SelectedAgent).FindExecutable() is not null;
+    /// <summary>Where the selected agent stands: checking, not installed, not signed in, or ready to chat.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAgentSetup), nameof(ShowAgentIcons), nameof(IsAgentInstalled), nameof(AgentStatus))]
+    private AgentState _agentState = AgentState.Unknown;
 
-    /// <summary>The next step for the selected agent: install it, or sign in once.</summary>
+    /// <summary>Whether the selected agent is installed on this PC.</summary>
+    public bool IsAgentInstalled => AgentState is AgentState.NotSignedIn or AgentState.Ready;
+
+    /// <summary>The warning with Install or Sign in, shown until the agent is ready.</summary>
+    public bool ShowAgentSetup => AgentState is AgentState.NotInstalled or AgentState.NotSignedIn;
+
+    /// <summary>Once ready, Sign in and Check again are small icons in the header.</summary>
+    public bool ShowAgentIcons => AgentState == AgentState.Ready;
+
+    /// <summary>What the warning says.</summary>
     public string AgentStatus
     {
         get
         {
             var agent = CreateAgent(SelectedAgent);
-            return agent.FindExecutable() is null
-                ? $"{agent.Name} is not installed. {agent.InstallHint}"
-                : $"{agent.Name} is installed. First time? Press Sign in once.";
+            return AgentState switch
+            {
+                AgentState.NotInstalled => $"{agent.Name} is not installed. {agent.InstallHint}",
+                AgentState.NotSignedIn => $"You are not signed in to {agent.Name}. Press Sign in and finish the sign-in in the window that opens, then Check again.",
+                AgentState.Checking => $"Checking {agent.Name}…",
+                _ => "",
+            };
         }
     }
 
@@ -162,20 +180,56 @@ public sealed partial class AssistantViewModel : ObservableObject
         var agent = CreateAgent(SelectedAgent);
         if (agent.SignInStart() is not { } start)
         {
-            RefreshAgent();
+            _ = RefreshAgentAsync();
             return;
         }
 
         Add(ChatEntryKind.Activity, agent.SignInHint);
+        if (!_settings.Value.Assistant.SignedIn.Contains(SelectedAgent))
+        {
+            _settings.Value.Assistant.SignedIn.Add(SelectedAgent); // for agents that cannot be asked (Copilot CLI)
+            _settings.Save();
+        }
+
         StartProcess(start);
     }
 
-    /// <summary>"Check again": looks for the agent again (after installing it).</summary>
+    /// <summary>"Check again": is the agent installed, and signed in? Also runs when the panel opens.</summary>
     [RelayCommand]
-    private void RefreshAgent()
+    private Task RefreshAgent() => RefreshAgentAsync();
+
+    private async Task RefreshAgentAsync()
     {
-        OnPropertyChanged(nameof(IsAgentInstalled));
-        OnPropertyChanged(nameof(AgentStatus));
+        var index = SelectedAgent;
+        var agent = CreateAgent(index);
+        AgentState = AgentState.Checking;
+        AgentState state;
+        if (agent.FindExecutable() is null)
+        {
+            state = AgentState.NotInstalled;
+        }
+        else
+        {
+            var signedIn = await agent.IsSignedInAsync(CancellationToken.None);
+            state = (signedIn ?? _settings.Value.Assistant.SignedIn.Contains(index)) ? AgentState.Ready : AgentState.NotSignedIn;
+        }
+
+        if (index == SelectedAgent) AgentState = state; // unless the user picked another agent meanwhile
+    }
+
+    /// <summary>Looks at the agent again when the panel opens with AI access on.</summary>
+    private void OnPanelShown()
+    {
+        if (IsPanelOpen && IsEnabled) _ = RefreshAgentAsync();
+    }
+
+    /// <summary>A chat that failed because the agent is not signed in turns the warning back on.</summary>
+    private void NoticeSignInError(string message)
+    {
+        string[] hints = ["log in", "login", "logged in", "sign in", "signed in", "authenticat", "unauthorized", "/login"];
+        if (!hints.Any(h => message.Contains(h, StringComparison.OrdinalIgnoreCase))) return;
+        if (_settings.Value.Assistant.SignedIn.Remove(SelectedAgent)) _settings.Save();
+        AgentState = AgentState.NotSignedIn;
     }
 
     /// <summary>Starts a window (installer, sign-in terminal); tests replace it.</summary>
@@ -258,6 +312,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         {
             if (answer.Text.Length == 0) Entries.Remove(answer);
             Add(ChatEntryKind.Error, ex.Message);
+            NoticeSignInError(ex.Message);
         }
         finally
         {
