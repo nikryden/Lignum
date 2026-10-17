@@ -11,13 +11,11 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <views:NullToCollapsedConverter x:Key="NullToCollapsed" />
     </UserControl.Resources>
-    <Border Visibility="{Binding IsFilterBarOpen, Converter={StaticResource BoolToVisibility}}"
+    <Border
             Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
             BorderThickness="0,0,0,1" Padding="8,4">
         <DockPanel>
             <DockPanel DockPanel.Dock="Top">
-                <Button DockPanel.Dock="Right" Content="✕" ToolTip="Hide the filter bar (the rules stay)" Padding="8,1" Margin="4,0,0,0"
-                        Command="{Binding ToggleFilterBarCommand}" />
                 <Button DockPanel.Dock="Right" Content="− E_xclude" ToolTip="Hide lines matching this (Shift+Enter)" Padding="8,1" Margin="4,0,0,0"
                         Command="{Binding AddExcludeFilterCommand}"
                         Background="{DynamicResource FilterExcludeBackgroundBrush}" BorderBrush="{DynamicResource FilterExcludeBorderBrush}" />

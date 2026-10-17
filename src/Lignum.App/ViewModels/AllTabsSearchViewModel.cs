@@ -84,6 +84,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     private string? _findTextError;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsResultsListVisible))]
     private bool _isPaneOpen;
 
     /// <summary>
@@ -91,7 +92,11 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     /// box and results pane instead (inside that tab's filter rules, if any), and this pane lists nothing.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsResultsListVisible))]
     private bool _showResultsPerTab = true;
+
+    /// <summary>Whether the main window shows the shared results list (not in per-tab mode).</summary>
+    public bool IsResultsListVisible => IsPaneOpen && !ShowResultsPerTab;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]

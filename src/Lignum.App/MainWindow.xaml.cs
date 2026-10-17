@@ -16,6 +16,7 @@ public partial class MainWindow : Window
         Appearance = appearance;
         DataContext = viewModel;
         InitializeComponent();
+        InitializeFindWindow();
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start

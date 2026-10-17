@@ -14,6 +14,17 @@ public sealed partial class MainViewModel
 
     private AllTabsSearchViewModel? _allTabsSearch;
 
+    /// <summary>Where the Find window was last shown (settings.json); null until it has been closed once.</summary>
+    internal Settings.WindowBounds? FindWindowBounds
+    {
+        get => _settings.Value.FindWindow;
+        set
+        {
+            _settings.Value.FindWindow = value;
+            _settings.Save();
+        }
+    }
+
     /// <summary>Find in all tabs (ticket 01): one search over every open tab, shown in the shared pane.</summary>
     public AllTabsSearchViewModel AllTabsSearch => _allTabsSearch ??= new AllTabsSearchViewModel(_uiContext,
         () => [.. Tabs], (tab, line) =>

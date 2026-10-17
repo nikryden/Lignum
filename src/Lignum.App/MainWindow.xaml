@@ -255,8 +255,8 @@
         </StatusBar>
         <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->
         <Border DockPanel.Dock="Bottom" Height="260" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
-                Visibility="{Binding AllTabsSearch.IsPaneOpen, Converter={StaticResource BoolToVisibility}}">
-            <views:AllTabsSearchPane DataContext="{Binding AllTabsSearch}" />
+                Visibility="{Binding AllTabsSearch.IsResultsListVisible, Converter={StaticResource BoolToVisibility}}">
+            <views:AllTabsSearchPane DataContext="{Binding AllTabsSearch}" ShowControls="False" />
         </Border>
         <!-- One LogTabView per open tab, all kept alive; only the selected one is visible. -->
         <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False">
