@@ -1,13 +1,21 @@
 name: Publish
 
-# Manual only: builds the self-contained single-file win-x64 exe and its installer (ticket 07) and uploads both.
+# Builds the self-contained single-file win-x64 exe and its installer (ticket 07).
+# - Push a version tag (git tag v0.2.0 && git push origin v0.2.0): creates a GitHub Release with both files.
+#   A tag with a suffix (v0.3.0-beta1) makes a pre-release.
+# - Run it by hand (Actions > Publish > Run workflow): a test build, uploaded as workflow artifacts only.
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
     inputs:
       version:
         description: "Version (e.g. 1.0.0). Leave empty for 0.1.<run number>."
         required: false
         default: ""
+
+permissions:
+  contents: write # to create the release
 
 jobs:
   publish:
@@ -23,9 +31,17 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $v = "${{ inputs.version }}"
+          if ("${{ github.ref_type }}" -eq "tag") { $v = "${{ github.ref_name }}".TrimStart("v") }
+          else { $v = "${{ inputs.version }}" }
           if ([string]::IsNullOrWhiteSpace($v)) { $v = "0.1.${{ github.run_number }}" }
+          # An MSI version is numbers only: 0.3.0-beta1 -> 0.3.0.
+          $numeric = ($v -split "[-+]")[0]
           "value=$v" >> $env:GITHUB_OUTPUT
+          "numeric=$numeric" >> $env:GITHUB_OUTPUT
+          "prerelease=$(if ($v -ne $numeric) { 'true' } else { 'false' })" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test --filter "Category!=Manual"
 
       - name: Publish
         run: >
@@ -35,21 +51,35 @@ jobs:
           -p:SourceRevisionId=${{ github.sha }}
           -o publish
 
+      - name: Build installer
+        shell: pwsh
+        env:
+          LIGNUM_VERSION: ${{ steps.version.outputs.numeric }}
+          LIGNUM_PUBLISH_DIR: ${{ github.workspace }}/publish
+        run: dotnet run -c Release --project installer/Lignum.Installer -- -o installer-out
+
       - uses: actions/upload-artifact@v4
         with:
           name: Lignum-${{ steps.version.outputs.value }}-win-x64
           path: publish/Lignum.exe
           if-no-files-found: error
 
-      - name: Build installer
-        shell: pwsh
-        env:
-          LIGNUM_VERSION: ${{ steps.version.outputs.value }}
-          LIGNUM_PUBLISH_DIR: ${{ github.workspace }}/publish
-        run: dotnet run -c Release --project installer/Lignum.Installer -- -o installer-out
-
       - uses: actions/upload-artifact@v4
         with:
           name: Lignum-${{ steps.version.outputs.value }}-installer
           path: installer-out/*.msi
           if-no-files-found: error
+
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.version.outputs.value }}"
+          Copy-Item publish/Lignum.exe "Lignum-$v-win-x64-portable.exe"
+          $msi = Get-ChildItem installer-out/*.msi | Select-Object -First 1
+          Copy-Item $msi.FullName "Lignum-$v-setup.msi"
+          $flags = @("--title", "Lignum $v", "--generate-notes")
+          if ("${{ steps.version.outputs.prerelease }}" -eq "true") { $flags += "--prerelease" }
+          gh release create "${{ github.ref_name }}" "Lignum-$v-setup.msi" "Lignum-$v-win-x64-portable.exe" @flags
