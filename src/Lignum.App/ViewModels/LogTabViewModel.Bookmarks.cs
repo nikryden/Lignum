@@ -1,3 +1,4 @@
+using Lignum.App.Packaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
@@ -15,7 +16,10 @@ public sealed partial class LogTabViewModel
 
     /// <summary>This file's bookmarks, loaded on first use.</summary>
     public BookmarksViewModel Bookmarks => _bookmarks ??= new BookmarksViewModel(
-        SettingsStore?.Open<BookmarksFile>(BookmarksFile.RelativePathFor(Path)), Path);
+        Package is { } package
+            // A package keeps its own bookmarks next to the extracted log, apart from the user's own.
+            ? new SettingsStore(package.Folder, Serilog.Log.Logger).Open<BookmarksFile>(LogPackage.BookmarksEntry)
+            : SettingsStore?.Open<BookmarksFile>(BookmarksFile.RelativePathFor(Path)), Path);
 
     /// <summary>
     /// Ctrl+F2 / "Toggle bookmark": the caret line of <paramref name="selection"/> (the results pane passes its

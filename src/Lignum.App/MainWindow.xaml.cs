@@ -51,8 +51,8 @@ public partial class MainWindow : Window
         var dialog = new OpenFileDialog
         {
             Title = "Open log file",
-            Filter = "Log files (*.log;*.txt)|*.log;*.txt|All files (*.*)|*.*",
-            FilterIndex = 2,
+            Filter = "Log files (*.log;*.txt)|*.log;*.txt|Lignum packages with notes (*.lm)|*.lm|All files (*.*)|*.*",
+            FilterIndex = 3,
             CheckFileExists = true,
         };
         if (dialog.ShowDialog(this) == true)
@@ -78,4 +78,22 @@ public partial class MainWindow : Window
     }
 
     private void OnExitClick(object sender, RoutedEventArgs e) => Close();
+
+    private void OnExportClick(object sender, RoutedEventArgs e) => Export(compress: true);
+
+    private void OnExportUncompressedClick(object sender, RoutedEventArgs e) => Export(compress: false);
+
+    /// <summary>File > Export with notes (ticket 06): the selected tab's log, bookmarks and notes as a .lm package.</summary>
+    private void Export(bool compress)
+    {
+        if (_viewModel.SelectedTab is not { } tab) return;
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export with notes",
+            Filter = "Lignum package with notes (*.lm)|*.lm",
+            FileName = Path.ChangeExtension(tab.FileName, ".lm"),
+            OverwritePrompt = true,
+        };
+        if (dialog.ShowDialog(this) == true) _ = _viewModel.ExportPackageAsync(dialog.FileName, compress);
+    }
 }

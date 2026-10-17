@@ -1,3 +1,4 @@
+using Lignum.App.Packaging;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -72,37 +73,59 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         if (FindTab(fullPath) is { } existing) return SelectExisting(existing);
 
-        var document = await OpenDocumentAsync(fullPath, path);
-        if (document is null) return Task.CompletedTask;
-        if (FindTab(fullPath) is { } opened) // opened meanwhile, e.g. dropped twice
-        {
-            document.Dispose();
-            return SelectExisting(opened);
-        }
-
-        var tab = AddTab(document);
-        SelectedTab = tab;
-        AddRecentFile(tab.Path);
-        return tab.Start();
+        if (await AddTabAsync(fullPath, path) is not { } added) return Task.CompletedTask;
+        if (!added.IsNew) return SelectExisting(added.Tab);
+        SelectedTab = added.Tab;
+        AddRecentFile(added.Tab.SourcePath);
+        return added.Tab.Start();
     }
 
     private Task SelectExisting(LogTabViewModel tab)
     {
         ErrorMessage = null;
         SelectedTab = tab;
-        AddRecentFile(tab.Path);
+        AddRecentFile(tab.SourcePath);
         return tab.IndexingCompletion;
+    }
+
+    /// <summary>
+    /// Opens <paramref name="fullPath"/> (a log, or a <c>.lm</c> package) and appends its tab, not yet indexing.
+    /// IsNew is false when a tab for the path appeared meanwhile (e.g. dropped twice); that tab is returned.
+    /// Null (and <see cref="ErrorMessage"/> set) when it cannot be opened.
+    /// </summary>
+    private async Task<(LogTabViewModel Tab, bool IsNew)?> AddTabAsync(string fullPath, string displayPath)
+    {
+        OpenedPackage? package = null;
+        if (LogPackage.IsPackage(fullPath) && (package = await OpenPackageAsync(fullPath, displayPath)) is null)
+            return null;
+
+        var document = await OpenDocumentAsync(package?.LogPath ?? fullPath, displayPath, package?.Manifest.Encoding);
+        if (document is null || FindTab(fullPath) is { } opened)
+        {
+            document?.Dispose();
+            if (package is not null) LogPackage.DeleteExtracted(package.Folder);
+            return document is null ? null : (FindTab(fullPath)!, false);
+        }
+
+        var tab = AddTab(document, package);
+        if (package is { ChecksumMatches: false })
+        {
+            ErrorMessage = $"Warning: the log in {displayPath} does not match the checksum in the package. "
+                           + "It may be damaged or changed.";
+        }
+
+        return (tab, true);
     }
 
     /// <summary>
     /// Opens <paramref name="fullPath"/> on a background thread, so a slow disk or share never blocks the UI.
     /// Null (and <see cref="ErrorMessage"/> set) when the file cannot be opened.
     /// </summary>
-    private async Task<LogDocument?> OpenDocumentAsync(string fullPath, string displayPath)
+    private async Task<LogDocument?> OpenDocumentAsync(string fullPath, string displayPath, LogEncoding? encoding = null)
     {
         try
         {
-            var document = await LogDocument.OpenAsync(fullPath);
+            var document = await LogDocument.OpenAsync(fullPath, encoding);
             ErrorMessage = null;
             return document;
         }
@@ -114,10 +137,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Appends a tab for <paramref name="document"/>, not yet indexing (call <see cref="LogTabViewModel.Start"/>).</summary>
-    private LogTabViewModel AddTab(LogDocument document)
+    private LogTabViewModel AddTab(LogDocument document, OpenedPackage? package = null)
     {
         var tab = new LogTabViewModel(document, _uiContext,
-            new TabServices(Copier, Highlighting, History, _settings.Store));
+            new TabServices(Copier, Highlighting, History, _settings.Store))
+        {
+            Package = package,
+            EncodingOverride = package?.Manifest.Encoding,
+        };
         Tabs.Add(tab);
         return tab;
     }
@@ -169,5 +196,5 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     private LogTabViewModel? FindTab(string fullPath) =>
-        Tabs.FirstOrDefault(t => string.Equals(t.Path, fullPath, StringComparison.OrdinalIgnoreCase));
+        Tabs.FirstOrDefault(t => string.Equals(t.SourcePath, fullPath, StringComparison.OrdinalIgnoreCase));
 }

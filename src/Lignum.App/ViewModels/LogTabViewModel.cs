@@ -1,3 +1,4 @@
+using Lignum.App.Packaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Viewer;
@@ -57,8 +58,14 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
         _document = document;
     }
 
-    /// <summary>The full path of the file; identifies the tab (compared case-insensitively).</summary>
+    /// <summary>The full path of the file being read (for a package, the extracted log).</summary>
     public string Path { get; }
+
+    /// <summary>The <c>.lm</c> package this tab shows (ticket 06), or null for a plain log file.</summary>
+    internal OpenedPackage? Package { get; init; }
+
+    /// <summary>What the user opened: the package for a package tab, else <see cref="Path"/>. Identifies the tab.</summary>
+    public string SourcePath => Package?.PackagePath ?? Path;
 
     public string FileName { get; }
 
@@ -77,6 +84,15 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
         _search?.Dispose();
         _document?.Dispose();
         _document = null;
+        if (Package is { } package)
+        {
+            // Once the indexer has let go of the file, remove the extracted copy (and its bookmarks).
+            _ = IndexingCompletion.ContinueWith(_ =>
+            {
+                Settings.SettingsStore.Flush();
+                LogPackage.DeleteExtracted(package.Folder);
+            }, TaskScheduler.Default);
+        }
     }
 
     private Task Attach(LogDocument document)
