@@ -30,7 +30,9 @@ Keep Lignum open with your logs; then ask your AI tool things like "Which errors
 
 With AI access on, the panel also has a chat. Pick the agent installed on this PC and ask about the open logs; it answers in the panel and can add filters, highlights and bookmarks:
 
-- **Claude Code** (`claude`): uses your Claude subscription. Install from https://claude.com/claude-code (or `npm install -g @anthropic-ai/claude-code`) and sign in once by running `claude`. Lignum runs it with only Lignum's tools (no file, shell or web tools).
-- **GitHub Copilot CLI** (`copilot`): uses your Copilot subscription. Install with `npm install -g @github/copilot` and sign in once by running `copilot`. Lignum runs it in prompt mode with the Lignum MCP server added.
+- **Claude Code** (`claude`): uses your Claude subscription (Pro, Max, Team or Enterprise). Lignum runs it with only Lignum's tools (no file, shell or web tools).
+- **GitHub Copilot CLI** (`copilot`): uses your GitHub Copilot subscription. Lignum runs it in prompt mode with the Lignum MCP server added.
+
+The panel walks you through setup: **Install** runs the vendor's official installer in a PowerShell window you can see (Claude Code: `irm https://claude.ai/install.ps1 | iex`; Copilot CLI: `winget install GitHub.Copilot`). **Sign in** opens the agent in a terminal for its one-time sign-in (for Copilot CLI, type `/login`). **Check again** finds a newly installed agent without restarting Lignum.
 
 Lignum starts the agent in the background for each question (a conversation continues until **New conversation**) and needs no API key. Each agent has its own usage limits and terms.

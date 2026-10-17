@@ -29,6 +29,37 @@ public abstract class CliAgent
     /// <summary>How to install it, shown when it is not found.</summary>
     public abstract string InstallHint { get; }
 
+    /// <summary>The vendor's official install command, run in a visible PowerShell window by "Install".</summary>
+    public abstract string InstallCommand { get; }
+
+    /// <summary>What to do in the sign-in window ("Sign in" runs the agent in a terminal).</summary>
+    public abstract string SignInHint { get; }
+
+    /// <summary>Where the official installers put the program, for when PATH is not updated yet.</summary>
+    protected abstract IEnumerable<string> KnownLocations { get; }
+
+    /// <summary>The installed program: on PATH (as Windows has it now, not as it was when Lignum started) or in a known location.</summary>
+    public string? FindExecutable() =>
+        Executable ?? FindOnPath(Command) ?? KnownLocations.FirstOrDefault(File.Exists);
+
+    /// <summary>Opens a PowerShell window that runs <see cref="InstallCommand"/> and stays open.</summary>
+    public ProcessStartInfo InstallStart() => new("powershell.exe")
+    {
+        UseShellExecute = true,
+        ArgumentList =
+        {
+            "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+            $"Write-Host 'Installing {Name}...'; {InstallCommand}; Write-Host ''; " +
+            $"Write-Host 'Done. Close this window, then press Check again in Lignum.'",
+        },
+    };
+
+    /// <summary>Opens the agent in its own terminal window to sign in; null when it is not installed.</summary>
+    public ProcessStartInfo? SignInStart() =>
+        FindExecutable() is { } exe
+            ? new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }
+            : null;
+
     /// <summary>Whether a turn was already sent in this conversation.</summary>
     protected bool HasStarted { get; private set; }
 
@@ -46,8 +77,7 @@ public abstract class CliAgent
     /// <summary>Runs one turn: sends <paramref name="prompt"/> and streams the answer's text to <paramref name="onText"/>.</summary>
     public async Task RunTurnAsync(string prompt, Action<string> onText, CancellationToken cancellationToken)
     {
-        var exe = Executable ?? FindOnPath(Command)
-                  ?? throw new AgentException($"{Name} is not installed (or not on PATH). {InstallHint}");
+        var exe = FindExecutable() ?? throw new AgentException($"{Name} is not installed. {InstallHint}");
         Directory.CreateDirectory(WorkFolder);
         var arguments = BuildArguments(prompt);
         var output = new StringBuilder();
@@ -83,11 +113,18 @@ public abstract class CliAgent
         return path;
     }
 
-    /// <summary>Finds <paramref name="command"/> on PATH with the usual Windows extensions (.exe, .cmd, ...).</summary>
+    /// <summary>
+    /// Finds <paramref name="command"/> on PATH with the usual Windows extensions (.exe, .cmd, ...). Also reads the
+    /// user and machine PATH from Windows, so a program installed after Lignum started is found too.
+    /// </summary>
     public static string? FindOnPath(string command)
     {
         var extensions = (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.CMD;.BAT").Split(';', StringSplitOptions.RemoveEmptyEntries);
-        foreach (var folder in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+        var path = string.Join(';',
+            Environment.GetEnvironmentVariable("PATH"),
+            Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User),
+            Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine));
+        foreach (var folder in Environment.ExpandEnvironmentVariables(path).Split(';', StringSplitOptions.RemoveEmptyEntries))
         {
             foreach (var extension in extensions)
             {
@@ -117,7 +154,17 @@ public sealed class ClaudeCodeAgent : CliAgent
 
     public override string Command => "claude";
 
-    public override string InstallHint => "Install it from https://claude.com/claude-code (or: npm install -g @anthropic-ai/claude-code), then sign in once with `claude`.";
+    public override string InstallHint => "Press Install to run Anthropic's installer, then Sign in (needs a Claude Pro, Max, Team or Enterprise plan).";
+
+    public override string InstallCommand => "irm https://claude.ai/install.ps1 | iex";
+
+    public override string SignInHint => "Claude Code opens in a terminal: follow the browser sign-in, then close the window.";
+
+    protected override IEnumerable<string> KnownLocations =>
+    [
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "bin", "claude.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm", "claude.cmd"),
+    ];
 
     protected override bool PromptOnStdin => true;
 
@@ -191,7 +238,17 @@ public sealed class CopilotCliAgent : CliAgent
 
     public override string Command => "copilot";
 
-    public override string InstallHint => "Install it with: npm install -g @github/copilot, then sign in once with `copilot`.";
+    public override string InstallHint => "Press Install to install it with WinGet, then Sign in (needs a GitHub Copilot subscription).";
+
+    public override string InstallCommand => "winget install GitHub.Copilot";
+
+    public override string SignInHint => "Copilot CLI opens in a terminal: type /login, follow the steps, then close the window.";
+
+    protected override IEnumerable<string> KnownLocations =>
+    [
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "WinGet", "Links", "copilot.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm", "copilot.cmd"),
+    ];
 
     protected internal override IReadOnlyList<string> BuildArguments(string prompt)
     {

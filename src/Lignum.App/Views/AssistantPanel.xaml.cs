@@ -4,12 +4,26 @@ using Lignum.App.Assistant;
 
 namespace Lignum.App.Views;
 
+/// <summary>Collapsed for true, visible for false.</summary>
+public sealed class InverseBoolToVisibilityConverter : System.Windows.Data.IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        value is true ? Visibility.Collapsed : Visibility.Visible;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 /// <summary>The AI access side panel (ticket 05).</summary>
 public partial class AssistantPanel : UserControl
 {
     private bool _stickToBottom = true;
 
-    public AssistantPanel() => InitializeComponent();
+    public AssistantPanel()
+    {
+        Resources.Add("InverseBoolToVisibility", new InverseBoolToVisibilityConverter());
+        InitializeComponent();
+    }
 
     /// <summary>Copies the MCP setting for the AI tool named in the button's Tag.</summary>
     private void OnCopySetupClick(object sender, RoutedEventArgs e)
