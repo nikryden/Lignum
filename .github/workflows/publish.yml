@@ -1,6 +1,6 @@
 name: Publish
 
-# Manual only: builds the self-contained single-file win-x64 exe and uploads it as an artifact.
+# Manual only: builds the self-contained single-file win-x64 exe and its installer (ticket 07) and uploads both.
 on:
   workflow_dispatch:
     inputs:
@@ -39,4 +39,17 @@ jobs:
         with:
           name: Lignum-${{ steps.version.outputs.value }}-win-x64
           path: publish/Lignum.exe
+          if-no-files-found: error
+
+      - name: Build installer
+        shell: pwsh
+        env:
+          LIGNUM_VERSION: ${{ steps.version.outputs.value }}
+          LIGNUM_PUBLISH_DIR: ${{ github.workspace }}/publish
+        run: dotnet run -c Release --project installer/Lignum.Installer -- -o installer-out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lignum-${{ steps.version.outputs.value }}-installer
+          path: installer-out/*.msi
           if-no-files-found: error
