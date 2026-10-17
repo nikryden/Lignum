@@ -84,6 +84,8 @@
                 <MenuItem Header="Find _previous" Command="{Binding SelectedTab.Search.FindPreviousCommand}" InputGestureText="Shift+F3" />
                 <MenuItem Header="Fi_lter rules" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.Search.IsFilterBarOpen, Mode=TwoWay, FallbackValue=False}" />
+                <MenuItem Header="Search _inside filter" IsCheckable="True"
+                          IsChecked="{Binding SelectedTab.Search.SearchInsideFilter, Mode=TwoWay, FallbackValue=True}" />
                 <Separator />
                 <MenuItem Header="_Results pane" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.Search.IsResultsPaneOpen, Mode=TwoWay, FallbackValue=False}" />

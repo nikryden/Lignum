@@ -31,6 +31,31 @@ public class FilterRuleTests : IDisposable
         return lines;
     }
 
+    private async Task<long[]> Run(Query query)
+    {
+        using var doc = LogDocument.Open(_temp.WriteFile(Log));
+        using var result = doc.StartQuery(query); // started before indexing: runs as lines arrive
+        await doc.StartIndexing();
+        await result.Completion;
+        Assert.Equal(QueryState.Completed, result.State);
+        var lines = new long[result.Count];
+        for (var i = 0; i < lines.Length; i++) lines[i] = result[i];
+        return lines;
+    }
+
+    [Fact]
+    public async Task A_search_inside_a_filter_finds_only_lines_that_pass_both()
+    {
+        var filter = new Query([Include("db"), Include("health"), Exclude("INFO")]); // lines 0, 1, 2
+        var search = Query.Find("o").Inside(filter);
+
+        Assert.Equal(new long[] { 0L, 1L }, await Run(Query.Find("error").Inside(filter)));
+        Assert.Equal(new long[] { 0L, 1L, 2L }, await Run(search));
+        Assert.Same(filter, search.Filter);
+        // Highlighting shows the search, not the filter rules.
+        Assert.Equal([new TextMatch(6, 5)], Query.Find("error", matchCase: true).Inside(filter).FindMatches("ERROR error db"));
+    }
+
     private static QueryRule Include(string text) => new(text);
 
     private static QueryRule Exclude(string text) => new(text, RuleKind.Exclude);

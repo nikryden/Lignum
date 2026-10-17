@@ -15,7 +15,8 @@ namespace Lignum.App.ViewModels;
 /// <remarks>
 /// The regex / case / NonBacktracking toggles shape the query in <see cref="BuildQuery"/>; an invalid
 /// pattern sets <see cref="FindTextError"/> instead of searching. Filter rules (SearchViewModel.Filter.cs)
-/// feed the same result set and pane: whichever of find all and the filter ran last owns it.
+/// and the search work together (ticket 08): with both active the search runs inside the filtered lines
+/// (or on the whole file, see <see cref="SearchInsideFilter"/>); with one of them, that one fills the pane.
 /// </remarks>
 public sealed partial class SearchViewModel : ObservableObject, IDisposable
 {
@@ -24,6 +25,19 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private QueryResult? _result;
     private int _refreshPending;
     private bool _showingFilter;
+    private Query? _activeSearch;
+    private string _activeSearchText = "";
+    private Query? _activeFilter;
+    private int _activeFilterRuleCount;
+    private string _queryLabel = "";
+
+    /// <summary>With filter rules active, search only the lines they show (on, the default) or the whole file.</summary>
+    [ObservableProperty]
+    private bool _searchInsideFilter = true;
+
+    /// <summary>What the results pane shows, e.g. "Filter: 2 rules · Search: timeout · 1,234 matches".</summary>
+    [ObservableProperty]
+    private string _resultsHeader = "";
 
     [ObservableProperty]
     private string _findText = "";
@@ -105,14 +119,26 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     {
         _document = document;
         ClearResults();
-        ApplyFilter(); // filter rules belong to the tab, not the document: run them on the new one
+        _activeSearch = null; // a new document starts without a search, as in v1
+        RebuildFilter(); // filter rules belong to the tab, not the document: run them on the new one
+        _ = Rerun();
     }
 
-    /// <summary>Runs find all for <see cref="FindText"/>; completes when the search stops.</summary>
+    /// <summary>
+    /// Runs find all for <see cref="FindText"/> (inside the filter rules when they are active); completes when
+    /// the search stops. An empty find box ends the search, leaving the filter's lines.
+    /// </summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     private async Task FindAll()
     {
-        if (_document is not { } document || string.IsNullOrEmpty(FindText)) return;
+        if (_document is null) return;
+        if (string.IsNullOrEmpty(FindText))
+        {
+            if (_activeSearch is null) return;
+            _activeSearch = null;
+            await Rerun();
+            return;
+        }
 
         Query query;
         try
@@ -127,13 +153,45 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
 
         FindTextError = null;
         History?.AddSearchTerm(FindText);
-        await RunQuery(document, query, isFilter: false);
+        _activeSearch = query;
+        _activeSearchText = FindText;
+        await Rerun();
     }
 
     /// <summary>
-    /// Shows <paramref name="query"/>'s results in the results pane (find all and the filter share it: the
-    /// last one run wins), cancelling the query shown before. Completes when the query stops.
+    /// Runs what the results pane should show: the search inside the filter rules (or on the whole file), the
+    /// search alone, or the filter alone. Cancels the previous run; completes when this one stops.
     /// </summary>
+    private Task Rerun()
+    {
+        var search = _activeSearch;
+        var filter = _activeFilter;
+        if (_document is not { } document || (search is null && filter is null))
+        {
+            ClearResults();
+            return Task.CompletedTask;
+        }
+
+        var inside = search is not null && filter is not null && SearchInsideFilter;
+        var query = search is null ? filter! : inside ? search.Inside(filter!) : search;
+        var parts = new List<string>();
+        if (filter is not null && (search is null || inside))
+            parts.Add(_activeFilterRuleCount == 1 ? "Filter: 1 rule" : $"Filter: {_activeFilterRuleCount} rules");
+        if (search is not null)
+            parts.Add(filter is not null && !inside ? $"Search: {_activeSearchText} (whole file)" : $"Search: {_activeSearchText}");
+        _queryLabel = string.Join(" · ", parts);
+        return RunQuery(document, query, isFilter: search is null);
+    }
+
+    [RelayCommand]
+    private void ToggleSearchScope() => SearchInsideFilter = !SearchInsideFilter;
+
+    partial void OnSearchInsideFilterChanged(bool value)
+    {
+        if (_activeSearch is not null && _activeFilter is not null) _ = Rerun();
+    }
+
+    /// <summary>Shows <paramref name="query"/>'s results in the results pane, cancelling the query shown before. Completes when it stops.</summary>
     private async Task RunQuery(LogDocument document, Query query, bool isFilter)
     {
         StopSearch();
@@ -161,6 +219,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         _showingFilter = false;
         Results = null;
         Highlight = null;
+        ResultsHeader = "";
         MatchCount = 0;
         SearchProgress = 0;
         SearchStatus = "";
@@ -244,7 +303,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private void OnOptionChanged()
     {
         FindTextError = null;
-        if (Results is not null && !_showingFilter && !string.IsNullOrEmpty(FindText)) FindAllCommand.Execute(null);
+        if (_activeSearch is not null && !string.IsNullOrEmpty(FindText)) FindAllCommand.Execute(null);
     }
 
     private void StopSearch()
@@ -286,6 +345,10 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         MatchCount = count;
         SearchProgress = result.Progress;
         IsSearching = state == QueryState.Running;
+        var countText = _showingFilter
+            ? count == 1 ? "1 line" : $"{count:N0} lines"
+            : count == 1 ? "1 match" : $"{count:N0} matches";
+        ResultsHeader = $"{_queryLabel} · {countText}" + (state == QueryState.Running ? $" · {result.Progress:P0}" : "");
         if (result.Error is RegexMatchTimeoutException)
         {
             // Don't keep a pattern that blows up as the highlight: the views would run it on every row.

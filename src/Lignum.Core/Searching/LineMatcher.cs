@@ -5,9 +5,12 @@ internal sealed class LineMatcher
 {
     private readonly TextPattern[] _includes;
     private readonly TextPattern[] _excludes;
+    private readonly LineMatcher? _within;
 
-    public LineMatcher(IEnumerable<QueryRule> rules, TimeSpan regexTimeout)
+    /// <param name="within">Lines must also pass this matcher (a search inside a filter); null: no extra condition.</param>
+    public LineMatcher(IEnumerable<QueryRule> rules, TimeSpan regexTimeout, LineMatcher? within = null)
     {
+        _within = within;
         var active = rules.Where(r => r.IsEnabled && !string.IsNullOrEmpty(r.Text)).ToList();
         _includes = [.. active.Where(r => r.Kind == RuleKind.Include).Select(r => Create(r, regexTimeout))];
         _excludes = [.. active.Where(r => r.Kind == RuleKind.Exclude).Select(r => Create(r, regexTimeout))];
@@ -18,6 +21,8 @@ internal sealed class LineMatcher
 
     public bool IsMatch(ReadOnlySpan<char> line)
     {
+        if (_within is not null && !_within.IsMatch(line)) return false;
+
         if (_includes.Length > 0)
         {
             var included = false;
