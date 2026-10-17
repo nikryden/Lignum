@@ -62,6 +62,9 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
     /// <summary>The full path of the file being read (for a package, the extracted log).</summary>
     public string Path { get; }
 
+    /// <summary>The open document, or null once the tab is closed (find in all tabs searches it).</summary>
+    internal LogDocument? Document => _document;
+
     /// <summary>The <c>.lm</c> package this tab shows (ticket 06), or null for a plain log file.</summary>
     internal OpenedPackage? Package { get; init; }
 

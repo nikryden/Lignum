@@ -12,6 +12,16 @@ public sealed partial class MainViewModel
     [ObservableProperty]
     private bool _highlightMatchesOutsideFilter = true;
 
+    private AllTabsSearchViewModel? _allTabsSearch;
+
+    /// <summary>Find in all tabs (ticket 01): one search over every open tab, shown in the shared pane.</summary>
+    public AllTabsSearchViewModel AllTabsSearch => _allTabsSearch ??= new AllTabsSearchViewModel(_uiContext,
+        () => [.. Tabs], (tab, line) =>
+        {
+            SelectedTab = tab;
+            if (line >= 0) tab.Navigation.GoToLine(line);
+        });
+
     partial void OnHighlightMatchesOutsideFilterChanged(bool value)
     {
         foreach (var tab in Tabs) tab.Search.HighlightOutsideFilter = value;
