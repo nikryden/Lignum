@@ -11,6 +11,7 @@ public enum FindPage
     Find,
     Filter,
     AllTabs,
+    Files,
 }
 
 /// <summary>Visible for null, collapsed otherwise ("open a file" hints).</summary>
@@ -62,7 +63,17 @@ public partial class FindWindow : Window
             case FindPage.AllTabs:
                 AllTabs.FocusFindBox();
                 break;
+            case FindPage.Files:
+                Dispatcher.BeginInvoke(() => FilesFindBox.Focus(), System.Windows.Threading.DispatcherPriority.Input);
+                break;
         }
+    }
+
+    private void OnBrowseFolderClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ViewModels.MainViewModel main) return;
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Folder to search", FolderName = main.AllTabsSearch.Folder };
+        if (dialog.ShowDialog(this) == true) main.AllTabsSearch.Folder = dialog.FolderName;
     }
 
     /// <summary>Closes for good (the main window is closing); otherwise closing only hides.</summary>

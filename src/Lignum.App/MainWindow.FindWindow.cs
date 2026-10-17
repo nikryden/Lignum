@@ -20,6 +20,10 @@ public partial class MainWindow
             if (e.PropertyName == nameof(MainViewModel.SelectedTab)) WatchSearch(_viewModel.SelectedTab?.Search);
         };
         _viewModel.AllTabsSearch.FindBoxFocusRequested += (_, _) => ShowFindWindow(FindPage.AllTabs);
+        _viewModel.AllTabsSearch.FindInFilesRequested += (_, _) => ShowFindWindow(FindPage.Files);
+        _viewModel.AllTabsSearch.ConfirmLargeSearch = message => System.Windows.MessageBox.Show(
+            (System.Windows.Window?)_findWindow ?? this, message, "Find in files", System.Windows.MessageBoxButton.OKCancel,
+            System.Windows.MessageBoxImage.Question) == System.Windows.MessageBoxResult.OK;
         WatchSearch(_viewModel.SelectedTab?.Search);
         Closed += (_, _) => _findWindow?.CloseForGood();
     }

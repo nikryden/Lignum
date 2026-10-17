@@ -33,5 +33,51 @@
         <TabItem Header="Find in _all tabs">
             <views:AllTabsSearchPane x:Name="AllTabs" DataContext="{Binding AllTabsSearch}" ShowResults="False" />
         </TabItem>
+        <!-- Find in files (ticket 02): files that are not open; results in the main window's shared list. -->
+        <TabItem Header="Find in f_iles">
+            <Grid Margin="8" DataContext="{Binding AllTabsSearch}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock Text="Find:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                <TextBox x:Name="FilesFindBox" Grid.Column="1" Margin="0,0,0,4"
+                         Text="{Binding FindText, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding SearchFolderCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,0,4">
+                    <ToggleButton Content="Aa" Padding="6,1" ToolTip="Match case" IsChecked="{Binding MatchCase}" />
+                    <ToggleButton Content=".*" Padding="6,1" Margin="4,0,0,0" ToolTip="Use regular expression" IsChecked="{Binding IsRegex}" />
+                    <ToggleButton Content="NB" Padding="6,1" Margin="4,0,0,0" ToolTip="NonBacktracking regex engine"
+                                  IsEnabled="{Binding IsRegex}" IsChecked="{Binding UseNonBacktracking}" />
+                </StackPanel>
+                <TextBlock Grid.Row="1" Text="Folder:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                <TextBox Grid.Row="1" Grid.Column="1" Margin="0,0,0,4" Text="{Binding Folder, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Grid.Row="1" Grid.Column="2" Content="Browse…" Padding="6,0" Margin="4,0,0,4" Click="OnBrowseFolderClick" />
+                <TextBlock Grid.Row="2" Text="Files:" VerticalAlignment="Center" Margin="0,0,8,4" />
+                <TextBox Grid.Row="2" Grid.Column="1" Margin="0,0,0,4" ToolTip="For example *.log;*.txt (empty: every file)"
+                         Text="{Binding FilePatterns, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Grid.Row="2" Grid.Column="2" Content="Subfolders" VerticalAlignment="Center" Margin="4,0,0,4"
+                          IsChecked="{Binding IncludeSubfolders}" />
+                <TextBlock Grid.Row="3" Grid.ColumnSpan="3" Text="{Binding FindTextError}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ErrorForegroundBrush}" />
+                <StackPanel Grid.Row="4" Grid.ColumnSpan="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,4,0,4">
+                    <Button Content="Find in files" Padding="8,1" Command="{Binding SearchFolderCommand}" />
+                    <Button Content="Cancel" Padding="8,1" Margin="4,0,0,0" Command="{Binding CancelCommand}" />
+                </StackPanel>
+                <TextBlock Grid.Row="5" Grid.ColumnSpan="3" Text="{Binding Status}" Opacity="0.8" TextWrapping="Wrap" />
+            </Grid>
+        </TabItem>
     </TabControl>
 </Window>
