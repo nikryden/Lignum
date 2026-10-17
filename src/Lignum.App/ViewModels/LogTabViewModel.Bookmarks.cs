@@ -10,8 +10,7 @@ public sealed partial class LogTabViewModel
 {
     private BookmarksViewModel? _bookmarks;
 
-    /// <summary>Where this tab's bookmarks file lives; MainViewModel passes its store. Null: not saved.</summary>
-    internal SettingsStore? SettingsStore { get; init; }
+    private SettingsStore? SettingsStore => _services.SettingsStore;
 
     /// <summary>This file's bookmarks, loaded on first use.</summary>
     public BookmarksViewModel Bookmarks => _bookmarks ??= new BookmarksViewModel(

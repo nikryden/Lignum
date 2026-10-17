@@ -116,8 +116,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Appends a tab for <paramref name="document"/>, not yet indexing (call <see cref="LogTabViewModel.Start"/>).</summary>
     private LogTabViewModel AddTab(LogDocument document)
     {
-        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History,
-            SettingsStore = _settings.Store };
+        var tab = new LogTabViewModel(document, _uiContext,
+            new TabServices(Copier, Highlighting, History, _settings.Store));
         Tabs.Add(tab);
         return tab;
     }

@@ -9,8 +9,7 @@ namespace Lignum.App.ViewModels;
 // PickSearchTextAsync: the selection, or its first line, or the word under the cursor.
 public sealed partial class LogTabViewModel
 {
-    /// <summary>The app-wide highlight rules ("Add as highlight rule"); MainViewModel hands it to every tab.</summary>
-    internal HighlightingViewModel? Highlighting { get; set; }
+    private HighlightingViewModel? Highlighting => _services.Highlighting;
 
     /// <summary>The picked text is cut to this many characters (a selection inside a multi-megabyte line).</summary>
     internal const int MaxSearchTextLength = 10_000;
