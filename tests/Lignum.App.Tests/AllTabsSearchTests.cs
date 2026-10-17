@@ -96,6 +96,21 @@ public sealed class AllTabsSearchTests : IDisposable
     }
 
     [Fact]
+    public async Task Per_tab_mode_runs_the_search_in_each_tabs_own_results_pane()
+    {
+        var main = await OpenTwo();
+        main.AllTabsSearch.ShowResultsPerTab = true;
+
+        await Search(main.AllTabsSearch, "error");
+
+        Assert.Empty(main.AllTabsSearch.Rows);
+        Assert.Equal([2L, 1L], main.Tabs.Select(t => t.Search.MatchCount));
+        Assert.All(main.Tabs, t => Assert.Equal("error", t.Search.FindText));
+        Assert.All(main.Tabs, t => Assert.True(t.Search.IsResultsPaneOpen));
+        Assert.Equal("3 matches in 2 tabs: see each tab's results pane", main.AllTabsSearch.Status);
+    }
+
+    [Fact]
     public async Task A_closed_tab_is_skipped_and_cancel_stops_the_search()
     {
         var main = await OpenTwo();

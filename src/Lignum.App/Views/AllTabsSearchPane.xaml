@@ -13,6 +13,9 @@
                     Command="{Binding CancelCommand}" />
             <Button DockPanel.Dock="Right" Content="Search all tabs" Padding="6,0" Margin="4,0,0,0"
                     Command="{Binding SearchCommand}" />
+            <ToggleButton DockPanel.Dock="Right" Content="Per tab" Padding="6,1" Margin="4,0,0,0"
+                          ToolTip="Show the results in each tab's own results pane instead of here"
+                          IsChecked="{Binding ShowResultsPerTab}" />
             <ToggleButton DockPanel.Dock="Right" Content="NB" Padding="6,1" Margin="4,0,0,0"
                           ToolTip="NonBacktracking regex engine" IsEnabled="{Binding IsRegex}"
                           IsChecked="{Binding UseNonBacktracking}" />

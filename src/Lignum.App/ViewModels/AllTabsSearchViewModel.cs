@@ -60,6 +60,13 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPaneOpen;
 
+    /// <summary>
+    /// Off (default): the matches are listed here, grouped by file. On: the search runs in each tab's own find
+    /// box and results pane instead (inside that tab's filter rules, if any), and this pane lists nothing.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showResultsPerTab;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
     private bool _isSearching;
@@ -119,6 +126,12 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         }
 
         FindTextError = null;
+        if (ShowResultsPerTab)
+        {
+            await SearchEachTab();
+            return;
+        }
+
         var generation = ++_generation;
         var searches = new List<(LogTabViewModel Tab, LogDocument Document, QueryResult Result)>();
         foreach (var tab in _tabs())
@@ -146,11 +159,42 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         UpdateProgress(generation);
     }
 
+    /// <summary>The per-tab mode: the same search in every tab's own find box; completes when all are done.</summary>
+    private async Task SearchEachTab()
+    {
+        var tabs = _tabs();
+        var generation = ++_generation;
+        IsSearching = tabs.Count > 0;
+        Status = $"Searching {tabs.Count} tabs…";
+        var searches = new List<Task>();
+        foreach (var tab in tabs)
+        {
+            var search = tab.Search;
+            search.IsRegex = IsRegex;
+            search.MatchCase = MatchCase;
+            search.UseNonBacktracking = UseNonBacktracking;
+            search.FindText = FindText;
+            search.IsFindBarOpen = true;
+            searches.Add(search.FindAllCommand.ExecuteAsync(null));
+        }
+
+        await Task.WhenAll(searches);
+        if (generation != _generation) return;
+        IsSearching = false;
+        var matches = tabs.Sum(t => t.Search.MatchCount);
+        Status = $"{(matches == 1 ? "1 match" : $"{matches:N0} matches")} in {tabs.Count} tabs: see each tab's results pane";
+    }
+
     [RelayCommand(CanExecute = nameof(IsSearching))]
     private void Cancel()
     {
         _generation++;
         foreach (var result in _running) result.Cancel();
+        if (ShowResultsPerTab && IsSearching)
+        {
+            foreach (var tab in _tabs()) tab.Search.CancelSearchCommand.Execute(null);
+        }
+
         _running = [];
         if (IsSearching)
         {
