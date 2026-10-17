@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Media;
 using Lignum.App.Settings;
 using Lignum.App.ViewModels;
+using Lignum.Core.Searching;
 
 namespace Lignum.App.Viewer;
 
@@ -34,15 +35,17 @@ public sealed class LineHighlighter
             if (!rule.IsEnabled || string.IsNullOrEmpty(rule.Pattern)) continue;
             var colors = theme == AppTheme.Dark ? rule.Dark : rule.Light;
             var style = new LineStyle(ToBrush(colors.Foreground), ToBrush(colors.Background));
-            Regex? regex = null;
-            if (rule.IsRegex)
+            TextPattern pattern;
+            try
             {
-                if (TryCreateRegex(rule.Pattern, rule.MatchCase) is not { } r) continue;
-                regex = r;
+                pattern = TextPattern.Create(rule.Pattern, rule.IsRegex, rule.MatchCase, RegexTimeout);
+            }
+            catch (ArgumentException)
+            {
+                continue; // invalid regex
             }
 
-            compiled.Add(new CompiledRule(rule.Pattern, regex,
-                rule.MatchCase ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase, style));
+            compiled.Add(new CompiledRule(pattern, style));
         }
 
         return compiled.Count == 0 ? None : new LineHighlighter([.. compiled]);
@@ -57,20 +60,6 @@ public sealed class LineHighlighter
         }
 
         return null;
-    }
-
-    /// <summary>The regex for a rule, or null when the pattern is invalid.</summary>
-    public static Regex? TryCreateRegex(string pattern, bool matchCase)
-    {
-        var options = RegexOptions.CultureInvariant | (matchCase ? RegexOptions.None : RegexOptions.IgnoreCase);
-        try
-        {
-            return new Regex(pattern, options, RegexTimeout);
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
     }
 
     /// <summary>Parses <c>#RRGGBB</c> / <c>#AARRGGBB</c> (or a named color); null when empty or invalid.</summary>
@@ -95,14 +84,13 @@ public sealed class LineHighlighter
         return brush;
     }
 
-    private sealed record CompiledRule(string Text, Regex? Regex, StringComparison Comparison, LineStyle Style)
+    private sealed record CompiledRule(TextPattern Pattern, LineStyle Style)
     {
         public bool IsMatch(string line)
         {
-            if (Regex is null) return line.Contains(Text, Comparison);
             try
             {
-                return Regex.IsMatch(line);
+                return Pattern.IsMatch(line);
             }
             catch (RegexMatchTimeoutException)
             {

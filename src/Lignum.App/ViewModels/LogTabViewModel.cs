@@ -45,10 +45,13 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool _isSelected;
 
+    private readonly TabServices _services;
+
     /// <summary>Takes ownership of an opened (not yet indexing) <paramref name="document"/>; call <see cref="Start"/>.</summary>
-    internal LogTabViewModel(LogDocument document, SynchronizationContext? uiContext)
+    internal LogTabViewModel(LogDocument document, SynchronizationContext? uiContext, TabServices services)
     {
         _uiContext = uiContext;
+        _services = services;
         Path = document.Path;
         FileName = document.FileName;
         _document = document;

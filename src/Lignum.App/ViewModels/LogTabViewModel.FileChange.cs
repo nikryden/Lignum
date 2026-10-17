@@ -42,11 +42,9 @@ public sealed partial class LogTabViewModel
         LogDocument document;
         try
         {
-            var encoding = EncodingOverride;
-            document = await Task.Run(() => LogDocument.Open(Path, encoding));
+            document = await LogDocument.OpenAsync(Path, EncodingOverride);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
+        catch (Exception ex) when (LogDocument.IsOpenFailure(ex))
         {
             ErrorMessage = $"Could not reload {Path}: {ex.Message}";
             return null;

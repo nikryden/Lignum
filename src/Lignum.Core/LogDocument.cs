@@ -44,6 +44,17 @@ public sealed partial class LogDocument : IDisposable
     public static LogDocument Open(string path) => Open(path, null);
 
     /// <summary>
+    /// <see cref="Open(string, LogEncoding?)"/> on a background thread, so a slow disk or share never blocks the
+    /// caller. Failures are the exceptions <see cref="IsOpenFailure"/> accepts.
+    /// </summary>
+    public static Task<LogDocument> OpenAsync(string path, LogEncoding? encoding = null) =>
+        Task.Run(() => Open(path, encoding));
+
+    /// <summary>True for the exceptions that mean "this file cannot be opened" (as opposed to a bug).</summary>
+    public static bool IsOpenFailure(Exception ex) =>
+        ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException;
+
+    /// <summary>
     /// Opens <paramref name="path"/> like <see cref="Open(string)"/>, but reads it as <paramref name="encoding"/>
     /// instead of detecting the encoding (null = detect). That encoding's byte order mark is still skipped if
     /// the file starts with it. To change the encoding of an open file, open it again with the new one.

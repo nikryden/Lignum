@@ -102,12 +102,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         try
         {
-            var document = await Task.Run(() => LogDocument.Open(fullPath));
+            var document = await LogDocument.OpenAsync(fullPath);
             ErrorMessage = null;
             return document;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
-                                       or NotSupportedException)
+        catch (Exception ex) when (LogDocument.IsOpenFailure(ex))
         {
             ErrorMessage = $"Could not open {displayPath}: {ex.Message}";
             return null;
@@ -117,8 +116,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Appends a tab for <paramref name="document"/>, not yet indexing (call <see cref="LogTabViewModel.Start"/>).</summary>
     private LogTabViewModel AddTab(LogDocument document)
     {
-        var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History,
-            SettingsStore = _settings.Store };
+        var tab = new LogTabViewModel(document, _uiContext,
+            new TabServices(Copier, Highlighting, History, _settings.Store));
         Tabs.Add(tab);
         return tab;
     }

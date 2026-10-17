@@ -9,8 +9,7 @@ public sealed partial class LogTabViewModel
 {
     private CancellationTokenSource? _copyCancel;
 
-    /// <summary>Copies selections; <see cref="MainViewModel"/> hands every tab its own (clipboard, prompts).</summary>
-    internal SelectionCopier? Copier { get; set; }
+    private SelectionCopier? Copier => _services.Copier;
 
     private TextSelection? _selection;
 

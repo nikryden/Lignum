@@ -55,18 +55,7 @@ internal sealed class BlockCache
         return copied;
     }
 
-    private int ReadDirect(long offset, Span<byte> destination)
-    {
-        var copied = 0;
-        while (copied < destination.Length)
-        {
-            var read = RandomAccess.Read(_handle, destination[copied..], offset + copied);
-            if (read == 0) break;
-            copied += read;
-        }
-
-        return copied;
-    }
+    private int ReadDirect(long offset, Span<byte> destination) => FileReads.ReadFully(_handle, destination, offset);
 
     private Block GetBlock(long blockStart, int neededLength)
     {

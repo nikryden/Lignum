@@ -1,3 +1,4 @@
+using Lignum.Core.Reading;
 using System.Buffers;
 using System.Text;
 using Lignum.Core.Searching;
@@ -143,13 +144,7 @@ public sealed partial class LogDocument
         var chars = ArrayPool<char>.Shared.Rent(Math.Max(1, length));
         try
         {
-            var filled = 0;
-            while (filled < length)
-            {
-                var read = RandomAccess.Read(_handle, bytes.AsSpan(filled, length - filled), startByte + filled);
-                if (read == 0) break; // the file shrank; change detection invalidates the index
-                filled += read;
-            }
+            var filled = FileReads.ReadFully(_handle, bytes.AsSpan(0, length), startByte);
 
             var codec = Codec; // decoding and line breaks in the file's encoding (no encoding has more chars than bytes)
             for (var line = first; line < end; line++)
