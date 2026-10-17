@@ -118,6 +118,50 @@ public sealed class BookmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task A_color_is_saved_with_its_bookmark_and_restored_on_reopen()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        tab.Bookmarks.SetNote(5, "slow");
+        tab.Bookmarks.SetColor(5, BookmarkColor.Purple);
+        tab.Bookmarks.SetColor(8, BookmarkColor.Green); // bookmarks the line too
+
+        var reopened = await Open(Start(), a);
+
+        Assert.Equal([5L, 8L], reopened.Bookmarks.Lines);
+        Assert.Equal(
+            [new BookmarkItem(5, "slow", BookmarkColor.Purple), new BookmarkItem(8, null, BookmarkColor.Green)],
+            reopened.Bookmarks.Items);
+    }
+
+    [Fact]
+    public async Task A_new_bookmark_is_blue_and_blue_is_not_written_to_the_file()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        ToggleAt(tab, 4);
+        tab.Bookmarks.SetColor(6, BookmarkColor.Red);
+        tab.Bookmarks.SetColor(6, BookmarkColor.Blue);
+        SettingsStore.Flush();
+
+        Assert.Equal(BookmarkColor.Blue, tab.Bookmarks.ColorFor(4));
+        Assert.Empty(tab.Bookmarks.Colors);
+        var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
+        Assert.DoesNotContain("color", File.ReadAllText(file));
+    }
+
+    [Fact]
+    public async Task Removing_a_bookmark_removes_its_color()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Bookmarks.SetColor(9, BookmarkColor.Yellow);
+
+        tab.Bookmarks.Toggle(9);
+        tab.Bookmarks.Toggle(9);
+
+        Assert.Equal(BookmarkColor.Blue, tab.Bookmarks.ColorFor(9));
+    }
+
+    [Fact]
     public async Task Clicking_a_row_in_the_bookmarks_pane_moves_the_caret_to_its_line()
     {
         var tab = await Open(Start(), WriteLog("a.log"));

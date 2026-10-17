@@ -8,7 +8,20 @@ public sealed partial class MainViewModel
     private DetailPaneLayoutViewModel? _detailPane;
 
     /// <summary>Open/collapsed, dock position and size of the detail pane, shared by all tabs and saved.</summary>
-    public DetailPaneLayoutViewModel DetailPane => _detailPane ??= new DetailPaneLayoutViewModel(_settings);
+    public DetailPaneLayoutViewModel DetailPane
+    {
+        get
+        {
+            if (_detailPane is not null) return _detailPane;
+            _detailPane = new DetailPaneLayoutViewModel(_settings);
+            _detailPane.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(DetailPaneLayoutViewModel.IncludeHiddenLines)) return;
+                foreach (var tab in Tabs) tab.Detail.IncludeHiddenLines = _detailPane.IncludeHiddenLines;
+            };
+            return _detailPane;
+        }
+    }
 
     /// <summary>
     /// "Show full line": opens the detail pane on <paramref name="line"/> (0-based) of the selected tab, or on

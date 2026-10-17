@@ -54,6 +54,77 @@ public sealed partial class AssistantViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand))]
     private bool _isBusy;
 
+    /// <summary>The skills matching the "/name" being typed at the start of <see cref="Input"/>.</summary>
+    public ObservableCollection<Skill> SkillSuggestions { get; } = [];
+
+    [ObservableProperty]
+    private bool _isSkillListOpen;
+
+    [ObservableProperty]
+    private Skill? _selectedSkillSuggestion;
+
+    /// <summary>The skills last read from disk; read again each time a "/" starts the input.</summary>
+    private IReadOnlyList<Skill> _skills = [];
+
+    partial void OnInputChanged(string value)
+    {
+        // Suggest while the input is a "/" followed only by name characters.
+        var typing = value.StartsWith('/') && !value.Skip(1).Any(char.IsWhiteSpace);
+        if (!typing)
+        {
+            IsSkillListOpen = false;
+            return;
+        }
+
+        if (!IsSkillListOpen || value == "/") _skills = _tools.LoadSkills();
+        var prefix = value[1..];
+        SkillSuggestions.Clear();
+        foreach (var skill in _skills.Where(s => s.Name.Contains(prefix, StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(s => !s.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            SkillSuggestions.Add(skill);
+        SelectedSkillSuggestion = SkillSuggestions.FirstOrDefault();
+        IsSkillListOpen = SkillSuggestions.Count > 0;
+    }
+
+    /// <summary>Puts "/name " in the input for the chosen suggestion (Tab, Enter or a click).</summary>
+    public void AcceptSkillSuggestion(Skill? skill = null)
+    {
+        if ((skill ?? SelectedSkillSuggestion) is not { } chosen) return;
+        Input = $"/{chosen.Name} ";
+        IsSkillListOpen = false;
+    }
+
+    /// <summary>Moves the highlighted suggestion by <paramref name="delta"/>, wrapping.</summary>
+    public void MoveSkillSuggestion(int delta)
+    {
+        if (SkillSuggestions.Count == 0) return;
+        var index = SelectedSkillSuggestion is { } current ? SkillSuggestions.IndexOf(current) : -1;
+        SelectedSkillSuggestion = SkillSuggestions[((index + delta) % SkillSuggestions.Count + SkillSuggestions.Count) % SkillSuggestions.Count];
+    }
+
+    [RelayCommand]
+    private void OpenGlobalSkillsFolder() => OpenFolder(_tools.GlobalSkillsFolder);
+
+    [RelayCommand]
+    private void OpenLocalSkillsFolder()
+    {
+        if (_tools.LocalSkillsFolder is { } folder) OpenFolder(folder);
+        else Add(ChatEntryKind.Error, "Open a log first: local skills are kept next to it.");
+    }
+
+    private void OpenFolder(string folder)
+    {
+        try
+        {
+            Directory.CreateDirectory(folder);
+            StartProcess(new System.Diagnostics.ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Add(ChatEntryKind.Error, $"Could not open {folder}: {ex.Message}");
+        }
+    }
+
     private CliAgent? _agent;
     private CancellationTokenSource? _cancel;
 
@@ -75,6 +146,9 @@ public sealed partial class AssistantViewModel : ObservableObject
     }
 
     public ObservableCollection<ChatEntry> Entries { get; } = [];
+
+    /// <summary>Lignum's tools for AI agents (skills folders live here too).</summary>
+    internal AssistantTools Tools => _tools;
 
     /// <summary>Whether the AI panel is shown (View > AI access, Ctrl+Shift+A); where it sits is <see cref="Layout"/>.</summary>
     public bool IsPanelOpen
@@ -321,7 +395,21 @@ public sealed partial class AssistantViewModel : ObservableObject
     private async Task Send()
     {
         var question = Input.Trim();
+        var prompt = question;
+        if (SkillLibrary.ParseCommand(question) is { } command)
+        {
+            var skill = _tools.LoadSkills().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
+            if (skill is null)
+            {
+                Add(ChatEntryKind.Error, $"There is no skill /{command.Name}. Type / to see the skills, or add one under Skills.");
+                return; // the input stays, to fix the name
+            }
+
+            prompt = SkillLibrary.PromptFor(skill, command.Text);
+        }
+
         Input = "";
+        IsSkillListOpen = false;
         Add(ChatEntryKind.User, question);
         var answer = new ChatEntry(ChatEntryKind.Assistant, "");
         Entries.Add(answer);
@@ -331,7 +419,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            await agent.RunTurnAsync(question, text => OnUi(() => answer.Text += text), _cancel.Token);
+            await agent.RunTurnAsync(prompt, text => OnUi(() => answer.Text += text), _cancel.Token);
             OnUi(() =>
             {
                 if (answer.Text.Trim().Length == 0) answer.Text = "(no answer)";
@@ -440,6 +528,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         "add_highlight_rule" => $"Adding highlight rule \"{Arg(call, "pattern")}\"",
         "add_bookmark" => $"Bookmarking line {Arg(call, "line")}",
         "go_to_line" => $"Going to line {Arg(call, "line")}",
+        "select_text" => $"Selecting text on line {Arg(call, "line")}",
         "list_tabs" => "Listing the open files",
         "select_tab" => $"Switching to tab {Arg(call, "tab")}",
         "search_all_tabs" => $"Searching all tabs for \"{Arg(call, "pattern")}\"",
@@ -450,6 +539,20 @@ public sealed partial class AssistantViewModel : ObservableObject
         "set_filter_rule_enabled" => $"Turning filter rule {Arg(call, "index")} {(Arg(call, "enabled") == "True" ? "on" : "off")}",
         "clear_filter_rules" => "Removing every filter rule",
         "list_bookmarks" => "Listing the bookmarks",
+        "remove_bookmark" => Arg(call, "all") == "True" ? "Removing every bookmark" : $"Removing the bookmark on line {Arg(call, "line")}",
+        "edit_bookmark" => $"Editing the bookmark on line {Arg(call, "line")}",
+        "get_selection" => "Reading your selection",
+        "set_hide_non_matching" => Arg(call, "enabled") == "True" ? "Hiding non-matching lines" : "Showing every line",
+        "list_highlight_rules" => "Listing the highlight rules",
+        "remove_highlight_rule" => $"Removing highlight rule {Arg(call, "index")}",
+        "clear_highlight_rules" => "Removing every highlight rule",
+        "show_full_line" => $"Showing line {Arg(call, "line")} in full",
+        "open_file" => $"Opening {Arg(call, "path")}",
+        "close_tab" => $"Closing tab {Arg(call, "tab")}",
+        "export_package" => $"Exporting to {Arg(call, "path")}",
+        "list_skills" => "Listing the skills",
+        "get_skill" => $"Reading skill /{Arg(call, "name")}",
+        "save_skill" => $"Saving skill /{Arg(call, "name")} ({(Arg(call, "scope") is "global" ? "global" : "local")})",
         _ => call.Name,
     };
 

@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using Lignum.App.Settings;
 using Lignum.App.Themes;
 
 namespace Lignum.App.Viewer;
@@ -17,6 +18,10 @@ public sealed partial class LogView
 
     public static readonly DependencyProperty BookmarkNotesProperty = DependencyProperty.Register(
         nameof(BookmarkNotes), typeof(IReadOnlyDictionary<long, string>), typeof(LogView),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty BookmarkColorsProperty = DependencyProperty.Register(
+        nameof(BookmarkColors), typeof(IReadOnlyDictionary<long, BookmarkColor>), typeof(LogView),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
 
     public static readonly DependencyProperty BookmarkBrushProperty = DependencyProperty.Register(
@@ -37,6 +42,14 @@ public sealed partial class LogView
         set => SetValue(BookmarkNotesProperty, value);
     }
 
+    /// <summary>Colors by 0-based file line; a bookmark that is not in it is drawn with <see cref="BookmarkBrush"/> (Blue).</summary>
+    public IReadOnlyDictionary<long, BookmarkColor>? BookmarkColors
+    {
+        get => (IReadOnlyDictionary<long, BookmarkColor>?)GetValue(BookmarkColorsProperty);
+        set => SetValue(BookmarkColorsProperty, value);
+    }
+
+    /// <summary>The Blue marker, from the theme. A theme switch replaces it, which also repaints the other colors.</summary>
     public Brush BookmarkBrush
     {
         get => (Brush)GetValue(BookmarkBrushProperty);
@@ -140,14 +153,18 @@ public sealed partial class LogView
         var gutter = BookmarkGutterWidth;
         var radius = Math.Max(2, Math.Min(gutter, _lineHeight) * 0.3);
         var center = new Point(gutter / 2 + 2, y + _lineHeight / 2);
+        var brush = BookmarkColors?.GetValueOrDefault(row.LineNumber) is { } color and not BookmarkColor.Blue
+            && TryFindResource(ThemeKeys.BookmarkMarkerFor(color)) is Brush colored
+            ? colored
+            : BookmarkBrush;
         if (BookmarkNotes?.ContainsKey(row.LineNumber) == true)
         {
             // A noted bookmark: a slightly larger square, so it stands out from the plain dots.
             var half = radius * 1.2;
-            dc.DrawRectangle(BookmarkBrush, null, new Rect(center.X - half, center.Y - half, 2 * half, 2 * half));
+            dc.DrawRectangle(brush, null, new Rect(center.X - half, center.Y - half, 2 * half, 2 * half));
             return;
         }
 
-        dc.DrawEllipse(BookmarkBrush, null, center, radius, radius);
+        dc.DrawEllipse(brush, null, center, radius, radius);
     }
 }

@@ -59,7 +59,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public async Task OpenFileAsync(string path) => await await OpenFileCoreAsync(path);
 
     /// <summary>Opens <paramref name="path"/> as <see cref="OpenFileAsync"/> does; completes once its tab is there, with the tab's indexing.</summary>
-    private async Task<Task> OpenFileCoreAsync(string path)
+    internal async Task<Task> OpenFileCoreAsync(string path)
     {
         string fullPath;
         try
@@ -147,6 +147,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             EncodingOverride = package?.Manifest.Encoding,
         };
         tab.Search.HighlightOutsideFilter = HighlightMatchesOutsideFilter;
+        tab.Detail.IncludeHiddenLines = DetailPane.IncludeHiddenLines;
         Tabs.Add(tab);
         return tab;
     }

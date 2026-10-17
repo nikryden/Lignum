@@ -36,4 +36,8 @@ public static class ThemeKeys
 
     /// <summary>The bookmark dot in the viewer margin (ticket 17).</summary>
     public const string BookmarkMarker = "BookmarkMarkerBrush";
+
+    /// <summary>The marker brush for a bookmark color; Blue is <see cref="BookmarkMarker"/>.</summary>
+    public static string BookmarkMarkerFor(Settings.BookmarkColor color) =>
+        color == Settings.BookmarkColor.Blue ? BookmarkMarker : $"BookmarkMarker{color}Brush";
 }

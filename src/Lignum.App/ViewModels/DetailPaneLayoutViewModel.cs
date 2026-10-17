@@ -59,6 +59,13 @@ public sealed partial class DetailPaneLayoutViewModel : ObservableObject
         set => Set(_layout.Height, ClampSize(value, DetailPaneSettings.DefaultHeight), v => _layout.Height = v);
     }
 
+    /// <summary>A multi-line selection also shows the hidden lines between its ends (off: only the selected rows).</summary>
+    public bool IncludeHiddenLines
+    {
+        get => _layout.IncludeHiddenLines;
+        set => Set(_layout.IncludeHiddenLines, value, v => _layout.IncludeHiddenLines = v);
+    }
+
     [RelayCommand]
     private void Toggle() => IsOpen = !IsOpen;
 

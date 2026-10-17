@@ -17,9 +17,27 @@
     </UserControl.InputBindings>
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <!-- A bookmark's color dot in the bookmarks pane; DataContext is a BookmarkItem. -->
+        <Style x:Key="BookmarkColorDot" TargetType="Ellipse">
+            <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Color}" Value="Red">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerRedBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Yellow">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerYellowBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Green">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerGreenBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Purple">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerPurpleBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- Right-click menus (ticket 15). The menu's DataContext is the LogView's (this tab). The text commands take
              the view's selection as parameter (null = the main view's); see LogTabViewModel.ContextMenu.cs.
-             "Toggle bookmark" (ticket 17) toggles the caret line of the view the menu opened on. -->
+             "Toggle bookmark" (ticket 17), the note and the color act on the caret line of the view the menu opened on. -->
         <ContextMenu x:Key="MainViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
             <MenuItem Header="Copy for _AI" Command="{Binding CopyForAiCommand}"
@@ -32,6 +50,23 @@
             <Separator />
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
             <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
+            <MenuItem Header="Bookmark co_lor">
+                <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Red" Tag="Red" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerRedBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Yellow" Tag="Yellow" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerYellowBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Green" Tag="Green" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerGreenBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Purple" Tag="Purple" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPurpleBrush}" /></MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
@@ -51,6 +86,23 @@
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+F2" />
             <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
+            <MenuItem Header="Bookmark co_lor">
+                <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Red" Tag="Red" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerRedBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Yellow" Tag="Yellow" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerYellowBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Green" Tag="Green" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerGreenBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Purple" Tag="Purple" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPurpleBrush}" /></MenuItem.Icon>
+                </MenuItem>
+            </MenuItem>
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
     </UserControl.Resources>
@@ -76,17 +128,21 @@
                             <TextBlock FontWeight="SemiBold" Text="Bookmarks" VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" TextWrapping="Wrap"
-                                   Text="Ctrl+F2 or double-click the margin to add one; right-click for a note." />
+                                   Text="Ctrl+F2 or double-click the margin to add one; right-click for a note or a color." />
                         <ListBox x:Name="BookmarkList" ItemsSource="{Binding Bookmarks.Items}" BorderThickness="0"
                                  Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="0,2">
-                                        <TextBlock FontWeight="SemiBold" Text="{Binding DisplayLine, StringFormat=Line {0:N0}}" />
-                                        <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
-                                    </StackPanel>
+                                    <DockPanel Margin="0,2">
+                                        <Ellipse DockPanel.Dock="Left" Width="10" Height="10" Margin="0,4,8,0"
+                                                 VerticalAlignment="Top" Style="{StaticResource BookmarkColorDot}" />
+                                        <StackPanel>
+                                            <TextBlock FontWeight="SemiBold" Text="{Binding DisplayLine, StringFormat=Line {0:N0}}" />
+                                            <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DockPanel>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -108,6 +164,7 @@
                                         Selection="{Binding Selection}"
                                         Bookmarks="{Binding Bookmarks.Lines}"
                                         BookmarkNotes="{Binding Bookmarks.Notes}"
+                                        BookmarkColors="{Binding Bookmarks.Colors}"
                                         ContextMenu="{StaticResource MainViewMenu}"
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
@@ -147,6 +204,7 @@
                                             Selection="{Binding Search.ResultsSelection}"
                                             Bookmarks="{Binding Bookmarks.Lines}"
                                             BookmarkNotes="{Binding Bookmarks.Notes}"
+                                            BookmarkColors="{Binding Bookmarks.Colors}"
                                             ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"

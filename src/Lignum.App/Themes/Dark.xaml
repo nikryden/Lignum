@@ -28,6 +28,10 @@
     <SolidColorBrush x:Key="FilterExcludeBackgroundBrush" Color="#45201E" />
     <SolidColorBrush x:Key="FilterExcludeBorderBrush" Color="#D0605A" />
 
-    <!-- Bookmark dot in the viewer margin (ticket 17). -->
+    <!-- Bookmark dot in the viewer margin (ticket 17), one brush per bookmark color; the plain one is Blue. -->
     <SolidColorBrush x:Key="BookmarkMarkerBrush" Color="#4FA3FF" />
+    <SolidColorBrush x:Key="BookmarkMarkerRedBrush" Color="#FF6B6B" />
+    <SolidColorBrush x:Key="BookmarkMarkerYellowBrush" Color="#FFD54F" />
+    <SolidColorBrush x:Key="BookmarkMarkerGreenBrush" Color="#5CD65C" />
+    <SolidColorBrush x:Key="BookmarkMarkerPurpleBrush" Color="#B98CFF" />
 </ResourceDictionary>

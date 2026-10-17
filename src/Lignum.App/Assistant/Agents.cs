@@ -29,6 +29,8 @@ public abstract class CliAgent
         "guessing, and never invent log content. Line numbers are 1-based. Search with a precise pattern first, then " +
         "read the lines around what matters. Write regular expressions in .NET syntax and check them with search. You " +
         "may add filter rules, highlight rules and bookmarks and go to lines when that helps; say what you changed. " +
+        "When the user asks for a skill (saved instructions run with /name), write it and save it with save_skill " +
+        "(local next to the log unless they want it for every log); do not ask them to save a file. " +
         "Keep answers short and concrete, and quote line numbers.";
 
     /// <summary>"Claude Code" or "GitHub Copilot CLI".</summary>
