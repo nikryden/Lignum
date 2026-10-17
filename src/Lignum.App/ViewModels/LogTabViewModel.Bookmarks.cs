@@ -1,3 +1,5 @@
+using Lignum.App.Packaging;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
 using Lignum.App.Viewer;
@@ -14,7 +16,10 @@ public sealed partial class LogTabViewModel
 
     /// <summary>This file's bookmarks, loaded on first use.</summary>
     public BookmarksViewModel Bookmarks => _bookmarks ??= new BookmarksViewModel(
-        SettingsStore?.Open<BookmarksFile>(BookmarksFile.RelativePathFor(Path)), Path);
+        Package is { } package
+            // A package keeps its own bookmarks next to the extracted log, apart from the user's own.
+            ? new SettingsStore(package.Folder, Serilog.Log.Logger).Open<BookmarksFile>(LogPackage.BookmarksEntry)
+            : SettingsStore?.Open<BookmarksFile>(BookmarksFile.RelativePathFor(Path)), Path);
 
     /// <summary>
     /// Ctrl+F2 / "Toggle bookmark": the caret line of <paramref name="selection"/> (the results pane passes its
@@ -27,6 +32,17 @@ public sealed partial class LogTabViewModel
     /// <summary>Double-click in the line-number margin (ticket 04): toggles that 0-based file line.</summary>
     [RelayCommand]
     private void ToggleBookmarkAt(long line) => Bookmarks.Toggle(line);
+
+    /// <summary>Whether the bookmarks pane (every bookmark and note in this file) is shown.</summary>
+    [ObservableProperty]
+    private bool _isBookmarksPaneOpen;
+
+    /// <summary>A click in the bookmarks pane: moves the caret to that bookmark's line.</summary>
+    [RelayCommand]
+    private void GoToBookmark(BookmarkItem? item)
+    {
+        if (item is not null) Navigation.GoToLine(item.Line);
+    }
 
     /// <summary>F2: the next bookmark after the caret, wrapping to the first.</summary>
     [RelayCommand]

@@ -25,6 +25,8 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         base.OnStartup(e);
+        // Remove .lm packages extracted by a session that crashed (ticket 06).
+        _ = Task.Run(() => Packaging.LogPackage.DeleteStaleFolders(Packaging.LogPackage.DefaultFolder, TimeSpan.FromDays(1)));
 
         // Settings (ticket 13). Later features share this one store and this one settings.json file.
         var commandLine = CommandLine.Parse(e.Args);

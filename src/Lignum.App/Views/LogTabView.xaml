@@ -29,6 +29,7 @@
             <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}" />
             <Separator />
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
+            <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
@@ -45,6 +46,7 @@
             <Separator />
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+F2" />
+            <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
         </ContextMenu>
     </UserControl.Resources>
@@ -58,6 +60,30 @@
             PaneWidth="{Binding DataContext.DetailPane.PaneWidth, RelativeSource={RelativeSource AncestorType=Window}}"
             PaneHeight="{Binding DataContext.DetailPane.PaneHeight, RelativeSource={RelativeSource AncestorType=Window}}">
             <views:DetailPaneLayout.Main>
+                <DockPanel>
+                <!-- The bookmarks pane (ticket 06): every bookmark and note in this file; a click jumps to it. -->
+                <Border DockPanel.Dock="Right" Width="260" BorderThickness="1,0,0,0"
+                        Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
+                        Visibility="{Binding IsBookmarksPaneOpen, Converter={StaticResource BoolToVisibility}}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Margin="8,6" FontWeight="SemiBold" Text="Bookmarks" />
+                        <TextBlock DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" TextWrapping="Wrap"
+                                   Text="Ctrl+F2 or double-click the margin to add one; right-click for a note." />
+                        <ListBox x:Name="BookmarkList" ItemsSource="{Binding Bookmarks.Items}" BorderThickness="0"
+                                 Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,2">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding DisplayLine, StringFormat=Line {0:N0}}" />
+                                        <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Border>
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -74,6 +100,7 @@
                         <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
                                         Bookmarks="{Binding Bookmarks.Lines}"
+                                        BookmarkNotes="{Binding Bookmarks.Notes}"
                                         ContextMenu="{StaticResource MainViewMenu}"
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
@@ -112,6 +139,7 @@
                                             Highlight="{Binding Search.Highlight}"
                                             Selection="{Binding Search.ResultsSelection}"
                                             Bookmarks="{Binding Bookmarks.Lines}"
+                                            BookmarkNotes="{Binding Bookmarks.Notes}"
                                             ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"
@@ -132,6 +160,7 @@
                         </ScrollViewer>
                     </DockPanel>
                 </Grid>
+                </DockPanel>
             </views:DetailPaneLayout.Main>
             <views:DetailPaneLayout.Pane>
                 <views:DetailPane DataContext="{Binding Detail}" />

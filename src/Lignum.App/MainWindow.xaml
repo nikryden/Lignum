@@ -56,6 +56,8 @@
                         </Style>
                     </MenuItem.ItemContainerStyle>
                 </MenuItem>
+                <MenuItem Header="_Export with notes…" Click="OnExportClick" />
+                <MenuItem Header="Export with notes, _uncompressed (huge logs)…" Click="OnExportUncompressedClick" />
                 <MenuItem Header="_Close tab" Command="{Binding CloseTabCommand}" InputGestureText="Ctrl+W" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
@@ -73,6 +75,8 @@
                 <MenuItem Header="Toggle _bookmark" Command="{Binding SelectedTab.ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
                 <MenuItem Header="_Next bookmark" Command="{Binding SelectedTab.NextBookmarkCommand}" InputGestureText="F2" />
                 <MenuItem Header="_Previous bookmark" Command="{Binding SelectedTab.PreviousBookmarkCommand}" InputGestureText="Shift+F2" />
+                <MenuItem Header="Bookmarks _pane" IsCheckable="True"
+                          IsChecked="{Binding SelectedTab.IsBookmarksPaneOpen, Mode=TwoWay, FallbackValue=False}" />
             </MenuItem>
             <MenuItem Header="_Search">
                 <MenuItem Header="_Find…" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" InputGestureText="Ctrl+F" />
@@ -214,6 +218,14 @@
                     <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
                             Command="{Binding SelectedTab.CancelCopyCommand}"
                             Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+                </StackPanel>
+            </StatusBarItem>
+            <!-- .lm packages (ticket 06): export / extract progress and cancel. -->
+            <StatusBarItem>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding PackageStatus}" VerticalAlignment="Center" />
+                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0" Command="{Binding CancelPackageWorkCommand}"
+                            Visibility="{Binding IsPackageWorkRunning, Converter={StaticResource BoolToVisibility}}" />
                 </StackPanel>
             </StatusBarItem>
             <Separator />

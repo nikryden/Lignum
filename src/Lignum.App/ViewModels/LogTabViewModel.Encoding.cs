@@ -25,7 +25,7 @@ public sealed partial class LogTabViewModel
     private bool _isEncodingOverridden;
 
     /// <summary>The encoding chosen by the user for this tab, or null to detect it.</summary>
-    public LogEncoding? EncodingOverride { get; private set; }
+    public LogEncoding? EncodingOverride { get; internal set; }
 
     /// <summary>The encoding for the status bar, e.g. "UTF-8 BOM"; empty until it is known.</summary>
     public string EncodingText => Encoding?.DisplayName(HasByteOrderMark) ?? "";

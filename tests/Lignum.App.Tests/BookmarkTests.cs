@@ -57,6 +57,76 @@ public sealed class BookmarkTests : IDisposable
         Assert.Empty(tab.Bookmarks.Lines);
     }
 
+    [Fact]
+    public async Task A_note_is_saved_with_its_bookmark_and_restored_on_reopen()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 12);
+        tab.Bookmarks.SetNote(12, "  look here  ");
+
+        var reopened = await Open(Start(), a);
+
+        Assert.Equal("look here", reopened.Bookmarks.NoteFor(12));
+        Assert.Equal([new BookmarkItem(12, "look here")], reopened.Bookmarks.Items);
+    }
+
+    [Fact]
+    public async Task A_note_on_an_unbookmarked_line_bookmarks_it()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+
+        tab.Bookmarks.SetNote(7, "start of the run");
+
+        Assert.Equal([7L], tab.Bookmarks.Lines);
+        Assert.Equal("start of the run", tab.Bookmarks.NoteFor(7));
+    }
+
+    [Fact]
+    public async Task Clearing_a_note_keeps_the_bookmark_and_removing_the_bookmark_removes_its_note()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        tab.Bookmarks.SetNote(3, "first");
+        tab.Bookmarks.SetNote(9, "second");
+
+        tab.Bookmarks.SetNote(3, "   ");
+        tab.Bookmarks.Toggle(9);
+
+        var reopened = await Open(Start(), a);
+        Assert.Equal([3L], reopened.Bookmarks.Lines);
+        Assert.Empty(reopened.Bookmarks.Notes);
+        tab.Bookmarks.Toggle(9);
+        Assert.Null(tab.Bookmarks.NoteFor(9)); // re-adding the bookmark does not bring the note back
+    }
+
+    [Fact]
+    public async Task A_bookmarks_file_without_notes_loads_unchanged()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 12);
+        SettingsStore.Flush();
+        var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
+        Assert.DoesNotContain("note", File.ReadAllText(file));
+
+        var reopened = await Open(Start(), a);
+
+        Assert.Equal([12L], reopened.Bookmarks.Lines);
+        Assert.Empty(reopened.Bookmarks.Notes);
+    }
+
+    [Fact]
+    public async Task Clicking_a_row_in_the_bookmarks_pane_moves_the_caret_to_its_line()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Bookmarks.SetNote(20, "here");
+
+        tab.GoToBookmarkCommand.Execute(tab.Bookmarks.Items[0]);
+
+        Assert.Equal(20, tab.Navigation.Caret.Line);
+    }
+
     private static void ToggleAt(LogTabViewModel tab, long line)
     {
         tab.Navigation.Caret = new FilePosition(line, 3);

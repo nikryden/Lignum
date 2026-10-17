@@ -14,7 +14,7 @@ public sealed partial class MainViewModel
         {
             Tabs = [.. Tabs.Select(tab => new SessionTab
             {
-                Path = tab.Path,
+                Path = tab.SourcePath,
                 FirstLine = tab.ScrollLine,
                 FilterRules = [.. tab.Search.GetFilterRules()],
             })],
@@ -59,21 +59,20 @@ public sealed partial class MainViewModel
                 continue;
             }
 
-            var document = File.Exists(fullPath) ? await OpenDocumentAsync(fullPath, entry.Path) : null;
-            if (document is null)
+            var added = File.Exists(fullPath) ? await AddTabAsync(fullPath, entry.Path) : null;
+            if (added is null)
             {
                 skipped.Add(entry.Path);
                 continue;
             }
 
-            if (FindTab(fullPath) is { } opened) // opened from the command line meanwhile
+            if (!added.Value.IsNew) // opened from the command line meanwhile
             {
-                document.Dispose();
-                if (i == session.SelectedIndex) selected = opened;
+                if (i == session.SelectedIndex) selected = added.Value.Tab;
                 continue;
             }
 
-            var tab = AddTab(document);
+            var tab = added.Value.Tab;
 
             tab.RestoreScroll(entry.FirstLine);
             if (entry.FilterRules is { Count: > 0 } rules) tab.Search.SetFilterRules(rules);
