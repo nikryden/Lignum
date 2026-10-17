@@ -12,7 +12,8 @@ public sealed class HighlightingViewModelTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private HighlightingViewModel Create(AppTheme theme = AppTheme.Light) => UiContext.None(() =>

@@ -17,7 +17,8 @@ public sealed class AgentChatTests : IDisposable
     public void Dispose()
     {
         foreach (var owned in _owned) owned.Dispose();
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private string Folder(string name) => Path.Combine(_dir, name);
@@ -109,6 +110,43 @@ public sealed class AgentChatTests : IDisposable
         Assert.Contains("--resume", calls[1]);
         Assert.Contains("And warnings?", File.ReadAllText(Path.Combine(_dir, "stdin.txt")));
         Assert.False(main.Assistant.IsBusy);
+    }
+
+    [Theory]
+    [InlineData(0, "irm https://claude.ai/install.ps1 | iex")]
+    [InlineData(1, "winget install GitHub.Copilot")]
+    public void Install_runs_the_official_installer_in_a_visible_PowerShell_window(int agent, string command)
+    {
+        var main = Start();
+        var started = new List<System.Diagnostics.ProcessStartInfo>();
+        main.Assistant.StartProcess = started.Add;
+        main.Assistant.SelectedAgent = agent;
+
+        main.Assistant.InstallAgentCommand.Execute(null);
+
+        var start = Assert.Single(started);
+        Assert.Equal("powershell.exe", start.FileName);
+        Assert.True(start.UseShellExecute); // its own window, so the user sees what runs
+        Assert.Contains("-NoExit", start.ArgumentList);
+        Assert.Contains(command, start.ArgumentList.Last());
+    }
+
+    [Fact]
+    public void Sign_in_opens_the_installed_agent_in_a_terminal()
+    {
+        var exe = FakeClaude();
+        var main = Start();
+        var started = new List<System.Diagnostics.ProcessStartInfo>();
+        main.Assistant.StartProcess = started.Add;
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+
+        Assert.True(main.Assistant.IsAgentInstalled);
+        Assert.StartsWith("Claude Code is installed", main.Assistant.AgentStatus);
+        main.Assistant.SignInAgentCommand.Execute(null);
+
+        Assert.Equal(exe, Assert.Single(started).FileName);
+        Assert.Contains(main.Assistant.Entries, e => e.Text.StartsWith("Claude Code opens in a terminal"));
     }
 
     [Fact]

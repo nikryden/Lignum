@@ -1,3 +1,4 @@
+using Lignum.App.Settings;
 using Lignum.App.Viewer;
 using Lignum.Core;
 
@@ -13,7 +14,8 @@ public class LineSourceTests : IDisposable
     public void Dispose()
     {
         foreach (var doc in _documents) doc.Dispose();
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private async Task<LogDocument> OpenIndexed(string content)

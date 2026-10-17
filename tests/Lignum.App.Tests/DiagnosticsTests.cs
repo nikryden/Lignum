@@ -1,3 +1,4 @@
+using Lignum.App.Settings;
 using Lignum.App.Diagnostics;
 
 namespace Lignum.App.Tests;
@@ -8,7 +9,8 @@ public sealed class DiagnosticsTests : IDisposable
 
     public void Dispose()
     {
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     [Fact]
