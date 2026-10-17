@@ -1,6 +1,6 @@
 <!--
-    The built-in assistant (ticket 05). DataContext is the AssistantViewModel. While it is off, the panel says
-    what would be sent to Anthropic and asks for an API key; once on, it shows the conversation.
+    AI access (ticket 05). DataContext is the AssistantViewModel. While off, the panel says what turning it on
+    allows and how to connect an AI tool; once on, it lists every call AI tools make.
 -->
 <UserControl x:Class="Lignum.App.Views.AssistantPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -22,72 +22,50 @@
         <DockPanel DockPanel.Dock="Top" Margin="8,6">
             <Button DockPanel.Dock="Right" Content="✕" ToolTip="Close (Ctrl+Shift+A)" Padding="6,0"
                     Command="{Binding TogglePanelCommand}" />
-            <Button DockPanel.Dock="Right" Content="New conversation" Padding="6,0" Margin="0,0,4,0"
-                    Command="{Binding ClearCommand}" Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}" />
-            <TextBlock Text="Assistant" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <TextBlock Text="AI access" FontWeight="SemiBold" VerticalAlignment="Center" />
         </DockPanel>
 
-        <!-- Off: what turning it on means, the API key and the model. -->
-        <ScrollViewer DockPanel.Dock="Top" Style="{StaticResource ShownWhenOff}" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="8">
-                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                           Text="The assistant uses Claude, by Anthropic, to help with your logs: find patterns, write regular expressions, explain errors, and add filters, highlights and bookmarks for you." />
-                <TextBlock TextWrapping="Wrap" Margin="0,0,0,8" FontWeight="SemiBold"
-                           Text="When it is on, what you type and the log lines it reads are sent to Anthropic's API and billed to your API key. Logs can contain sensitive data. Nothing is sent while it is off." />
-                <TextBlock Text="Anthropic API key" Margin="0,4,0,2" />
-                <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="Save key" Padding="6,0" Margin="4,0,0,0" Click="OnSaveKeyClick" />
-                    <PasswordBox x:Name="KeyBox" />
-                </DockPanel>
-                <TextBlock Margin="0,2,0,0" Opacity="0.7" TextWrapping="Wrap"
-                           Text="Stored encrypted for your Windows user. Without one, ANTHROPIC_API_KEY is used." />
-                <TextBlock Margin="0,2,0,0" Foreground="{DynamicResource ErrorForegroundBrush}" Text="No API key yet."
-                           Visibility="{Binding HasApiKey, Converter={StaticResource InverseBoolToVisibility}}" />
-                <TextBlock Text="Model" Margin="0,8,0,2" />
-                <TextBox Text="{Binding Model, UpdateSourceTrigger=LostFocus}" />
-                <Button Content="Turn on the assistant" Padding="8,2" Margin="0,12,0,0" HorizontalAlignment="Left"
-                        Command="{Binding TurnOnCommand}" />
+        <!-- How to connect an AI tool: shown both when off and on. -->
+        <Expander DockPanel.Dock="Bottom" Header="Connect an AI tool" Margin="8" IsExpanded="False">
+            <StackPanel Margin="0,4,0,0">
+                <TextBlock TextWrapping="Wrap" Margin="0,0,0,6"
+                           Text="Add Lignum as an MCP server in your AI tool once. Copy the setting for your tool and paste it where the tool keeps its MCP servers:" />
+                <Button Content="Copy for VS Code / GitHub Copilot (mcp.json)" Margin="0,2" HorizontalContentAlignment="Left"
+                        Padding="6,1" Tag="vscode" Click="OnCopySetupClick" />
+                <Button Content="Copy for Claude Desktop / Cursor" Margin="0,2" HorizontalContentAlignment="Left"
+                        Padding="6,1" Tag="claude-desktop" Click="OnCopySetupClick" />
+                <Button Content="Copy Claude Code command" Margin="0,2" HorizontalContentAlignment="Left"
+                        Padding="6,1" Tag="claude-code" Click="OnCopySetupClick" />
+                <TextBlock x:Name="CopiedText" Margin="0,4,0,0" Opacity="0.7" />
+                <TextBlock Margin="0,4,0,0" Opacity="0.7" TextWrapping="Wrap" Text="{Binding ExePath, StringFormat=Lignum: {0}}" />
             </StackPanel>
-        </ScrollViewer>
+        </Expander>
 
-        <!-- On: the input at the bottom, the conversation above it. -->
-        <DockPanel DockPanel.Dock="Bottom" Margin="8" Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
-            <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
-                <Button DockPanel.Dock="Right" Content="Send" Padding="10,1" Command="{Binding SendCommand}" />
-                <Button DockPanel.Dock="Right" Content="Stop" Padding="10,1" Margin="0,0,4,0" Command="{Binding StopCommand}" />
-                <Button DockPanel.Dock="Left" Content="Turn off" Padding="6,1" Command="{Binding TurnOffCommand}"
-                        ToolTip="Stop sending anything to Anthropic" />
-                <TextBlock />
-            </DockPanel>
-            <TextBox x:Name="InputBox" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True"
-                     TextWrapping="Wrap" MinHeight="48" MaxHeight="160" VerticalScrollBarVisibility="Auto"
-                     ToolTip="Enter sends; Shift+Enter starts a new line" PreviewKeyDown="OnInputKeyDown" />
+        <!-- Off: what turning it on means. -->
+        <StackPanel DockPanel.Dock="Top" Margin="8" Style="{StaticResource ShownWhenOff}">
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                       Text="Let AI tools you already use (GitHub Copilot, Claude, Cursor and others) work with your open logs: search them, read lines, and add filters, highlights and bookmarks for you. No API key is needed: the AI runs in your tool, on your own subscription." />
+            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8" FontWeight="SemiBold"
+                       Text="When it is on, the lines an AI tool reads are sent to that tool's AI service. Logs can contain sensitive data. Nothing is shared while it is off." />
+            <Button Content="Turn on AI access" Padding="8,2" HorizontalAlignment="Left" Command="{Binding TurnOnCommand}" />
+        </StackPanel>
+
+        <!-- On: what AI tools did. -->
+        <DockPanel DockPanel.Dock="Top" Margin="8,0,8,4" Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
+            <Button DockPanel.Dock="Right" Content="Turn off" Padding="6,0" Command="{Binding TurnOffCommand}"
+                    ToolTip="Stop AI tools from using Lignum" />
+            <Button DockPanel.Dock="Right" Content="Clear" Padding="6,0" Margin="0,0,4,0" Command="{Binding ClearCommand}" />
+            <TextBlock Text="On: what AI tools did" VerticalAlignment="Center" Opacity="0.8" />
         </DockPanel>
         <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" ScrollChanged="OnScrollChanged"
                       Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
             <ItemsControl ItemsSource="{Binding Entries}" Margin="8,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Margin="0,4">
-                            <TextBlock x:Name="Who" FontWeight="SemiBold" Visibility="Collapsed" />
-                            <!-- A read-only text box, so answers can be selected and copied. -->
-                            <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
-                                     BorderThickness="0" Background="Transparent" Padding="0"
-                                     Foreground="{DynamicResource WindowForegroundBrush}" />
-                        </StackPanel>
+                        <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
+                                 BorderThickness="0" Background="Transparent" Padding="0" Margin="0,1"
+                                 Foreground="{DynamicResource WindowForegroundBrush}" />
                         <DataTemplate.Triggers>
-                            <DataTrigger Binding="{Binding Kind}" Value="User">
-                                <Setter TargetName="Who" Property="Text" Value="You" />
-                                <Setter TargetName="Who" Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Kind}" Value="Assistant">
-                                <Setter TargetName="Who" Property="Text" Value="Claude" />
-                                <Setter TargetName="Who" Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Kind}" Value="Activity">
-                                <Setter TargetName="Body" Property="Opacity" Value="0.65" />
-                                <Setter TargetName="Body" Property="FontStyle" Value="Italic" />
-                            </DataTrigger>
                             <DataTrigger Binding="{Binding Kind}" Value="Error">
                                 <Setter TargetName="Body" Property="Foreground" Value="{DynamicResource ErrorForegroundBrush}" />
                             </DataTrigger>

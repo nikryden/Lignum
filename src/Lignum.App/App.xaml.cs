@@ -18,6 +18,19 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (CommandLine.Parse(e.Args) is { IsMcp: true } mcp)
+        {
+            // An AI tool started us as its MCP server: no window, just relay to the running Lignum.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var pipe = SingleInstance.AiPipeNameFor(mcp.SettingsDirectory ?? SettingsStore.DefaultDirectory);
+            _ = Task.Run(async () =>
+            {
+                try { await Assistant.McpHost.RunAsync(pipe); }
+                finally { Dispatcher.Invoke(Shutdown); }
+            });
+            return;
+        }
+
         _log = DiagnosticLog.Start(DiagnosticLog.DefaultDirectory);
         _crashHandler = new CrashHandler(_log.Logger, new ClipboardCrashReporter());
 
@@ -64,6 +77,11 @@ public partial class App : Application
         var viewModel = new MainViewModel(_settings) { Highlighting = highlighting, DiagnosticsLog = _log.Logger };
         MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
         MainWindow.Show();
+        var settingsDirectory = commandLine.SettingsDirectory ?? SettingsStore.DefaultDirectory;
+        viewModel.Assistant.McpArguments = commandLine.SettingsDirectory is { } custom
+            ? ["--settings-dir", Path.GetFullPath(custom), "--mcp"]
+            : ["--mcp"];
+        viewModel.Assistant.PipeName = SingleInstance.AiPipeNameFor(settingsDirectory);
         var mainWindow = MainWindow;
         _instance?.Listen(message => mainWindow.Dispatcher.BeginInvoke(() =>
         {

@@ -30,6 +30,9 @@ internal sealed class SingleInstance : IDisposable
         return "Lignum-" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..24];
     }
 
+    /// <summary>The pipe the running Lignum serves AI access on (ticket 05); <c>Lignum.exe --mcp</c> connects to it.</summary>
+    public static string AiPipeNameFor(string settingsDirectory) => NameFor(settingsDirectory) + "-ai";
+
     /// <summary>Becomes the running instance for <paramref name="name"/>; null when another one already is.</summary>
     public static SingleInstance? TryAcquire(string name)
     {

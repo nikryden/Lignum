@@ -1,10 +1,5 @@
 using System.Collections.ObjectModel;
-using System.Net.Http;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
-using Anthropic.Exceptions;
-using Anthropic.Models.Beta.Messages;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
@@ -12,17 +7,17 @@ using Serilog;
 
 namespace Lignum.App.Assistant;
 
-/// <summary>What a line of the conversation is.</summary>
+/// <summary>What a line of the AI panel is.</summary>
 public enum ChatEntryKind
 {
     User,
     Assistant,
-    /// <summary>What the assistant did: a tool call, or lines it read (so the user sees what was sent).</summary>
+    /// <summary>What an agent did: a tool call, or lines it read (so the user sees what was shared).</summary>
     Activity,
     Error,
 }
 
-/// <summary>One line of the conversation; assistant text grows while it streams.</summary>
+/// <summary>One line of the AI panel.</summary>
 public sealed partial class ChatEntry(ChatEntryKind kind, string text) : ObservableObject
 {
     public ChatEntryKind Kind => kind;
@@ -32,62 +27,39 @@ public sealed partial class ChatEntry(ChatEntryKind kind, string text) : Observa
 }
 
 /// <summary>
-/// The built-in assistant (ticket 05): a conversation with Claude, which can look at the open logs and add
-/// filter rules, highlight rules and bookmarks through <see cref="AssistantTools"/>. Off until the user turns
-/// it on; then the lines its tools read are sent to Anthropic's API with the user's own API key. Every tool
-/// call is shown in the conversation and written to the diagnostics log.
+/// AI access (ticket 05): AI tools on this PC (GitHub Copilot, Claude Desktop, Claude Code, Cursor...) use
+/// Lignum's tools through <c>Lignum.exe --mcp</c>, which relays to this running window over a named pipe. Off
+/// until the user turns it on; while on, every call is listed in the panel and written to the diagnostics log.
+/// The AI runs in the user's own tool, on their own subscription: Lignum holds no API key.
 /// </summary>
 public sealed partial class AssistantViewModel : ObservableObject
 {
-    public const string DefaultModel = "claude-opus-5-5";
-    private const int MaxToolRounds = 20;
-
-    private const string SystemPrompt = """
-        You are the assistant built into Lignum, a read-only Windows viewer for very large log files. The user is
-        looking at log files in Lignum; use the tools to look at them instead of guessing, and never invent log content.
-        Line numbers are 1-based, as Lignum shows them.
-        Read only what you need: search with a precise pattern first, then read_lines around the lines that matter.
-        When you write a regular expression, use .NET syntax and check it with search before you suggest or apply it.
-        You may add filter rules, highlight rules and bookmarks, and move to a line, when that helps; say what you changed.
-        Keep answers short and concrete, and quote line numbers.
-        """;
+    private const int MaxEntries = 500;
 
     private readonly SettingsFile<AppSettings> _settings;
     private readonly AssistantTools _tools;
-    private readonly Func<string?, IClaudeChat> _chatFactory;
+    private readonly SynchronizationContext? _uiContext;
     private readonly ILogger _log;
-    private readonly List<BetaMessageParam> _history = [];
-    private CancellationTokenSource? _cancel;
+    private AiAccessServer? _server;
+    private string? _pipeName;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    private string _input = "";
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand))]
-    private bool _isBusy;
-
-    /// <summary>Whether the side panel is shown (View > Assistant, Ctrl+Shift+A).</summary>
+    /// <summary>Whether the side panel is shown (View > AI access, Ctrl+Shift+A).</summary>
     [ObservableProperty]
     private bool _isPanelOpen;
 
-    internal AssistantViewModel(SettingsFile<AppSettings> settings, AssistantTools tools,
-                                Func<string?, IClaudeChat> chatFactory, ILogger log)
+    internal AssistantViewModel(SettingsFile<AppSettings> settings, AssistantTools tools, SynchronizationContext? uiContext,
+                                ILogger log)
     {
         _settings = settings;
         _tools = tools;
-        _chatFactory = chatFactory;
+        _uiContext = uiContext;
         _log = log;
-        _tools.LinesRead += (file, lines) =>
-            Entries.Add(new ChatEntry(ChatEntryKind.Activity, $"Claude read {lines:N0} line{(lines == 1 ? "" : "s")} from {file}"));
+        _tools.LinesRead += (file, lines) => Add(ChatEntryKind.Activity, $"Read {lines:N0} line{(lines == 1 ? "" : "s")} from {file}");
     }
 
     public ObservableCollection<ChatEntry> Entries { get; } = [];
 
-    /// <summary>Raised after each tool call (tests).</summary>
-    internal event Action<ToolCall, ToolOutcome>? ToolRan;
-
-    /// <summary>Off by default: nothing is sent anywhere until the user turns the assistant on.</summary>
+    /// <summary>Off by default: no AI tool can use Lignum until the user turns this on.</summary>
     public bool IsEnabled
     {
         get => _settings.Value.Assistant.Enabled;
@@ -97,185 +69,98 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Value.Assistant.Enabled = value;
             _settings.Save();
             OnPropertyChanged();
-            SendCommand.NotifyCanExecuteChanged();
+            UpdateServer();
+            Add(ChatEntryKind.Activity, value ? "AI access is on." : "AI access is off.");
         }
     }
 
-    /// <summary>The Claude model, e.g. claude-opus-5-5.</summary>
-    public string Model
+    /// <summary>The pipe to serve on (set by the app once the window is up); null serves nothing.</summary>
+    internal string? PipeName
     {
-        get => _settings.Value.Assistant.Model is { Length: > 0 } model ? model : DefaultModel;
+        get => _pipeName;
         set
         {
-            _settings.Value.Assistant.Model = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-            _settings.Save();
-            OnPropertyChanged();
+            _pipeName = value;
+            UpdateServer();
         }
     }
 
-    /// <summary>A key is saved, or ANTHROPIC_API_KEY is set.</summary>
-    public bool HasApiKey =>
-        _settings.Value.Assistant.ProtectedApiKey is not null
-        || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY"));
+    /// <summary>The arguments an AI tool passes to Lignum.exe (with --settings-dir when this run uses one).</summary>
+    internal IReadOnlyList<string> McpArguments { get; set; } = ["--mcp"];
 
-    /// <summary>Saves the API key encrypted for this Windows user (DPAPI); null or empty removes it.</summary>
-    public void SetApiKey(string? key)
+    /// <summary>The Lignum.exe an AI tool starts.</summary>
+    public string ExePath { get; } = Environment.ProcessPath ?? "Lignum.exe";
+
+    /// <summary>The MCP setting to paste into an AI tool: "vscode", "claude-desktop" (also Cursor) or "claude-code".</summary>
+    public string SetupSnippet(string tool)
     {
-        _settings.Value.Assistant.ProtectedApiKey = string.IsNullOrWhiteSpace(key)
-            ? null
-            : Convert.ToBase64String(ProtectedData.Protect(Encoding.UTF8.GetBytes(key.Trim()), null,
-                DataProtectionScope.CurrentUser));
-        _settings.Save();
-        OnPropertyChanged(nameof(HasApiKey));
+        var args = JsonSerializer.Serialize(McpArguments);
+        var command = JsonSerializer.Serialize(ExePath);
+        return tool switch
+        {
+            "vscode" => $$"""{ "servers": { "lignum": { "type": "stdio", "command": {{command}}, "args": {{args}} } } }""",
+            "claude-code" => $"claude mcp add lignum -- \"{ExePath}\" {string.Join(' ', McpArguments.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))}",
+            _ => $$"""{ "mcpServers": { "lignum": { "command": {{command}}, "args": {{args}} } } }""",
+        };
     }
-
-    /// <summary>The saved key, decrypted; null to let the SDK use ANTHROPIC_API_KEY.</summary>
-    internal string? ApiKey()
-    {
-        if (_settings.Value.Assistant.ProtectedApiKey is not { } stored) return null;
-        try
-        {
-            return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(stored), null,
-                DataProtectionScope.CurrentUser));
-        }
-        catch (Exception ex) when (ex is CryptographicException or FormatException)
-        {
-            return null; // saved by another Windows user or damaged: fall back to the environment
-        }
-    }
-
-    private bool CanSend() => IsEnabled && !IsBusy && !string.IsNullOrWhiteSpace(Input);
-
-    /// <summary>Sends <see cref="Input"/> and runs Claude's tool calls until it answers; completes when done.</summary>
-    [RelayCommand(CanExecute = nameof(CanSend))]
-    private async Task Send()
-    {
-        var question = Input.Trim();
-        Input = "";
-        Entries.Add(new ChatEntry(ChatEntryKind.User, question));
-        var historyBefore = _history.Count;
-        _history.Add(new BetaMessageParam { Role = Role.User, Content = question });
-        _cancel = new CancellationTokenSource();
-        var token = _cancel.Token;
-        IsBusy = true;
-        try
-        {
-            var chat = _chatFactory(ApiKey());
-            for (var round = 0; round < MaxToolRounds; round++)
-            {
-                var entry = new ChatEntry(ChatEntryKind.Assistant, "");
-                Entries.Add(entry);
-                var reply = await chat.SendAsync(BuildRequest(), text => entry.Text += text, token);
-                if (entry.Text.Length == 0) entry.Text = reply.Text;
-                if (entry.Text.Length == 0) Entries.Remove(entry);
-                _history.Add(new BetaMessageParam { Role = Role.Assistant, Content = reply.Echo });
-
-                if (reply.StopReason == "refusal")
-                {
-                    AddError("Claude declined to answer this.");
-                    break;
-                }
-
-                if (reply.StopReason == "max_tokens")
-                {
-                    AddError("The answer was cut off (too long).");
-                    if (reply.ToolCalls.Count > 0) RollBack(historyBefore); // half-written tool calls can't be answered
-                    break;
-                }
-
-                if (reply.StopReason != "tool_use" || reply.ToolCalls.Count == 0) break;
-
-                var results = new List<BetaContentBlockParam>();
-                foreach (var call in reply.ToolCalls)
-                {
-                    Entries.Add(new ChatEntry(ChatEntryKind.Activity, Describe(call)));
-                    _log.Information("Assistant tool call {Tool} {Input}", call.Name, JsonSerializer.Serialize(call.Input));
-                    var outcome = await _tools.RunAsync(call, token);
-                    ToolRan?.Invoke(call, outcome);
-                    if (outcome.IsError) Entries.Add(new ChatEntry(ChatEntryKind.Activity, $"  failed: {outcome.Content}"));
-                    results.Add(new BetaToolResultBlockParam
-                    {
-                        ToolUseID = call.Id,
-                        Content = outcome.Content,
-                        IsError = outcome.IsError,
-                    });
-                }
-
-                _history.Add(new BetaMessageParam { Role = Role.User, Content = results }); // all results in one message
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            RollBack(historyBefore);
-            Entries.Add(new ChatEntry(ChatEntryKind.Activity, "Stopped. That question is not kept in the conversation."));
-        }
-        catch (AnthropicRateLimitException)
-        {
-            RollBack(historyBefore);
-            AddError("Claude is rate limited right now; try again in a minute.");
-        }
-        catch (AnthropicApiException ex)
-        {
-            RollBack(historyBefore);
-            AddError($"Claude API error: {ex.Message}");
-        }
-        catch (HttpRequestException ex)
-        {
-            RollBack(historyBefore);
-            AddError($"Could not reach Claude: {ex.Message}");
-        }
-        finally
-        {
-            IsBusy = false;
-            _cancel.Dispose();
-            _cancel = null;
-        }
-    }
-
-    [RelayCommand(CanExecute = nameof(IsBusy))]
-    private void Stop() => _cancel?.Cancel();
 
     [RelayCommand]
     private void TogglePanel() => IsPanelOpen = !IsPanelOpen;
 
-    /// <summary>The panel's button, after it has said what gets sent.</summary>
     [RelayCommand]
     private void TurnOn() => IsEnabled = true;
 
-    /// <summary>Stops anything running and sends nothing more.</summary>
     [RelayCommand]
-    private void TurnOff()
-    {
-        _cancel?.Cancel();
-        IsEnabled = false;
-    }
+    private void TurnOff() => IsEnabled = false;
 
-    /// <summary>Starts a new conversation.</summary>
     [RelayCommand]
-    private void Clear()
+    private void Clear() => Entries.Clear();
+
+    /// <summary>Runs one tool call from an AI agent on the UI thread, listing it in the panel.</summary>
+    internal Task<ToolOutcome> HandleToolCallAsync(ToolCall call, CancellationToken cancellationToken)
     {
-        _cancel?.Cancel();
-        _history.Clear();
-        Entries.Clear();
+        if (_uiContext is null) return RunToolAsync(call, cancellationToken);
+        var done = new TaskCompletionSource<ToolOutcome>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _uiContext.Post(async _ =>
+        {
+            try
+            {
+                done.SetResult(await RunToolAsync(call, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                done.SetException(ex);
+            }
+        }, null);
+        return done.Task;
     }
 
-    private MessageCreateParams BuildRequest() => new()
+    private async Task<ToolOutcome> RunToolAsync(ToolCall call, CancellationToken cancellationToken)
     {
-        Model = Model,
-        MaxTokens = 32000,
-        System = SystemPrompt,
-        Tools = [.. AssistantTools.Definitions],
-        Messages = [.. _history],
-        CacheControl = new BetaCacheControlEphemeral(), // the system prompt, tools and history are reused every round
-    };
-
-    /// <summary>Drops a failed or stopped exchange, so the history stays a valid, append-only conversation.</summary>
-    private void RollBack(int count)
-    {
-        if (_history.Count > count) _history.RemoveRange(count, _history.Count - count);
+        if (!IsEnabled) return new ToolOutcome(AiPipeClient.NotAvailableMessage, IsError: true);
+        Add(ChatEntryKind.Activity, Describe(call));
+        _log.Information("AI tool call {Tool} {Input}", call.Name, JsonSerializer.Serialize(call.Input));
+        var outcome = await _tools.RunAsync(call, cancellationToken);
+        if (outcome.IsError) Add(ChatEntryKind.Error, $"  failed: {outcome.Content}");
+        return outcome;
     }
 
-    private void AddError(string message) => Entries.Add(new ChatEntry(ChatEntryKind.Error, message));
+    private void UpdateServer()
+    {
+        var serve = IsEnabled && _pipeName is not null;
+        if (serve && _server is null) _server = new AiAccessServer(_pipeName!, HandleToolCallAsync);
+        else if (!serve && _server is not null)
+        {
+            _server.Dispose();
+            _server = null;
+        }
+    }
+
+    private void Add(ChatEntryKind kind, string text)
+    {
+        Entries.Add(new ChatEntry(kind, text));
+        if (Entries.Count > MaxEntries) Entries.RemoveAt(0);
+    }
 
     private static string Describe(ToolCall call) => call.Name switch
     {
