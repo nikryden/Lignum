@@ -17,6 +17,7 @@ internal sealed class FileChangeWatcher : IDisposable
     private readonly Lock _gate = new();
     private readonly FileIdentity? _identity;
     private long _knownLength;
+    private DateTime _knownWriteTime;
     private FileSystemWatcher? _fsw;
     private Timer? _poll;
     private bool _stopped;
@@ -28,6 +29,7 @@ internal sealed class FileChangeWatcher : IDisposable
         _knownLength = knownLength;
         _onChange = onChange;
         _identity = FileIdentity.Of(handle);
+        _knownWriteTime = LastWriteTime();
     }
 
     public void Start()
@@ -70,6 +72,7 @@ internal sealed class FileChangeWatcher : IDisposable
                 }
 
                 var length = RandomAccess.GetLength(_handle);
+                var writeTime = LastWriteTime();
                 if (length < _knownLength)
                 {
                     Stop(FileChangeKind.Truncated, length);
@@ -77,7 +80,13 @@ internal sealed class FileChangeWatcher : IDisposable
                 else if (length > _knownLength)
                 {
                     _knownLength = length;
+                    _knownWriteTime = writeTime;
                     _onChange(FileChangeKind.Grown, length);
+                }
+                else if (writeTime > _knownWriteTime)
+                {
+                    // Same length but written since: the content was rewritten in place, so the index is stale.
+                    Stop(FileChangeKind.Replaced, length);
                 }
             }
             catch (Exception ex) when (ex is IOException or ObjectDisposedException or UnauthorizedAccessException)
@@ -119,6 +128,8 @@ internal sealed class FileChangeWatcher : IDisposable
     }
 
     /// <summary>Reports a change that invalidates the index; nothing is reported after it.</summary>
+    private DateTime LastWriteTime() => File.GetLastWriteTimeUtc(_handle);
+
     private void Stop(FileChangeKind kind, long length)
     {
         _stopped = true;

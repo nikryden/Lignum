@@ -35,13 +35,12 @@ public sealed partial class LogTabViewModel
     /// Completes when the new indexing stops.
     /// </summary>
     [RelayCommand]
-    private Task ChangeEncoding(LogEncoding? encoding)
+    private async Task ChangeEncoding(LogEncoding? encoding)
     {
         var previous = EncodingOverride;
         EncodingOverride = encoding;
-        var reopened = Reopen();
-        if (ErrorMessage is not null) EncodingOverride = previous; // the file could not be reopened
-        return reopened;
+        if (await OpenAgainAsync() is { } document) await Attach(document);
+        else EncodingOverride = previous; // the file could not be reopened
     }
 
     private void RefreshEncoding(LogDocument document)

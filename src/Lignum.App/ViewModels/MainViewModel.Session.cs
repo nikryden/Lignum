@@ -29,7 +29,7 @@ public sealed partial class MainViewModel
     /// does not await it). Files that no longer exist (or cannot be opened) are skipped and listed in
     /// <see cref="ErrorMessage"/>. Restoring does not change the recent files.
     /// </summary>
-    public Task RestoreSession()
+    public async Task RestoreSession()
     {
         var session = _settings.Value.Session ?? new SessionSettings();
         var saved = session.Tabs ?? [];
@@ -59,12 +59,21 @@ public sealed partial class MainViewModel
                 continue;
             }
 
-            var tab = File.Exists(fullPath) ? AddTab(fullPath, entry.Path) : null;
-            if (tab is null)
+            var document = File.Exists(fullPath) ? await OpenDocumentAsync(fullPath, entry.Path) : null;
+            if (document is null)
             {
                 skipped.Add(entry.Path);
                 continue;
             }
+
+            if (FindTab(fullPath) is { } opened) // opened from the command line meanwhile
+            {
+                document.Dispose();
+                if (i == session.SelectedIndex) selected = opened;
+                continue;
+            }
+
+            var tab = AddTab(document);
 
             tab.RestoreScroll(entry.FirstLine);
             if (entry.FilterRules is { Count: > 0 } rules) tab.Search.SetFilterRules(rules);
@@ -79,6 +88,6 @@ public sealed partial class MainViewModel
             1 => $"Could not reopen {skipped[0]}: the file no longer exists or cannot be opened.",
             _ => $"Could not reopen {skipped.Count} files that no longer exist or cannot be opened: {string.Join(", ", skipped)}",
         };
-        return Task.WhenAll(indexing);
+        await Task.WhenAll(indexing);
     }
 }
