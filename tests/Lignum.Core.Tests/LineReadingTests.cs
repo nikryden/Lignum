@@ -123,8 +123,9 @@ public class LineReadingTests : IDisposable
             if (e.LineCount >= 50) firstScreen.TrySetResult(doc.ReadLines(0, 50));
         };
 
-        doc.StartIndexing();
+        var indexing = doc.StartIndexing();
         var lines = await firstScreen.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        await indexing;
 
         Assert.Equal(Enumerable.Range(0, 50).Select(i => $"line {i}"), lines);
     }

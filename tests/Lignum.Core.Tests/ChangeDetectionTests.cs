@@ -91,6 +91,25 @@ public class ChangeDetectionTests : IDisposable
     }
 
     [Fact]
+    public async Task Rewriting_the_file_in_place_at_the_same_length_raises_replaced()
+    {
+        var path = _temp.WriteFile("aaaa\n");
+        using var doc = LogDocument.Open(path);
+        var changes = new ChangeRecorder(doc);
+        await doc.StartIndexing();
+
+        using (var writer = new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite))
+        {
+            writer.Write("bbbb\n"u8);
+        }
+        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddSeconds(5)); // don't depend on timestamp granularity
+
+        var change = changes.Next();
+        Assert.Equal(FileChangeKind.Replaced, change.Kind);
+        Assert.False(doc.IsIndexValid);
+    }
+
+    [Fact]
     public async Task Changes_are_detected_while_a_writer_keeps_the_file_open()
     {
         var path = _temp.File("live.log");
