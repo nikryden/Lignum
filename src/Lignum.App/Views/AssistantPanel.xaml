@@ -42,8 +42,10 @@
                            Text="Add Lignum as an MCP server in your AI tool once. Copy the setting for your tool and paste it where the tool keeps its MCP servers:" />
                 <Button Content="Copy for VS Code / GitHub Copilot (mcp.json)" Margin="0,2" HorizontalContentAlignment="Left"
                         Padding="6,1" Tag="vscode" Click="OnCopySetupClick" />
-                <Button Content="Copy for Claude Desktop / Cursor" Margin="0,2" HorizontalContentAlignment="Left"
+                <Button Content="Copy for Claude Desktop, Cursor, Windsurf, Antigravity (mcpServers JSON)" Margin="0,2" HorizontalContentAlignment="Left"
                         Padding="6,1" Tag="claude-desktop" Click="OnCopySetupClick" />
+                <Button Content="Copy OpenAI Codex command" Margin="0,2" HorizontalContentAlignment="Left"
+                        Padding="6,1" Tag="codex" Click="OnCopySetupClick" />
                 <Button Content="Copy Claude Code command" Margin="0,2" HorizontalContentAlignment="Left"
                         Padding="6,1" Tag="claude-code" Click="OnCopySetupClick" />
                 <TextBlock x:Name="CopiedText" Margin="0,4,0,0" Opacity="0.7" />
@@ -58,6 +60,14 @@
                 <ComboBox ItemsSource="{Binding AgentNames}" SelectedIndex="{Binding SelectedAgent}" Margin="0,0,4,0"
                           ToolTip="The AI agent installed on this PC that answers here" />
             </DockPanel>
+            <!-- Custom agent: its command and argument template. -->
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4" Visibility="{Binding IsCustomAgent, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="Command (name on PATH, or full path)" Opacity="0.8" />
+                <TextBox Text="{Binding CustomCommand, UpdateSourceTrigger=LostFocus}" Margin="0,2,0,4" />
+                <TextBlock Text="Arguments: {prompt} = the question, {mcpConfig} = MCP settings file with Lignum, {lignum} = Lignum.exe"
+                           Opacity="0.8" TextWrapping="Wrap" />
+                <TextBox Text="{Binding CustomArguments, UpdateSourceTrigger=LostFocus}" Margin="0,2,0,0" />
+            </StackPanel>
             <!-- Setup: a warning until the agent is installed and signed in; then the header icons take over. -->
             <Border DockPanel.Dock="Top" Margin="0,0,0,4" Padding="8,6" BorderThickness="1" CornerRadius="4"
                     Background="{DynamicResource BannerBackgroundBrush}" BorderBrush="{DynamicResource BannerBorderBrush}"

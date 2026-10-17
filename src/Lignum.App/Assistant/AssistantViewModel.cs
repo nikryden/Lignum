@@ -117,7 +117,40 @@ public sealed partial class AssistantViewModel : ObservableObject
     internal IReadOnlyList<string> McpArguments { get; set; } = ["--mcp"];
 
     /// <summary>The agents the chat can run (index = <see cref="AssistantSettings.Agent"/>).</summary>
-    public IReadOnlyList<string> AgentNames { get; } = ["Claude Code", "GitHub Copilot CLI"];
+    public IReadOnlyList<string> AgentNames { get; } = ["Claude Code", "GitHub Copilot CLI", "Cursor CLI", "OpenAI Codex CLI", "Custom agent"];
+
+    /// <summary>The index of "Custom agent" in <see cref="AgentNames"/>.</summary>
+    public const int CustomAgentIndex = 4;
+
+    /// <summary>Whether the custom agent's command and arguments are shown.</summary>
+    public bool IsCustomAgent => SelectedAgent == CustomAgentIndex;
+
+    /// <summary>The custom agent's program (name on PATH or full path).</summary>
+    public string CustomCommand
+    {
+        get => _settings.Value.Assistant.CustomCommand ?? "";
+        set
+        {
+            _settings.Value.Assistant.CustomCommand = value.Trim();
+            _settings.Save();
+            _agent = null;
+            OnPropertyChanged();
+            _ = RefreshAgentAsync();
+        }
+    }
+
+    /// <summary>The custom agent's arguments: {prompt}, {mcpConfig} and {lignum} are filled in.</summary>
+    public string CustomArguments
+    {
+        get => _settings.Value.Assistant.CustomArguments ?? "-p {prompt}";
+        set
+        {
+            _settings.Value.Assistant.CustomArguments = value;
+            _settings.Save();
+            _agent = null;
+            OnPropertyChanged();
+        }
+    }
 
     /// <summary>The agent the chat runs; changing it starts a new conversation.</summary>
     public int SelectedAgent
@@ -130,6 +163,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Save();
             _agent = null;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(IsCustomAgent));
             _ = RefreshAgentAsync();
         }
     }
@@ -240,9 +274,7 @@ public sealed partial class AssistantViewModel : ObservableObject
     };
 
     /// <summary>Creates the agent for a conversation (tests replace it).</summary>
-    internal Func<int, string, CliAgent> AgentFactory { get; set; } = (index, folder) => index == 1
-        ? new CopilotCliAgent { WorkFolder = folder, LignumExe = "", LignumArguments = [] }
-        : new ClaudeCodeAgent { WorkFolder = folder, LignumExe = "", LignumArguments = [] };
+    internal Func<int, string, CliAgent>? AgentFactory { get; set; }
 
     /// <summary>The Lignum.exe an AI tool starts.</summary>
     public string ExePath { get; } = Environment.ProcessPath ?? "Lignum.exe";
@@ -256,6 +288,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         {
             "vscode" => $$"""{ "servers": { "lignum": { "type": "stdio", "command": {{command}}, "args": {{args}} } } }""",
             "claude-code" => $"claude mcp add lignum -- \"{ExePath}\" {string.Join(' ', McpArguments.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))}",
+            "codex" => $"codex mcp add lignum -- \"{ExePath}\" {string.Join(' ', McpArguments.Select(a => a.Contains(' ') ? $"\"{a}\"" : a))}",
             _ => $$"""{ "mcpServers": { "lignum": { "command": {{command}}, "args": {{args}} } } }""",
         };
     }
@@ -329,15 +362,22 @@ public sealed partial class AssistantViewModel : ObservableObject
     {
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lignum",
             "agents", Guid.NewGuid().ToString("N"));
-        var made = AgentFactory(index, folder);
-        return made switch
+        var made = AgentFactory?.Invoke(index, folder) ?? index switch
         {
-            ClaudeCodeAgent when made.LignumExe.Length == 0 => new ClaudeCodeAgent
-                { WorkFolder = folder, LignumExe = ExePath, LignumArguments = McpArguments, Executable = made.Executable },
-            CopilotCliAgent when made.LignumExe.Length == 0 => new CopilotCliAgent
-                { WorkFolder = folder, LignumExe = ExePath, LignumArguments = McpArguments, Executable = made.Executable },
-            _ => made,
+            1 => new CopilotCliAgent(),
+            2 => new CursorCliAgent(),
+            3 => new CodexCliAgent(),
+            CustomAgentIndex => new CustomAgent(CustomCommand, CustomArguments),
+            _ => new ClaudeCodeAgent(),
         };
+        if (made.WorkFolder.Length == 0) made.WorkFolder = folder;
+        if (made.LignumExe.Length == 0)
+        {
+            made.LignumExe = ExePath;
+            made.LignumArguments = McpArguments;
+        }
+
+        return made;
     }
 
     private void OnUi(Action action)

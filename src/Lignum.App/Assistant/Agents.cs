@@ -69,21 +69,47 @@ public abstract class CliAgent
     };
 
     /// <summary>Opens the agent in its own terminal window to sign in; null when it is not installed.</summary>
-    public ProcessStartInfo? SignInStart() =>
-        FindExecutable() is { } exe
-            ? new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) }
-            : null;
+    public ProcessStartInfo? SignInStart()
+    {
+        if (FindExecutable() is not { } exe) return null;
+        var start = new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) };
+        foreach (var argument in SignInArguments) start.ArgumentList.Add(argument);
+        return start;
+    }
+
+    /// <summary>Arguments for the sign-in window (e.g. "login"); none starts the agent itself.</summary>
+    protected virtual IReadOnlyList<string> SignInArguments => [];
+
+    /// <summary>Runs the agent with <paramref name="arguments"/>: true for exit code 0, null when it could not tell.</summary>
+    protected async Task<bool?> ExitCodeIsZeroAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (FindExecutable() is not { } exe) return false;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        try
+        {
+            Directory.CreateDirectory(WorkFolder);
+            return await ProcessRunner.RunAsync(exe, arguments, null, WorkFolder, _ => { }, _ => { }, timeout.Token) == 0;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>One line without double quotes, for prompts that go on the command line (cmd.exe shims).</summary>
+    protected static string OneLine(string text) => text.Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' ');
 
     /// <summary>Whether a turn was already sent in this conversation.</summary>
     protected bool HasStarted { get; private set; }
 
     /// <summary>A folder of the agent's own (MCP config, prompt file, working directory); created by the caller.</summary>
-    public required string WorkFolder { get; init; }
+    public string WorkFolder { get; set; } = "";
 
     /// <summary>The MCP server entry that starts Lignum.exe --mcp.</summary>
-    public required string LignumExe { get; init; }
+    public string LignumExe { get; set; } = "";
 
-    public required IReadOnlyList<string> LignumArguments { get; init; }
+    public IReadOnlyList<string> LignumArguments { get; set; } = [];
 
     /// <summary>The program to run, or null when the agent is not installed. Overridable for tests.</summary>
     public string? Executable { get; init; }
@@ -183,21 +209,8 @@ public sealed class ClaudeCodeAgent : CliAgent
     protected override bool PromptOnStdin => true;
 
     /// <summary><c>claude auth status</c> exits with 0 when signed in, 1 when not.</summary>
-    public override async Task<bool?> IsSignedInAsync(CancellationToken cancellationToken)
-    {
-        if (FindExecutable() is not { } exe) return false;
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeout.CancelAfter(TimeSpan.FromSeconds(20));
-        try
-        {
-            Directory.CreateDirectory(WorkFolder);
-            return await ProcessRunner.RunAsync(exe, ["auth", "status"], null, WorkFolder, _ => { }, _ => { }, timeout.Token) == 0;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException)
-        {
-            return null; // could not tell
-        }
-    }
+    public override Task<bool?> IsSignedInAsync(CancellationToken cancellationToken) =>
+        ExitCodeIsZeroAsync(["auth", "status"], cancellationToken);
 
     protected internal override IReadOnlyList<string> BuildArguments(string prompt)
     {
@@ -302,6 +315,162 @@ public sealed class CopilotCliAgent : CliAgent
     {
         output.AppendLine(line);
         onText(line + "\n");
+    }
+}
+
+/// <summary>
+/// Cursor CLI (`agent`), on the user's Cursor subscription. Lignum's MCP server goes in the conversation folder's
+/// .cursor/mcp.json (Cursor reads project MCP settings) and is approved with --approve-mcps.
+/// </summary>
+public sealed class CursorCliAgent : CliAgent
+{
+    public override string Name => "Cursor CLI";
+
+    public override string Command => "agent";
+
+    public override string InstallHint => "Press Install to run Cursor's installer, then Sign in (needs a Cursor account).";
+
+    public override string InstallCommand => "irm 'https://cursor.com/install?win32=true' | iex";
+
+    public override string SignInHint => "Cursor CLI opens in a terminal: sign in when it asks, then close the window.";
+
+    protected override IEnumerable<string> KnownLocations =>
+    [
+        .. new[] { "agent", "cursor-agent" }.Select(FindOnPath).OfType<string>(),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "bin", "agent.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "cursor-agent", "agent.cmd"),
+    ];
+
+    protected internal override IReadOnlyList<string> BuildArguments(string prompt)
+    {
+        Directory.CreateDirectory(Path.Combine(WorkFolder, ".cursor"));
+        WriteFile(Path.Combine(".cursor", "mcp.json"), JsonSerializer.Serialize(new
+        {
+            mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
+        }));
+        List<string> arguments = ["-p", OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}"),
+                                  "--approve-mcps", "--output-format", "text"];
+        if (HasStarted) arguments.Add("--continue");
+        return arguments;
+    }
+
+    protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
+    {
+        output.AppendLine(line);
+        onText(line + "\n");
+    }
+}
+
+/// <summary>
+/// OpenAI Codex CLI (`codex`), on the user's ChatGPT plan. Runs `codex exec` in a read-only sandbox with Lignum's MCP
+/// server added through -c overrides; a follow-up resumes the last session in the conversation folder.
+/// </summary>
+public sealed class CodexCliAgent : CliAgent
+{
+    public override string Name => "OpenAI Codex CLI";
+
+    public override string Command => "codex";
+
+    public override string InstallHint => "Press Install to install it with npm (needs Node.js from nodejs.org), then Sign in with your ChatGPT account.";
+
+    public override string InstallCommand => "npm install -g @openai/codex";
+
+    public override string SignInHint => "Codex runs `codex login` in a terminal: sign in with ChatGPT in the browser, then close the window.";
+
+    protected override IReadOnlyList<string> SignInArguments => ["login"];
+
+    protected override IEnumerable<string> KnownLocations =>
+    [
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm", "codex.cmd"),
+    ];
+
+    /// <summary><c>codex login status</c> exits with 0 when logged in.</summary>
+    public override Task<bool?> IsSignedInAsync(CancellationToken cancellationToken) =>
+        ExitCodeIsZeroAsync(["login", "status"], cancellationToken);
+
+    protected internal override IReadOnlyList<string> BuildArguments(string prompt)
+    {
+        List<string> arguments = ["exec"];
+        if (HasStarted) arguments.AddRange(["resume", "--last"]);
+        arguments.AddRange(
+        [
+            "--skip-git-repo-check", "--sandbox", "read-only",
+            "-c", "mcp_servers.lignum.command=" + JsonSerializer.Serialize(LignumExe),
+            "-c", "mcp_servers.lignum.args=" + JsonSerializer.Serialize(LignumArguments),
+            OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}"),
+        ]);
+        return arguments;
+    }
+
+    protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
+    {
+        output.AppendLine(line);
+        onText(line + "\n");
+    }
+
+    protected override string? FailureText(string errors) =>
+        string.IsNullOrWhiteSpace(errors) ? "OpenAI Codex CLI stopped with an error." : $"OpenAI Codex CLI: {errors.Trim().Split('\n')[^1]}";
+}
+
+/// <summary>
+/// Any other agent CLI: the user gives the command and an argument template. {prompt} is the question, {mcpConfig}
+/// the path of an MCP settings file (mcpServers JSON) with Lignum in it, {lignum} the Lignum.exe path. The answer is
+/// read as plain text from standard output; each question starts afresh unless the template continues a session.
+/// </summary>
+public sealed class CustomAgent(string command, string argumentTemplate) : CliAgent
+{
+    public override string Name => "Custom agent";
+
+    public override string Command => command;
+
+    public override string InstallHint => "Enter the agent's command and its arguments below.";
+
+    public override string InstallCommand => "Write-Host 'Install your agent the way its documentation says.'";
+
+    public override string SignInHint => "Your agent opens in a terminal: sign in the way it asks, then close the window.";
+
+    protected override IEnumerable<string> KnownLocations => File.Exists(command) ? [command] : [];
+
+    protected internal override IReadOnlyList<string> BuildArguments(string prompt)
+    {
+        var mcp = WriteFile("mcp.json", JsonSerializer.Serialize(new
+        {
+            mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
+        }));
+        var question = OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}");
+        return [.. SplitArguments(argumentTemplate).Select(a => a
+            .Replace("{prompt}", question).Replace("{mcpConfig}", mcp).Replace("{lignum}", LignumExe))];
+    }
+
+    protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
+    {
+        output.AppendLine(line);
+        onText(line + "\n");
+    }
+
+    /// <summary>Splits a command line on spaces, keeping "quoted parts" together.</summary>
+    internal static List<string> SplitArguments(string template)
+    {
+        var result = new List<string>();
+        var current = new StringBuilder();
+        var quoted = false;
+        var any = false;
+        foreach (var c in template)
+        {
+            if (c == '"') { quoted = !quoted; any = true; continue; }
+            if (char.IsWhiteSpace(c) && !quoted)
+            {
+                if (any || current.Length > 0) result.Add(current.ToString());
+                current.Clear();
+                any = false;
+                continue;
+            }
+
+            current.Append(c);
+        }
+
+        if (any || current.Length > 0) result.Add(current.ToString());
+        return result;
     }
 }
 
