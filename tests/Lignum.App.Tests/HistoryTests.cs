@@ -17,7 +17,8 @@ public sealed class HistoryTests : IDisposable
     public void Dispose()
     {
         foreach (var owned in _owned) owned.Dispose();
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>A fresh app start: settings are read from disk again.</summary>

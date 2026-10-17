@@ -16,7 +16,8 @@ public sealed class AllTabsSearchTests : IDisposable
     public void Dispose()
     {
         foreach (var owned in _owned) owned.Dispose();
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        SettingsStore.Flush(); // settings are written in the background: let them finish first
+        try { Directory.Delete(_dir, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private async Task<MainViewModel> OpenTwo()

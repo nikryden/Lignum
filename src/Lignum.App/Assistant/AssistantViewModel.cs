@@ -114,21 +114,63 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Save();
             _agent = null;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(AgentStatus));
+            RefreshAgent();
         }
     }
 
-    /// <summary>"Not installed: how to install" for the selected agent, or empty when it is found.</summary>
+    /// <summary>Whether the selected agent is installed on this PC.</summary>
+    public bool IsAgentInstalled => CreateAgent(SelectedAgent).FindExecutable() is not null;
+
+    /// <summary>The next step for the selected agent: install it, or sign in once.</summary>
     public string AgentStatus
     {
         get
         {
             var agent = CreateAgent(SelectedAgent);
-            return agent.Executable is not null || CliAgent.FindOnPath(agent.Command) is not null
-                ? ""
-                : $"{agent.Name} was not found. {agent.InstallHint}";
+            return agent.FindExecutable() is null
+                ? $"{agent.Name} is not installed. {agent.InstallHint}"
+                : $"{agent.Name} is installed. First time? Press Sign in once.";
         }
     }
+
+    /// <summary>"Install": runs the vendor's official installer in a visible PowerShell window.</summary>
+    [RelayCommand]
+    private void InstallAgent()
+    {
+        var agent = CreateAgent(SelectedAgent);
+        Add(ChatEntryKind.Activity, $"Installing {agent.Name} in a PowerShell window ({agent.InstallCommand}). Press Check again when it is done.");
+        StartProcess(agent.InstallStart());
+    }
+
+    /// <summary>"Sign in": opens the agent in a terminal for its one-time sign-in.</summary>
+    [RelayCommand]
+    private void SignInAgent()
+    {
+        var agent = CreateAgent(SelectedAgent);
+        if (agent.SignInStart() is not { } start)
+        {
+            RefreshAgent();
+            return;
+        }
+
+        Add(ChatEntryKind.Activity, agent.SignInHint);
+        StartProcess(start);
+    }
+
+    /// <summary>"Check again": looks for the agent again (after installing it).</summary>
+    [RelayCommand]
+    private void RefreshAgent()
+    {
+        OnPropertyChanged(nameof(IsAgentInstalled));
+        OnPropertyChanged(nameof(AgentStatus));
+    }
+
+    /// <summary>Starts a window (installer, sign-in terminal); tests replace it.</summary>
+    internal Action<System.Diagnostics.ProcessStartInfo> StartProcess { get; set; } = start =>
+    {
+        try { System.Diagnostics.Process.Start(start)?.Dispose(); }
+        catch (System.ComponentModel.Win32Exception) { } // the user cancelled, or the program is gone
+    };
 
     /// <summary>Creates the agent for a conversation (tests replace it).</summary>
     internal Func<int, string, CliAgent> AgentFactory { get; set; } = (index, folder) => index == 1
