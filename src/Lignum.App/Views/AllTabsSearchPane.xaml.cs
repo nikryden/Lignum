@@ -35,7 +35,8 @@ public partial class AllTabsSearchPane : UserControl
 
     private void GoToSelected()
     {
-        if (DataContext is AllTabsSearchViewModel search && ResultList.SelectedItem is AllTabsRow row)
-            search.GoToCommand.Execute(row);
+        if (DataContext is not AllTabsSearchViewModel search) return;
+        if (ResultList.SelectedItem is AllTabsFileRow file) search.ToggleGroupCommand.Execute(file);
+        else if (ResultList.SelectedItem is AllTabsMatchRow match) search.GoToCommand.Execute(match);
     }
 }

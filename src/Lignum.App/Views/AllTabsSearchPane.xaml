@@ -34,7 +34,11 @@
                 </TextBox.InputBindings>
             </TextBox>
         </DockPanel>
-        <TextBlock DockPanel.Dock="Top" Margin="8,0,8,4" Text="{Binding Status}" Opacity="0.8" />
+        <DockPanel DockPanel.Dock="Top" Margin="8,0,8,4">
+            <Button DockPanel.Dock="Right" Content="Expand all" Padding="6,0" Margin="4,0,0,0" Command="{Binding ExpandAllCommand}" />
+            <Button DockPanel.Dock="Right" Content="Collapse all" Padding="6,0" Command="{Binding CollapseAllCommand}" />
+            <TextBlock Text="{Binding Status}" Opacity="0.8" VerticalAlignment="Center" />
+        </DockPanel>
         <ListBox x:Name="ResultList" ItemsSource="{Binding Rows}" BorderThickness="0" Background="Transparent"
                  Foreground="{DynamicResource WindowForegroundBrush}"
                  VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
@@ -43,19 +47,45 @@
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                     <Setter Property="Padding" Value="4,0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                     <Setter Property="MinHeight" Value="0" />
                 </Style>
             </ListBox.ItemContainerStyle>
             <ListBox.Resources>
                 <DataTemplate DataType="{x:Type vm:AllTabsFileRow}">
-                    <TextBlock Text="{Binding Header}" FontWeight="SemiBold" Margin="0,6,0,2" />
+                    <!-- A line between files; click the heading to hide or show its matches. -->
+                    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
+                            Margin="0,4,0,0" Padding="0,4,0,2" Cursor="Hand" ToolTip="Click to hide or show this file's matches">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Arrow}" Width="16" />
+                            <TextBlock Text="{Binding Header}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Border>
                 </DataTemplate>
                 <DataTemplate DataType="{x:Type vm:AllTabsMatchRow}">
                     <DockPanel Margin="12,0,0,0">
                         <TextBlock DockPanel.Dock="Left" Width="70" Opacity="0.7" TextAlignment="Right" Margin="0,0,8,0"
                                    Text="{Binding DisplayLine, StringFormat={}{0:N0}}" />
-                        <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis"
-                                   FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <!-- The line, with the matched text highlighted. -->
+                        <ItemsControl ItemsSource="{Binding Segments}" Focusable="False"
+                                      TextElement.FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock x:Name="Piece" Text="{Binding Text}" />
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding IsMatch}" Value="True">
+                                            <Setter TargetName="Piece" Property="Background" Value="{DynamicResource SearchMatchBackgroundBrush}" />
+                                            <Setter TargetName="Piece" Property="FontWeight" Value="Bold" />
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </DockPanel>
                 </DataTemplate>
             </ListBox.Resources>

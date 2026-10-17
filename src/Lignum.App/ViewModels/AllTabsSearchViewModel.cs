@@ -6,19 +6,45 @@ using Lignum.Core;
 namespace Lignum.App.ViewModels;
 
 /// <summary>A row of the all-tabs results: a file heading or one matching line.</summary>
-public abstract record AllTabsRow(LogTabViewModel Tab);
-
-/// <summary>The heading of one file's matches, e.g. "app.log: 12 matches".</summary>
-public sealed record AllTabsFileRow(LogTabViewModel Tab, long MatchCount, bool IsCapped) : AllTabsRow(Tab)
+public abstract class AllTabsRow(LogTabViewModel tab) : ObservableObject
 {
+    public LogTabViewModel Tab { get; } = tab;
+}
+
+/// <summary>The heading of one file's matches, e.g. "app.log: 12 matches"; collapses to hide them.</summary>
+public sealed partial class AllTabsFileRow(LogTabViewModel tab, long matchCount, bool isCapped) : AllTabsRow(tab)
+{
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Arrow))]
+    private bool _isExpanded = true;
+
+    public long MatchCount => matchCount;
+
+    public bool IsCapped => isCapped;
+
+    /// <summary>This file's matching lines (shown under the heading while it is expanded).</summary>
+    public List<AllTabsMatchRow> Matches { get; } = [];
+
+    public string Arrow => IsExpanded ? "▾" : "▸";
+
     public string Header =>
         $"{Tab.FileName}: {(MatchCount == 1 ? "1 match" : $"{MatchCount:N0} matches")}"
         + (IsCapped ? $" (first {AllTabsSearchViewModel.MaxRowsPerFile:N0} shown)" : "");
 }
 
-/// <summary>One matching line: its 0-based file line and (the start of) its text.</summary>
-public sealed record AllTabsMatchRow(LogTabViewModel Tab, long Line, string Text) : AllTabsRow(Tab)
+/// <summary>A piece of a result line; <see cref="IsMatch"/> pieces are highlighted.</summary>
+public sealed record TextSegment(string Text, bool IsMatch);
+
+/// <summary>One matching line: its 0-based file line and (the start of) its text, split for highlighting.</summary>
+public sealed class AllTabsMatchRow(LogTabViewModel tab, long line, string text, IReadOnlyList<TextSegment> segments)
+    : AllTabsRow(tab)
 {
+    public long Line => line;
+
+    public string Text => text;
+
+    public IReadOnlyList<TextSegment> Segments => segments;
+
     public long DisplayLine => Line + 1;
 }
 
@@ -65,7 +91,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     /// box and results pane instead (inside that tab's filter rules, if any), and this pane lists nothing.
     /// </summary>
     [ObservableProperty]
-    private bool _showResultsPerTab;
+    private bool _showResultsPerTab = true;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CancelCommand))]
@@ -84,8 +110,11 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         _goTo = goTo;
     }
 
-    /// <summary>File headings and matching lines, grouped by file in tab order.</summary>
-    public ObservableCollection<AllTabsRow> Rows { get; } = [];
+    /// <summary>File headings and, under each expanded one, its matching lines; in tab order. Replaced on change.</summary>
+    [ObservableProperty]
+    private ObservableCollection<AllTabsRow> _rows = [];
+
+    private readonly List<AllTabsFileRow> _files = [];
 
     /// <summary>Raised when the find box should take the keyboard.</summary>
     public event EventHandler? FindBoxFocusRequested;
@@ -110,7 +139,8 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     private async Task Search()
     {
         Cancel();
-        Rows.Clear();
+        _files.Clear();
+        Rows = [];
         Status = "";
         if (string.IsNullOrEmpty(FindText)) return;
 
@@ -147,12 +177,15 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         UpdateProgress(generation);
 
         // Each file's rows go in as it finishes, but always in tab order (a finished file waits for the ones before it).
-        var reads = searches.Select(s => ReadRows(s.Tab, s.Document, s.Result)).ToList();
+        var highlight = new Query(query.Rules, SearchViewModel.HighlightRegexTimeout);
+        var reads = searches.Select(s => ReadRows(s.Tab, s.Document, s.Result, highlight)).ToList();
         foreach (var read in reads)
         {
-            var rows = await read;
+            var file = await read;
             if (generation != _generation) return; // a newer search (or Cancel) took over
-            foreach (var row in rows) Rows.Add(row);
+            if (file is null) continue;
+            _files.Add(file);
+            RebuildRows();
         }
 
         IsSearching = false;
@@ -211,6 +244,39 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
         _goTo(row.Tab, row is AllTabsMatchRow match ? match.Line : -1);
     }
 
+    /// <summary>A click on a file heading: hides or shows that file's matching lines.</summary>
+    [RelayCommand]
+    private void ToggleGroup(AllTabsFileRow? file)
+    {
+        if (file is null) return;
+        file.IsExpanded = !file.IsExpanded;
+        RebuildRows();
+    }
+
+    [RelayCommand]
+    private void CollapseAll() => SetAllExpanded(false);
+
+    [RelayCommand]
+    private void ExpandAll() => SetAllExpanded(true);
+
+    private void SetAllExpanded(bool expanded)
+    {
+        foreach (var file in _files) file.IsExpanded = expanded;
+        RebuildRows();
+    }
+
+    private void RebuildRows()
+    {
+        var rows = new List<AllTabsRow>();
+        foreach (var file in _files)
+        {
+            rows.Add(file);
+            if (file.IsExpanded) rows.AddRange(file.Matches);
+        }
+
+        Rows = new ObservableCollection<AllTabsRow>(rows);
+    }
+
     [RelayCommand]
     private void ToggleMatchCase() => MatchCase = !MatchCase;
 
@@ -220,14 +286,16 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
     partial void OnFindTextChanged(string value) => FindTextError = null;
 
     /// <summary>Waits for one file's search, then reads its matching lines' text in the background.</summary>
-    private static async Task<List<AllTabsRow>> ReadRows(LogTabViewModel tab, LogDocument document, QueryResult result)
+    private static async Task<AllTabsFileRow?> ReadRows(LogTabViewModel tab, LogDocument document, QueryResult result,
+                                                        Query highlight)
     {
         await result.Completion.ConfigureAwait(false);
-        if (result.State != QueryState.Completed || result.Count == 0) return [];
+        if (result.State != QueryState.Completed || result.Count == 0) return null;
         return await Task.Run(() =>
         {
             var shown = (int)Math.Min(result.Count, MaxRowsPerFile);
-            var rows = new List<AllTabsRow>(shown + 1) { new AllTabsFileRow(tab, result.Count, shown < result.Count) };
+            var file = new AllTabsFileRow(tab, result.Count, shown < result.Count);
+            var rows = file.Matches;
             try
             {
                 for (var i = 0; i < shown; i++)
@@ -235,7 +303,7 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
                     var line = result[i];
                     var prefix = document.ReadLinePrefixes(line, 1, MaxTextLength);
                     var text = prefix.Length > 0 ? prefix[0].Text + (prefix[0].IsTruncated ? " …" : "") : "";
-                    rows.Add(new AllTabsMatchRow(tab, line, text));
+                    rows.Add(new AllTabsMatchRow(tab, line, text, Split(text, highlight)));
                 }
             }
             catch (Exception ex) when (ex is IOException or ObjectDisposedException)
@@ -243,8 +311,25 @@ public sealed partial class AllTabsSearchViewModel : ObservableObject
                 // The tab closed or the file went away meanwhile: list what was read.
             }
 
-            return rows;
+            return file;
         }).ConfigureAwait(false);
+    }
+
+    /// <summary>Cuts <paramref name="text"/> into plain and matched pieces (best effort: a regex timeout gives one plain piece).</summary>
+    private static List<TextSegment> Split(string text, Query highlight)
+    {
+        var segments = new List<TextSegment>();
+        var pos = 0;
+        foreach (var match in highlight.FindMatches(text))
+        {
+            if (match.Start < pos || match.Start + match.Length > text.Length) continue;
+            if (match.Start > pos) segments.Add(new TextSegment(text[pos..match.Start], false));
+            segments.Add(new TextSegment(text.Substring(match.Start, match.Length), true));
+            pos = match.Start + match.Length;
+        }
+
+        if (pos < text.Length) segments.Add(new TextSegment(text[pos..], false));
+        return segments;
     }
 
     private void RequestProgress(int generation)

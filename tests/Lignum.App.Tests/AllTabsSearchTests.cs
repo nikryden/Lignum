@@ -29,6 +29,7 @@ public sealed class AllTabsSearchTests : IDisposable
         File.WriteAllLines(a, ["start", "ERROR disk full", "ok", "error again"]);
         File.WriteAllLines(b, ["nothing here", "Error in b"]);
         await main.OpenFilesAsync([a, b]);
+        main.AllTabsSearch.ShowResultsPerTab = false; // most tests check the shared pane
         return main;
     }
 
@@ -61,6 +62,30 @@ public sealed class AllTabsSearchTests : IDisposable
         Assert.Equal("3 matches in 2 files", main.AllTabsSearch.Status);
         Assert.False(main.AllTabsSearch.IsSearching);
     }
+
+    [Fact]
+    public async Task A_file_group_collapses_and_matched_text_is_marked()
+    {
+        var main = await OpenTwo();
+        var search = main.AllTabsSearch;
+        await Search(search, "error");
+
+        search.ToggleGroupCommand.Execute(search.Rows[0]);
+        Assert.Equal(["a.log: 2 matches", "b.log: 1 match", "  2: Error in b"], Describe(search));
+        search.ExpandAllCommand.Execute(null);
+        Assert.Equal(5, search.Rows.Count);
+        search.CollapseAllCommand.Execute(null);
+        Assert.Equal(["a.log: 2 matches", "b.log: 1 match"], Describe(search));
+
+        search.ExpandAllCommand.Execute(null);
+        var row = search.Rows.OfType<AllTabsMatchRow>().First();
+        Assert.Equal([new TextSegment("ERROR", true), new TextSegment(" disk full", false)], row.Segments);
+    }
+
+    [Fact]
+    public void Per_tab_is_the_default() => Assert.True(
+        UiContext.None(() => new MainViewModel(new SettingsStore(Path.Combine(_dir, "s2"), Logger.None)
+            .Open<AppSettings>(AppSettings.FileName))).AllTabsSearch.ShowResultsPerTab);
 
     [Fact]
     public async Task Case_and_regex_options_work_like_single_file_search()
