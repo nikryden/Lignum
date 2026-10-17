@@ -14,6 +14,10 @@ public sealed class CommandLineTests
     }
 
     [Fact]
+    public void Mcp_mode_is_not_a_file_to_open() =>
+        Assert.Equal(new CommandLine(@"D:\s", null, IsMcp: true), CommandLine.Parse(["--settings-dir", @"D:\s", "--mcp"]));
+
+    [Fact]
     public void No_arguments_means_defaults() =>
         Assert.Equal(new CommandLine(null, null), CommandLine.Parse([]));
 }

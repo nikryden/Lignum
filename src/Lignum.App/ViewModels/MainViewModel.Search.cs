@@ -15,16 +15,12 @@ public sealed partial class MainViewModel
     private AllTabsSearchViewModel? _allTabsSearch;
     private Assistant.AssistantViewModel? _assistant;
 
-    /// <summary>Where tool calls of the assistant are logged (the app passes its diagnostics log).</summary>
+    /// <summary>Where AI tool calls are logged (the app passes its diagnostics log).</summary>
     public Serilog.ILogger DiagnosticsLog { get; init; } = Serilog.Core.Logger.None;
 
-    /// <summary>Creates the Claude client from an API key (null: ANTHROPIC_API_KEY); tests pass a fake.</summary>
-    internal Func<string?, Assistant.IClaudeChat> ClaudeChatFactory { get; init; } =
-        key => new Assistant.AnthropicClaudeChat(key);
-
-    /// <summary>The built-in assistant (ticket 05).</summary>
+    /// <summary>AI access (ticket 05): AI tools on this PC use Lignum's tools over MCP.</summary>
     public Assistant.AssistantViewModel Assistant => _assistant ??=
-        new Assistant.AssistantViewModel(_settings, new Assistant.AssistantTools(this), ClaudeChatFactory, DiagnosticsLog);
+        new Assistant.AssistantViewModel(_settings, new Assistant.AssistantTools(this), _uiContext, DiagnosticsLog);
 
     /// <summary>Where the Find window was last shown (settings.json); null until it has been closed once.</summary>
     internal Settings.WindowBounds? FindWindowBounds

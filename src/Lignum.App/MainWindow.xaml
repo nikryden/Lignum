@@ -141,7 +141,7 @@
                           IsChecked="{Binding DataContext.DetailPane.Dock, Mode=OneWay, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource IsEqual}, ConverterParameter=Bottom}" />
                 <MenuItem Header="Show _full line" Command="{Binding DataContext.ShowFullLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
                 <Separator />
-                <MenuItem Header="_Assistant" IsCheckable="True" InputGestureText="Ctrl+Shift+A"
+                <MenuItem Header="_AI access" IsCheckable="True" InputGestureText="Ctrl+Shift+A"
                           IsChecked="{Binding DataContext.Assistant.IsPanelOpen, RelativeSource={RelativeSource AncestorType=Window}}" />
             </MenuItem>
         </Menu>
@@ -258,7 +258,7 @@
                 </StackPanel>
             </StatusBarItem>
         </StatusBar>
-        <!-- The assistant (ticket 05): a side panel to the right of the log. -->
+        <!-- AI access (ticket 05): a side panel to the right of the log. -->
         <Border DockPanel.Dock="Right" Width="380" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
                 Visibility="{Binding Assistant.IsPanelOpen, Converter={StaticResource BoolToVisibility}}">
             <views:AssistantPanel DataContext="{Binding Assistant}" />
