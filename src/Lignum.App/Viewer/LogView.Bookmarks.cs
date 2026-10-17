@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using Lignum.App.Themes;
 
@@ -29,6 +30,25 @@ public sealed partial class LogView
     {
         get => (Brush)GetValue(BookmarkBrushProperty);
         set => SetValue(BookmarkBrushProperty, value);
+    }
+
+    /// <summary>
+    /// The line-number margin was double-clicked (ticket 04), with that row's 0-based file line; in the results
+    /// pane that is the original line in the file.
+    /// </summary>
+    public event EventHandler<long>? MarginDoubleClicked;
+
+    /// <summary>A left double-click on a row's line-number margin raises <see cref="MarginDoubleClicked"/>.</summary>
+    private bool HandleMarginDoubleClick(MouseButtonEventArgs e)
+    {
+        if (e.ClickCount != 2 || Source is not { } source) return false;
+        var point = e.GetPosition(this);
+        if (point.X >= _textLeft - TextPadding) return false; // in the text: normal click behaviour
+        var row = Geometry.PointToPosition(point).Row;
+        if (row < 0 || row >= source.RowCount) return false;
+        MarginDoubleClicked?.Invoke(this, source.Lines[row]);
+        e.Handled = true;
+        return true;
     }
 
     private void InitializeBookmarks() => SetResourceReference(BookmarkBrushProperty, ThemeKeys.BookmarkMarker);

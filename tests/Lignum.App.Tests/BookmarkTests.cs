@@ -44,6 +44,19 @@ public sealed class BookmarkTests : IDisposable
         return vm.SelectedTab!;
     }
 
+    [Fact]
+    public async Task Double_clicking_the_margin_toggles_the_bookmark_on_that_line_not_the_caret_line()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Navigation.Caret = new FilePosition(3, 0);
+
+        tab.ToggleBookmarkAtCommand.Execute(12L);
+        Assert.Equal([12L], tab.Bookmarks.Lines);
+
+        tab.ToggleBookmarkAtCommand.Execute(12L);
+        Assert.Empty(tab.Bookmarks.Lines);
+    }
+
     private static void ToggleAt(LogTabViewModel tab, long line)
     {
         tab.Navigation.Caret = new FilePosition(line, 3);

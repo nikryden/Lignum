@@ -24,6 +24,12 @@ public partial class LogTabView : UserControl
         if (Window.GetWindow(this)?.DataContext is MainViewModel main) main.DetailPane.IsOpen = true;
     }
 
+    /// <summary>The line-number margin was double-clicked (ticket 04): toggle the bookmark on that file line.</summary>
+    private void OnMarginDoubleClicked(object? sender, long line)
+    {
+        if (DataContext is LogTabViewModel tab) tab.ToggleBookmarkAtCommand.Execute(line);
+    }
+
     /// <summary>When this tab becomes the visible one, give its viewer the keyboard.</summary>
     private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
     {

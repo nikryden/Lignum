@@ -11,7 +11,13 @@
     <Version>0.1.0</Version>
     <!-- Bundle WPF's native DLLs into the single-file exe instead of placing them beside it. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- Placeholder icon (ticket 03): tree rings, "lignum" being Latin for wood. -->
+    <ApplicationIcon>Assets\Lignum.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Lignum.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="Lignum.App.Tests" />

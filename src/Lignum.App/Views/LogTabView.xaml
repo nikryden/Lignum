@@ -78,6 +78,7 @@
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                         FullLineRequested="OnFullLineRequested"
+                                        MarginDoubleClicked="OnMarginDoubleClicked"
                                         FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                         FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                         TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}">
@@ -114,6 +115,7 @@
                                             ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"
+                                            MarginDoubleClicked="OnMarginDoubleClicked"
                                             FontFamily="{Binding Appearance.FontFamily, RelativeSource={RelativeSource AncestorType=Window}}"
                                             FontSize="{Binding Appearance.EffectiveFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                             TabWidth="{Binding Appearance.TabWidth, RelativeSource={RelativeSource AncestorType=Window}}">
