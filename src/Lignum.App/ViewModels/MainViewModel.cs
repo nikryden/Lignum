@@ -34,6 +34,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _settings = settings;
         History = new SearchHistory(settings);
+        _highlightMatchesOutsideFilter = settings.Value.HighlightMatchesOutsideFilter;
         LoadRecentFiles();
     }
 
@@ -145,6 +146,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             Package = package,
             EncodingOverride = package?.Manifest.Encoding,
         };
+        tab.Search.HighlightOutsideFilter = HighlightMatchesOutsideFilter;
         Tabs.Add(tab);
         return tab;
     }

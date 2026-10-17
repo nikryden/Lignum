@@ -52,6 +52,9 @@ public sealed class AppSettings
     /// <summary>The tabs open when Lignum last exited, restored on start (ticket 18).</summary>
     public SessionSettings Session { get; set; } = new();
 
+    /// <summary>Highlight search matches on lines the filter rules hide too (ticket 08).</summary>
+    public bool HighlightMatchesOutsideFilter { get; set; } = true;
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Lignum.App.Settings;
 using Lignum.App.Tests.Support;
+using Lignum.App.Viewer;
 using Lignum.App.ViewModels;
 using Lignum.Core;
 using Serilog.Core;
@@ -28,15 +29,86 @@ public sealed class CombinedSearchTests : IDisposable
         try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
     }
 
-    private async Task<SearchViewModel> Open()
+    private async Task<SearchViewModel> Open() => (await OpenTab()).Tab.Search;
+
+    private MainViewModel Start()
     {
         var main = UiContext.None(() => new MainViewModel(
             new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName)));
         _owned.Add(main);
+        return main;
+    }
+
+    private async Task<(MainViewModel Main, LogTabViewModel Tab)> OpenTab()
+    {
+        var main = Start();
         var path = Path.Combine(_dir, "app.log");
         File.WriteAllText(path, Log);
         await main.OpenFileAsync(path);
-        return main.SelectedTab!.Search;
+        return (main, main.SelectedTab!);
+    }
+
+    private static long[] Rows(LineSource? source)
+    {
+        if (source is null) return [];
+        var lines = new long[source.RowCount];
+        for (var i = 0; i < lines.Length; i++) lines[i] = source.Lines[i];
+        return lines;
+    }
+
+    [Fact]
+    public async Task Hiding_non_matching_lines_shows_only_the_results_in_the_main_view()
+    {
+        var (_, tab) = await OpenTab();
+        FilterOrders(tab.Search);
+        await Find(tab.Search, "timeout");
+        Shown(tab.Search);
+        Assert.Equal(5, tab.ViewLines!.RowCount); // off by default: every line
+
+        tab.HideNonMatchingLines = true;
+        Assert.Equal([1L], Rows(tab.ViewLines));
+
+        await Find(tab.Search, ""); // the results change: the main view follows
+        Shown(tab.Search);
+        Assert.Equal([1L, 3L], Rows(tab.ViewLines));
+    }
+
+    [Fact]
+    public async Task Matches_on_lines_the_filter_hides_are_highlighted_only_when_the_setting_is_on()
+    {
+        var (main, tab) = await OpenTab();
+        FilterOrders(tab.Search);
+        await Find(tab.Search, "timeout");
+        const string hidden = "HealthCheck OrderService timeout";
+
+        Assert.NotEmpty(tab.Search.Highlight!.FindMatches(hidden)); // on by default
+
+        main.HighlightMatchesOutsideFilter = false;
+        Assert.Empty(tab.Search.Highlight!.FindMatches(hidden));
+        Assert.NotEmpty(tab.Search.Highlight.FindMatches("OrderService timeout calling db"));
+        Assert.False(Start().HighlightMatchesOutsideFilter); // saved in settings.json
+    }
+
+    [Fact]
+    public async Task The_session_restores_the_search_the_scope_and_hiding()
+    {
+        var (main, tab) = await OpenTab();
+        FilterOrders(tab.Search);
+        tab.Search.MatchCase = true;
+        await Find(tab.Search, "timeout");
+        tab.Search.SearchInsideFilter = false;
+        tab.HideNonMatchingLines = true;
+        main.SaveSession();
+
+        var restarted = Start();
+        await restarted.RestoreSession();
+
+        var search = restarted.SelectedTab!.Search;
+        Assert.Equal("timeout", search.FindText);
+        Assert.True(search.MatchCase);
+        Assert.False(search.SearchInsideFilter);
+        Assert.True(restarted.SelectedTab.HideNonMatchingLines);
+        Assert.Equal([1L, 2L, 4L], Shown(search));
     }
 
     private static long[] Shown(SearchViewModel search)

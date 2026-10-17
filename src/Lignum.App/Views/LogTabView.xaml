@@ -97,7 +97,7 @@
                     <!-- LogView is its own IScrollInfo: rows and columns are the scroll units. -->
                     <ScrollViewer Grid.Row="2" CanContentScroll="True" Focusable="False"
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
-                        <viewer:LogView x:Name="LogView" Source="{Binding Lines}" Caret="{Binding Navigation.Caret}"
+                        <viewer:LogView x:Name="LogView" Source="{Binding ViewLines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
                                         Bookmarks="{Binding Bookmarks.Lines}"
                                         BookmarkNotes="{Binding Bookmarks.Notes}"

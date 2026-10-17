@@ -24,4 +24,17 @@ public sealed class SessionTab
     public long FirstLine { get; set; }
 
     public List<QueryRule> FilterRules { get; set; } = [];
+
+    /// <summary>The active search (ticket 08), or null; with its options.</summary>
+    public string? SearchText { get; set; }
+
+    public bool SearchIsRegex { get; set; }
+
+    public bool SearchMatchCase { get; set; }
+
+    public bool SearchNonBacktracking { get; set; }
+
+    public bool SearchInsideFilter { get; set; } = true;
+
+    public bool HideNonMatchingLines { get; set; }
 }

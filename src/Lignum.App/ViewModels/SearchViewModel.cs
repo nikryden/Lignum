@@ -30,6 +30,11 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     private Query? _activeFilter;
     private int _activeFilterRuleCount;
     private string _queryLabel = "";
+    private Query? _shownQuery;
+
+    /// <summary>Highlight search matches on lines the filter hides too (an app setting, see MainViewModel).</summary>
+    [ObservableProperty]
+    private bool _highlightOutsideFilter = true;
 
     /// <summary>With filter rules active, search only the lines they show (on, the default) or the whole file.</summary>
     [ObservableProperty]
@@ -117,9 +122,10 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     /// <summary>Switches to another document (or none): stops the search, clears the results and re-applies the filter rules.</summary>
     public void SetDocument(LogDocument? document)
     {
+        var reopened = _document is not null;
         _document = document;
         ClearResults();
-        _activeSearch = null; // a new document starts without a search, as in v1
+        if (reopened) _activeSearch = null; // a reloaded document starts without a search, as in v1; a restored one keeps it
         RebuildFilter(); // filter rules belong to the tab, not the document: run them on the new one
         _ = Rerun();
     }
@@ -186,6 +192,44 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ToggleSearchScope() => SearchInsideFilter = !SearchInsideFilter;
 
+    /// <summary>The active search's text, or null without one (saved with the session).</summary>
+    internal string? ActiveSearchText => _activeSearch is null ? null : _activeSearchText;
+
+    /// <summary>
+    /// Session restore: the find box, its options and the search, which runs once the document is attached.
+    /// An invalid pattern restores the text only.
+    /// </summary>
+    internal void RestoreSearch(string text, bool isRegex, bool matchCase, bool nonBacktracking)
+    {
+        IsRegex = isRegex;
+        MatchCase = matchCase;
+        UseNonBacktracking = nonBacktracking;
+        FindText = text;
+        try
+        {
+            _activeSearch = BuildQuery(RegexTimeout);
+            _activeSearchText = text;
+        }
+        catch (ArgumentException)
+        {
+            _activeSearch = null;
+        }
+    }
+
+    /// <summary>The views' highlight: the shown query's include rules, kept to the filtered lines when the setting says so.</summary>
+    private Query BuildHighlight(Query query)
+    {
+        var highlight = new Query(query.Rules, HighlightRegexTimeout);
+        return query.Filter is { } filter && !HighlightOutsideFilter
+            ? highlight.Inside(new Query(filter.Rules, HighlightRegexTimeout))
+            : highlight;
+    }
+
+    partial void OnHighlightOutsideFilterChanged(bool value)
+    {
+        if (_shownQuery is { } query && Highlight is not null) Highlight = BuildHighlight(query);
+    }
+
     partial void OnSearchInsideFilterChanged(bool value)
     {
         if (_activeSearch is not null && _activeFilter is not null) _ = Rerun();
@@ -200,7 +244,8 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         _showingFilter = isFilter;
         Results = new LineSource(new ResultLines(result), new DocumentLineReader(document));
         ResultsSelection.MoveCaret(default, extend: false);
-        Highlight = new Query(query.Rules, HighlightRegexTimeout);
+        _shownQuery = query;
+        Highlight = BuildHighlight(query);
         CurrentLine = null;
         CurrentResultRow = null;
         IsResultsPaneOpen = true;

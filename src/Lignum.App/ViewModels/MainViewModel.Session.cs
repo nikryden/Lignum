@@ -17,6 +17,12 @@ public sealed partial class MainViewModel
                 Path = tab.SourcePath,
                 FirstLine = tab.ScrollLine,
                 FilterRules = [.. tab.Search.GetFilterRules()],
+                SearchText = tab.Search.ActiveSearchText,
+                SearchIsRegex = tab.Search.IsRegex,
+                SearchMatchCase = tab.Search.MatchCase,
+                SearchNonBacktracking = tab.Search.UseNonBacktracking,
+                SearchInsideFilter = tab.Search.SearchInsideFilter,
+                HideNonMatchingLines = tab.HideNonMatchingLines,
             })],
             SelectedIndex = SelectedTab is { } selected ? Tabs.IndexOf(selected) : -1,
         };
@@ -76,6 +82,14 @@ public sealed partial class MainViewModel
 
             tab.RestoreScroll(entry.FirstLine);
             if (entry.FilterRules is { Count: > 0 } rules) tab.Search.SetFilterRules(rules);
+            tab.Search.SearchInsideFilter = entry.SearchInsideFilter;
+            if (!string.IsNullOrEmpty(entry.SearchText))
+            {
+                tab.Search.RestoreSearch(entry.SearchText, entry.SearchIsRegex, entry.SearchMatchCase,
+                    entry.SearchNonBacktracking);
+            }
+
+            tab.HideNonMatchingLines = entry.HideNonMatchingLines;
             indexing.Add(tab.Start()); // the rules run once the document is attached
             if (i == session.SelectedIndex) selected = tab;
         }

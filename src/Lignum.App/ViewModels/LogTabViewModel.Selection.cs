@@ -34,7 +34,9 @@ public sealed partial class LogTabViewModel
     [RelayCommand(CanExecute = nameof(CanCopy))]
     private Task Copy() =>
         _document is { } document && Copier is { } copier && !Selection.IsEmpty
-            ? RunCopy(token => copier.CopyAsync(document, Selection, token))
+            ? RunCopy(token => HidingView is { } shown // only the lines the main view shows (ticket 08)
+                ? copier.CopyRowsAsync(document, shown.Lines, Selection, token)
+                : copier.CopyAsync(document, Selection, token))
             : Task.CompletedTask;
 
     /// <summary>Ctrl+C in the results pane: copies the selected result lines only (filter / find all).</summary>
