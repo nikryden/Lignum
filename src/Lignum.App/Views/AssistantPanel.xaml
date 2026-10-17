@@ -22,6 +22,12 @@
         <DockPanel DockPanel.Dock="Top" Margin="8,6">
             <Button DockPanel.Dock="Right" Content="✕" ToolTip="Close (Ctrl+Shift+A)" Padding="6,0"
                     Command="{Binding TogglePanelCommand}" />
+            <Button DockPanel.Dock="Right" Content="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
+                    ToolTip="Check the agent again" Command="{Binding RefreshAgentCommand}"
+                    Visibility="{Binding ShowAgentIcons, Converter={StaticResource BoolToVisibility}}" />
+            <Button DockPanel.Dock="Right" Content="&#xE77B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
+                    ToolTip="Sign in to the agent again" Command="{Binding SignInAgentCommand}"
+                    Visibility="{Binding ShowAgentIcons, Converter={StaticResource BoolToVisibility}}" />
             <Button DockPanel.Dock="Right" Content="&#xE90E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
                     ToolTip="Dock at the bottom" Command="{Binding Layout.DockBottomCommand}" />
             <Button DockPanel.Dock="Right" Content="&#xE90D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Padding="6,2" Margin="0,0,4,0"
@@ -52,17 +58,25 @@
                 <ComboBox ItemsSource="{Binding AgentNames}" SelectedIndex="{Binding SelectedAgent}" Margin="0,0,4,0"
                           ToolTip="The AI agent installed on this PC that answers here" />
             </DockPanel>
-            <!-- Setup: not installed -> Install -> Sign in -> ready. -->
-            <TextBlock DockPanel.Dock="Top" Text="{Binding AgentStatus}" TextWrapping="Wrap" Margin="0,0,0,4" Opacity="0.85" />
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,4">
-                <Button Content="Install" Padding="8,0" Margin="0,0,4,0" Command="{Binding InstallAgentCommand}"
-                        Visibility="{Binding IsAgentInstalled, Converter={StaticResource InverseBoolToVisibility}}"
-                        ToolTip="Runs the official installer in a PowerShell window you can see" />
-                <Button Content="Sign in" Padding="8,0" Margin="0,0,4,0" Command="{Binding SignInAgentCommand}"
-                        Visibility="{Binding IsAgentInstalled, Converter={StaticResource BoolToVisibility}}"
-                        ToolTip="Opens the agent in a terminal for its one-time sign-in" />
-                <Button Content="Check again" Padding="8,0" Command="{Binding RefreshAgentCommand}" />
-            </StackPanel>
+            <!-- Setup: a warning until the agent is installed and signed in; then the header icons take over. -->
+            <Border DockPanel.Dock="Top" Margin="0,0,0,4" Padding="8,6" BorderThickness="1" CornerRadius="4"
+                    Background="{DynamicResource BannerBackgroundBrush}" BorderBrush="{DynamicResource BannerBorderBrush}"
+                    Visibility="{Binding ShowAgentSetup, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource BannerForegroundBrush}">
+                        <Run Text="&#x26A0;" /> <Run Text="{Binding AgentStatus, Mode=OneWay}" />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <Button Content="Install" Padding="8,0" Margin="0,0,4,0" Command="{Binding InstallAgentCommand}"
+                                Visibility="{Binding IsAgentInstalled, Converter={StaticResource InverseBoolToVisibility}}"
+                                ToolTip="Runs the official installer in a PowerShell window you can see" />
+                        <Button Content="Sign in" Padding="8,0" Margin="0,0,4,0" Command="{Binding SignInAgentCommand}"
+                                Visibility="{Binding IsAgentInstalled, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="Opens the agent in a terminal for its one-time sign-in" />
+                        <Button Content="Check again" Padding="8,0" Command="{Binding RefreshAgentCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
             <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
                 <Button DockPanel.Dock="Right" Content="Send" Padding="10,1" Command="{Binding SendCommand}" />
                 <Button DockPanel.Dock="Right" Content="Stop" Padding="10,1" Margin="0,0,4,0" Command="{Binding StopCommand}" />

@@ -4,6 +4,16 @@ using System.Text.Json;
 
 namespace Lignum.App.Assistant;
 
+/// <summary>Where the chat's agent stands, for the AI panel's setup warning.</summary>
+public enum AgentState
+{
+    Unknown,
+    Checking,
+    NotInstalled,
+    NotSignedIn,
+    Ready,
+}
+
 /// <summary>
 /// An AI agent CLI the user already has (ticket 05): Lignum runs it in its non-interactive mode for the chat in
 /// the AI panel, attaches Lignum's MCP tools, and shows its answer. The agent runs on the user's own
@@ -42,6 +52,9 @@ public abstract class CliAgent
     /// <summary>The installed program: on PATH (as Windows has it now, not as it was when Lignum started) or in a known location.</summary>
     public string? FindExecutable() =>
         Executable ?? FindOnPath(Command) ?? KnownLocations.FirstOrDefault(File.Exists);
+
+    /// <summary>Whether the user is signed in to the agent; null when the agent cannot tell (the panel then remembers).</summary>
+    public virtual Task<bool?> IsSignedInAsync(CancellationToken cancellationToken) => Task.FromResult<bool?>(null);
 
     /// <summary>Opens a PowerShell window that runs <see cref="InstallCommand"/> and stays open.</summary>
     public ProcessStartInfo InstallStart() => new("powershell.exe")
@@ -168,6 +181,23 @@ public sealed class ClaudeCodeAgent : CliAgent
     ];
 
     protected override bool PromptOnStdin => true;
+
+    /// <summary><c>claude auth status</c> exits with 0 when signed in, 1 when not.</summary>
+    public override async Task<bool?> IsSignedInAsync(CancellationToken cancellationToken)
+    {
+        if (FindExecutable() is not { } exe) return false;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        try
+        {
+            Directory.CreateDirectory(WorkFolder);
+            return await ProcessRunner.RunAsync(exe, ["auth", "status"], null, WorkFolder, _ => { }, _ => { }, timeout.Token) == 0;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException)
+        {
+            return null; // could not tell
+        }
+    }
 
     protected internal override IReadOnlyList<string> BuildArguments(string prompt)
     {

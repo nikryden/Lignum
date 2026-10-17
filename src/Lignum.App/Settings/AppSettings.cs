@@ -87,4 +87,7 @@ public sealed class AssistantSettings
 
     /// <summary>The agent the in-app chat runs: 0 = Claude Code, 1 = GitHub Copilot CLI.</summary>
     public int Agent { get; set; }
+
+    /// <summary>Agents the user has signed in to through the panel (for agents that cannot be asked).</summary>
+    public List<int> SignedIn { get; set; } = [];
 }
