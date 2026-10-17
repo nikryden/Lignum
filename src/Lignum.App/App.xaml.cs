@@ -61,7 +61,7 @@ public partial class App : Application
                 highlighting.Theme = appearance.EffectiveTheme;
         };
 
-        var viewModel = new MainViewModel(_settings) { Highlighting = highlighting };
+        var viewModel = new MainViewModel(_settings) { Highlighting = highlighting, DiagnosticsLog = _log.Logger };
         MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
         MainWindow.Show();
         var mainWindow = MainWindow;

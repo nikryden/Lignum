@@ -52,6 +52,9 @@ public sealed class AppSettings
     /// <summary>The tabs open when Lignum last exited, restored on start (ticket 18).</summary>
     public SessionSettings Session { get; set; } = new();
 
+    /// <summary>The built-in assistant (ticket 05).</summary>
+    public AssistantSettings Assistant { get; set; } = new();
+
     /// <summary>Where the Find window was last shown; null: centred on the main window.</summary>
     public WindowBounds? FindWindow { get; set; }
 
@@ -72,4 +75,16 @@ public sealed class WindowBounds
     public double Width { get; set; }
 
     public double Height { get; set; }
+}
+
+/// <summary>The built-in assistant (ticket 05). Off until the user turns it on.</summary>
+public sealed class AssistantSettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>The Claude model; null uses the default.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>The API key, encrypted with DPAPI for the current Windows user; null uses ANTHROPIC_API_KEY.</summary>
+    public string? ProtectedApiKey { get; set; }
 }
