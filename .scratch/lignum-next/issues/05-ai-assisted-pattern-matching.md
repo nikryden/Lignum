@@ -4,7 +4,7 @@
 
 **Blocked by:** None (needs design first)
 
-**Status:** in progress (MCP server and in-app chat done; Copy for AI and a live check of Copilot CLI's flags remain)
+**Status:** done (MCP access, chat with Claude Code / Copilot CLI / Cursor CLI / Codex CLI / custom, Copy for AI). Live check of Copilot CLI still open.
 
 ## Options to decide between
 - **A. Lignum as an MCP server:** Lignum exposes tools (search, read a line range, add a filter or highlight rule) that Claude Desktop or Claude Code can call. No API key in Lignum, and the user's own Claude does the thinking.
