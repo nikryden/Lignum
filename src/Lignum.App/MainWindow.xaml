@@ -6,7 +6,7 @@
         xmlns:settings="clr-namespace:Lignum.App.Settings"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         xmlns:core="clr-namespace:Lignum.Core;assembly=Lignum.Core"
-        Title="{Binding Title}" Height="720" Width="1200"
+        Title="{Binding Title}" Icon="/Assets/Lignum.ico" Height="720" Width="1200"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBackgroundBrush}"
         Foreground="{DynamicResource WindowForegroundBrush}"
