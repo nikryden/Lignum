@@ -210,21 +210,21 @@ public class FilterRulesTests : IDisposable
     }
 
     [Fact]
-    public async Task Filter_and_find_all_share_the_results_pane_and_the_last_one_run_wins()
+    public async Task Filter_and_find_all_share_the_results_pane_and_the_search_runs_inside_the_filter()
     {
         var search = (await OpenLog()).Search;
         search.AddFilterRule(new QueryRule("error"));
         Assert.Equal([1L, 2L], Shown(search));
 
-        search.FindText = "INFO";
+        search.FindText = "health";
         await search.FindAllCommand.ExecuteAsync(null);
-        Assert.Equal([4L], Shown(search));
+        Assert.Equal([2L], Shown(search)); // ticket 08: the search runs inside the filtered lines
 
-        // A find option change re-runs find all, never the filter, and vice versa.
-        search.FilterRules[0].Text = "WARN";
-        Assert.Equal([3L], Shown(search));
+        // Changing a rule or a find option re-runs the combined query.
+        search.FilterRules[0].Text = "check";
+        Assert.Equal([2L, 4L], Shown(search));
         search.MatchCase = true;
-        Assert.Equal([3L], Shown(search));
+        Assert.Equal([2L, 4L], Shown(search));
     }
 
     [Fact]

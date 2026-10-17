@@ -19,6 +19,9 @@
                     Command="{Binding FindPreviousCommand}" />
             <Button DockPanel.Dock="Right" Content="Find _all" ToolTip="List every matching line (Enter)" Padding="10,1" Margin="8,0,0,0"
                     Command="{Binding FindAllCommand}" />
+            <ToggleButton DockPanel.Dock="Right" Content="In filter" Padding="6,1" Margin="4,0,0,0"
+                          ToolTip="With filter rules active: search only the lines they show (on) or the whole file (off)"
+                          IsChecked="{Binding SearchInsideFilter}" />
             <ToggleButton DockPanel.Dock="Right" Content="NB" Padding="6,1" Margin="4,0,0,0"
                           ToolTip="NonBacktracking regex engine: never hangs, but no backreferences or lookarounds (Alt+B)"
                           IsEnabled="{Binding IsRegex}" IsChecked="{Binding UseNonBacktracking}" />

@@ -43,13 +43,32 @@ public sealed class Query
     /// <summary>Default limit for one regex match on one line.</summary>
     public static readonly TimeSpan DefaultRegexTimeout = TimeSpan.FromSeconds(2);
 
-    public Query(IEnumerable<QueryRule> rules, TimeSpan? regexTimeout = null)
+    public Query(IEnumerable<QueryRule> rules, TimeSpan? regexTimeout = null) : this(rules, regexTimeout, null)
+    {
+    }
+
+    private Query(IEnumerable<QueryRule> rules, TimeSpan? regexTimeout, Query? filter)
     {
         ArgumentNullException.ThrowIfNull(rules);
         Rules = [.. rules];
         RegexTimeout = regexTimeout ?? DefaultRegexTimeout;
-        Matcher = new LineMatcher(Rules, RegexTimeout);
+        Filter = filter;
+        Matcher = new LineMatcher(Rules, RegexTimeout, filter?.Matcher);
     }
+
+    /// <summary>
+    /// This query run inside <paramref name="filter"/> (ticket 08): lines that pass the filter's rules and match
+    /// this query, found in one pass over the file. <see cref="FindMatches"/> still returns only this query's
+    /// matches, so the views highlight the search, not the filter.
+    /// </summary>
+    public Query Inside(Query filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        return new Query(Rules, RegexTimeout, filter);
+    }
+
+    /// <summary>The filter this query runs inside (see <see cref="Inside"/>), or null.</summary>
+    public Query? Filter { get; }
 
     /// <summary>A find-all query: lines containing <paramref name="text"/>.</summary>
     public static Query Find(string text, bool matchCase = false, bool isRegex = false, bool nonBacktracking = false) =>

@@ -8,8 +8,8 @@ using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
 
-// Filter rules (ticket 12): include / exclude rules whose combined result fills the results pane. Any
-// change to the list or to a rule re-runs the filter, cancelling the previous run.
+// Filter rules (ticket 12): include / exclude rules whose combined result fills the results pane; an active
+// search runs inside them (ticket 08). Any change to the list or to a rule re-runs, cancelling the previous run.
 public sealed partial class SearchViewModel
 {
     private ObservableCollection<FilterRuleViewModel>? _filterRules;
@@ -137,34 +137,41 @@ public sealed partial class SearchViewModel
     }
 
     /// <summary>
-    /// Runs the current rules. With no active rule the filter's results are cleared (find all results stay);
-    /// an invalid regex sets <see cref="FilterError"/> and keeps whatever is shown.
+    /// Runs the current rules (with the search inside them, if one is active). An invalid regex sets
+    /// <see cref="FilterError"/> and keeps whatever is shown.
     /// </summary>
     private void ApplyFilter()
     {
-        if (_filterRules is null) return;
-        var rules = GetFilterRules();
-        if (!rules.Any(r => r.IsEnabled && !string.IsNullOrEmpty(r.Text)))
+        var before = _activeFilter;
+        if (!RebuildFilter()) return;
+        if (before is null && _activeFilter is null) return; // still no filter: nothing changes
+        _ = Rerun(); // never faults: Completion does not
+    }
+
+    /// <summary>Compiles the active rules into <c>_activeFilter</c> (null: none). False for an invalid regex.</summary>
+    private bool RebuildFilter()
+    {
+        var rules = _filterRules is null ? [] : GetFilterRules();
+        var active = rules.Count(r => r.IsEnabled && !string.IsNullOrEmpty(r.Text));
+        if (active == 0)
         {
             FilterError = null;
-            if (_showingFilter) ClearResults();
-            return;
+            _activeFilter = null;
+            return true;
         }
 
-        if (_document is not { } document) return;
-
-        Query query;
         try
         {
-            query = new Query(rules, RegexTimeout);
+            _activeFilter = new Query(rules, RegexTimeout);
         }
         catch (ArgumentException ex)
         {
             FilterError = ex.Message;
-            return;
+            return false;
         }
 
+        _activeFilterRuleCount = active;
         FilterError = null;
-        _ = RunQuery(document, query, isFilter: true); // never faults: Completion does not
+        return true;
     }
 }

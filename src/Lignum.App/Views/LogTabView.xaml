@@ -127,7 +127,7 @@
                                     Command="{Binding Search.ToggleResultsPaneCommand}" />
                             <TextBlock VerticalAlignment="Center">
                                 <Run Text="Results:" FontWeight="SemiBold" />
-                                <Run Text="{Binding Search.SearchStatus, Mode=OneWay}" />
+                                <Run Text="{Binding Search.ResultsHeader, Mode=OneWay}" />
                             </TextBlock>
                         </DockPanel>
                         <ScrollViewer CanContentScroll="True" Focusable="False"
