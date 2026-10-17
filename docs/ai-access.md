@@ -15,6 +15,8 @@ The panel's **Connect an AI tool** section copies the right setting for you. By 
 - **Claude Desktop** (`claude_desktop_config.json`) and **Cursor** (`~/.cursor/mcp.json`):
   `{ "mcpServers": { "lignum": { "command": "C:\...\Lignum.exe", "args": ["--mcp"] } } }`
 - **Claude Code**: `claude mcp add lignum -- "C:\...\Lignum.exe" --mcp`
+- **OpenAI Codex CLI**: `codex mcp add lignum -- "C:\...\Lignum.exe" --mcp`
+- **Windsurf** and **Antigravity** use the same mcpServers JSON as Claude Desktop (Antigravity: `.agents/mcp_config.json` or `~/.gemini/config/mcp_config.json`).
 
 Keep Lignum open with your logs; then ask your AI tool things like "Which errors happen most in the log open in Lignum? Add a filter for them."
 
@@ -35,7 +37,10 @@ With AI access on, the panel also has a chat. Pick the agent installed on this P
 
 - **Claude Code** (`claude`): uses your Claude subscription (Pro, Max, Team or Enterprise). Lignum runs it with only Lignum's tools (no file, shell or web tools).
 - **GitHub Copilot CLI** (`copilot`): uses your GitHub Copilot subscription. Lignum runs it in prompt mode with the Lignum MCP server added.
+- **Cursor CLI** (`agent`): uses your Cursor account. Lignum puts its MCP server in the conversation folder's `.cursor/mcp.json` and runs `agent -p --approve-mcps`.
+- **OpenAI Codex CLI** (`codex`): uses your ChatGPT plan. Lignum runs `codex exec` in a read-only sandbox with Lignum added through `-c mcp_servers.lignum...`. Installing it needs Node.js.
+- **Custom agent**: any other agent CLI, for example Antigravity CLI (`agy`, Google's replacement for Gemini CLI). Enter its command and an argument template; `{prompt}` is the question, `{mcpConfig}` an MCP settings file (mcpServers JSON) with Lignum in it, `{lignum}` the path of Lignum.exe.
 
-The panel walks you through setup: **Install** runs the vendor's official installer in a PowerShell window you can see (Claude Code: `irm https://claude.ai/install.ps1 | iex`; Copilot CLI: `winget install GitHub.Copilot`). **Sign in** opens the agent in a terminal for its one-time sign-in (for Copilot CLI, type `/login`). **Check again** finds a newly installed agent without restarting Lignum.
+The panel walks you through setup: **Install** runs the vendor's official installer in a PowerShell window you can see (Claude Code: `irm https://claude.ai/install.ps1 | iex`; Copilot CLI: `winget install GitHub.Copilot`; Cursor CLI: `irm 'https://cursor.com/install?win32=true' | iex`; Codex CLI: `npm install -g @openai/codex`). **Sign in** opens the agent in a terminal for its one-time sign-in (for Copilot CLI, type `/login`). **Check again** finds a newly installed agent without restarting Lignum.
 
 Lignum starts the agent in the background for each question (a conversation continues until **New conversation**) and needs no API key. Each agent has its own usage limits and terms.

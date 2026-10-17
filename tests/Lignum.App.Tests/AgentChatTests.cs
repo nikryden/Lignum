@@ -112,9 +112,54 @@ public sealed class AgentChatTests : IDisposable
         Assert.False(main.Assistant.IsBusy);
     }
 
+    [Fact]
+    public void Codex_runs_read_only_with_Lignum_added_and_resumes_the_last_session()
+    {
+        var agent = new CodexCliAgent { WorkFolder = Folder("codex"), LignumExe = @"C:\L\Lignum.exe", LignumArguments = ["--mcp"] };
+
+        var first = agent.BuildArguments("hi");
+
+        Assert.Equal("exec", first[0]);
+        Assert.DoesNotContain("resume", first);
+        Assert.Equal("read-only", first[first.ToList().IndexOf("--sandbox") + 1]);
+        Assert.Contains("mcp_servers.lignum.command=\"C:\\\\L\\\\Lignum.exe\"", first);
+        Assert.Contains("mcp_servers.lignum.args=[\"--mcp\"]", first);
+        Assert.EndsWith("The user asks: hi", first[^1]);
+    }
+
+    [Fact]
+    public void Cursor_gets_Lignum_in_its_project_mcp_file_and_approves_it()
+    {
+        var agent = new CursorCliAgent { WorkFolder = Folder("cursor"), LignumExe = "Lignum.exe", LignumArguments = ["--mcp"] };
+        Directory.CreateDirectory(agent.WorkFolder);
+
+        var arguments = agent.BuildArguments("hi");
+
+        Assert.Contains("--approve-mcps", arguments);
+        Assert.Equal("-p", arguments[0]);
+        Assert.Contains("\"lignum\"", File.ReadAllText(Path.Combine(agent.WorkFolder, ".cursor", "mcp.json")));
+    }
+
+    [Fact]
+    public void A_custom_agent_fills_in_its_argument_template()
+    {
+        var agent = new CustomAgent("agy", "-p {prompt} --mcp-config \"{mcpConfig}\" --name \"two words\"")
+            { WorkFolder = Folder("custom"), LignumExe = "Lignum.exe", LignumArguments = ["--mcp"] };
+        Directory.CreateDirectory(agent.WorkFolder);
+
+        var arguments = agent.BuildArguments("Find \"x\"");
+
+        Assert.Equal("-p", arguments[0]);
+        Assert.EndsWith("The user asks: Find 'x'", arguments[1]);
+        Assert.Equal(Path.Combine(agent.WorkFolder, "mcp.json"), arguments[3]);
+        Assert.Equal("two words", arguments[5]);
+    }
+
     [Theory]
     [InlineData(0, "irm https://claude.ai/install.ps1 | iex")]
     [InlineData(1, "winget install GitHub.Copilot")]
+    [InlineData(2, "irm 'https://cursor.com/install?win32=true' | iex")]
+    [InlineData(3, "npm install -g @openai/codex")]
     public void Install_runs_the_official_installer_in_a_visible_PowerShell_window(int agent, string command)
     {
         var main = Start();
