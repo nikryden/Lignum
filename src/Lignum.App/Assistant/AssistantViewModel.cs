@@ -47,6 +47,18 @@ public sealed partial class AssistantViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPanelOpen;
 
+    /// <summary>The chat's input box.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
+    private string _input = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SendCommand), nameof(StopCommand))]
+    private bool _isBusy;
+
+    private CliAgent? _agent;
+    private CancellationTokenSource? _cancel;
+
     internal AssistantViewModel(SettingsFile<AppSettings> settings, AssistantTools tools, SynchronizationContext? uiContext,
                                 ILogger log)
     {
@@ -88,6 +100,41 @@ public sealed partial class AssistantViewModel : ObservableObject
     /// <summary>The arguments an AI tool passes to Lignum.exe (with --settings-dir when this run uses one).</summary>
     internal IReadOnlyList<string> McpArguments { get; set; } = ["--mcp"];
 
+    /// <summary>The agents the chat can run (index = <see cref="AssistantSettings.Agent"/>).</summary>
+    public IReadOnlyList<string> AgentNames { get; } = ["Claude Code", "GitHub Copilot CLI"];
+
+    /// <summary>The agent the chat runs; changing it starts a new conversation.</summary>
+    public int SelectedAgent
+    {
+        get => Math.Clamp(_settings.Value.Assistant.Agent, 0, AgentNames.Count - 1);
+        set
+        {
+            if (value == SelectedAgent) return;
+            _settings.Value.Assistant.Agent = value;
+            _settings.Save();
+            _agent = null;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AgentStatus));
+        }
+    }
+
+    /// <summary>"Not installed: how to install" for the selected agent, or empty when it is found.</summary>
+    public string AgentStatus
+    {
+        get
+        {
+            var agent = CreateAgent(SelectedAgent);
+            return agent.Executable is not null || CliAgent.FindOnPath(agent.Command) is not null
+                ? ""
+                : $"{agent.Name} was not found. {agent.InstallHint}";
+        }
+    }
+
+    /// <summary>Creates the agent for a conversation (tests replace it).</summary>
+    internal Func<int, string, CliAgent> AgentFactory { get; set; } = (index, folder) => index == 1
+        ? new CopilotCliAgent { WorkFolder = folder, LignumExe = "", LignumArguments = [] }
+        : new ClaudeCodeAgent { WorkFolder = folder, LignumExe = "", LignumArguments = [] };
+
     /// <summary>The Lignum.exe an AI tool starts.</summary>
     public string ExePath { get; } = Environment.ProcessPath ?? "Lignum.exe";
 
@@ -115,6 +162,79 @@ public sealed partial class AssistantViewModel : ObservableObject
 
     [RelayCommand]
     private void Clear() => Entries.Clear();
+
+    /// <summary>Starts a new conversation with the agent.</summary>
+    [RelayCommand]
+    private void NewConversation()
+    {
+        _cancel?.Cancel();
+        _agent = null;
+        Entries.Clear();
+    }
+
+    private bool CanSend() => IsEnabled && !IsBusy && !string.IsNullOrWhiteSpace(Input);
+
+    /// <summary>Asks the selected agent; it uses Lignum's tools through MCP and its answer streams in.</summary>
+    [RelayCommand(CanExecute = nameof(CanSend))]
+    private async Task Send()
+    {
+        var question = Input.Trim();
+        Input = "";
+        Add(ChatEntryKind.User, question);
+        var answer = new ChatEntry(ChatEntryKind.Assistant, "");
+        Entries.Add(answer);
+        _agent ??= CreateAgent(SelectedAgent);
+        var agent = _agent;
+        _cancel = new CancellationTokenSource();
+        IsBusy = true;
+        try
+        {
+            await agent.RunTurnAsync(question, text => OnUi(() => answer.Text += text), _cancel.Token);
+            OnUi(() =>
+            {
+                if (answer.Text.Trim().Length == 0) answer.Text = "(no answer)";
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            Add(ChatEntryKind.Activity, "Stopped.");
+        }
+        catch (Exception ex) when (ex is AgentException or System.ComponentModel.Win32Exception or IOException)
+        {
+            if (answer.Text.Length == 0) Entries.Remove(answer);
+            Add(ChatEntryKind.Error, ex.Message);
+        }
+        finally
+        {
+            IsBusy = false;
+            _cancel.Dispose();
+            _cancel = null;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(IsBusy))]
+    private void Stop() => _cancel?.Cancel();
+
+    private CliAgent CreateAgent(int index)
+    {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lignum",
+            "agents", Guid.NewGuid().ToString("N"));
+        var made = AgentFactory(index, folder);
+        return made switch
+        {
+            ClaudeCodeAgent when made.LignumExe.Length == 0 => new ClaudeCodeAgent
+                { WorkFolder = folder, LignumExe = ExePath, LignumArguments = McpArguments, Executable = made.Executable },
+            CopilotCliAgent when made.LignumExe.Length == 0 => new CopilotCliAgent
+                { WorkFolder = folder, LignumExe = ExePath, LignumArguments = McpArguments, Executable = made.Executable },
+            _ => made,
+        };
+    }
+
+    private void OnUi(Action action)
+    {
+        if (_uiContext is null) action();
+        else _uiContext.Post(_ => action(), null);
+    }
 
     /// <summary>Runs one tool call from an AI agent on the UI thread, listing it in the panel.</summary>
     internal Task<ToolOutcome> HandleToolCallAsync(ToolCall call, CancellationToken cancellationToken)
