@@ -108,7 +108,7 @@ public sealed class SessionTests : IDisposable
     }
 
     [Fact]
-    public async Task Restore_returns_with_the_tabs_open_while_indexing_continues_in_the_background()
+    public async Task Restore_reopens_the_tabs_with_their_scroll_position_pending()
     {
         var a = WriteLog("a.log");
         var vm = Start();
@@ -117,12 +117,11 @@ public sealed class SessionTests : IDisposable
         Exit(vm);
 
         var restarted = Start();
-        var indexing = restarted.RestoreSession(); // not awaited: the tabs are there already
+        await restarted.RestoreSession(); // files open in the background, so the tabs only appear later
 
         var tab = Assert.Single(restarted.Tabs);
         Assert.True(tab.IsScrollRestorePending);
         Assert.Equal(7, tab.ScrollLine);
-        await indexing;
     }
 
     [Fact]

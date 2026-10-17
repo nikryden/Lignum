@@ -26,24 +26,40 @@ public sealed partial class LogTabViewModel
     /// Opens this tab's path again (with the chosen encoding, if any) and indexes it in the same tab. On
     /// failure the current document stays and <see cref="ErrorMessage"/> says why.
     /// </summary>
-    private Task Reopen()
+    private async Task Reopen()
     {
-        if (_document is null) return Task.CompletedTask; // closed
+        if (await OpenAgainAsync() is { } document) await Attach(document);
+    }
+
+    /// <summary>
+    /// Opens this tab's path again on a background thread and disposes the current document. Null when the tab
+    /// was closed meanwhile, or the file could not be opened (the current document then stays).
+    /// </summary>
+    private async Task<LogDocument?> OpenAgainAsync()
+    {
+        if (_document is null) return null; // closed
 
         LogDocument document;
         try
         {
-            document = LogDocument.Open(Path, EncodingOverride);
+            var encoding = EncodingOverride;
+            document = await Task.Run(() => LogDocument.Open(Path, encoding));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
                                        or NotSupportedException)
         {
             ErrorMessage = $"Could not reload {Path}: {ex.Message}";
-            return Task.CompletedTask;
+            return null;
+        }
+
+        if (_document is null) // closed while opening
+        {
+            document.Dispose();
+            return null;
         }
 
         _document.Dispose();
-        return Attach(document);
+        return document;
     }
 
     /// <summary>Called for each newly opened document, before indexing starts.</summary>

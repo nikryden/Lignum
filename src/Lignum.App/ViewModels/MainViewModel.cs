@@ -54,7 +54,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// (paths compared case-insensitively after resolving the full path). The returned task completes when
     /// that tab's indexing stops; the UI does not need to await it.
     /// </summary>
-    public Task OpenFileAsync(string path)
+    public async Task OpenFileAsync(string path) => await await OpenFileCoreAsync(path);
+
+    /// <summary>Opens <paramref name="path"/> as <see cref="OpenFileAsync"/> does; completes once its tab is there, with the tab's indexing.</summary>
+    private async Task<Task> OpenFileCoreAsync(string path)
     {
         string fullPath;
         try
@@ -67,32 +70,41 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return Task.CompletedTask;
         }
 
-        var existing = FindTab(fullPath);
-        if (existing is not null)
+        if (FindTab(fullPath) is { } existing) return SelectExisting(existing);
+
+        var document = await OpenDocumentAsync(fullPath, path);
+        if (document is null) return Task.CompletedTask;
+        if (FindTab(fullPath) is { } opened) // opened meanwhile, e.g. dropped twice
         {
-            ErrorMessage = null;
-            SelectedTab = existing;
-            AddRecentFile(existing.Path);
-            return existing.IndexingCompletion;
+            document.Dispose();
+            return SelectExisting(opened);
         }
 
-        var tab = AddTab(fullPath, path);
-        if (tab is null) return Task.CompletedTask;
+        var tab = AddTab(document);
         SelectedTab = tab;
         AddRecentFile(tab.Path);
         return tab.Start();
     }
 
+    private Task SelectExisting(LogTabViewModel tab)
+    {
+        ErrorMessage = null;
+        SelectedTab = tab;
+        AddRecentFile(tab.Path);
+        return tab.IndexingCompletion;
+    }
+
     /// <summary>
-    /// Opens <paramref name="fullPath"/> and appends its tab, not yet indexing (call <see cref="LogTabViewModel.Start"/>).
+    /// Opens <paramref name="fullPath"/> on a background thread, so a slow disk or share never blocks the UI.
     /// Null (and <see cref="ErrorMessage"/> set) when the file cannot be opened.
     /// </summary>
-    private LogTabViewModel? AddTab(string fullPath, string displayPath)
+    private async Task<LogDocument?> OpenDocumentAsync(string fullPath, string displayPath)
     {
-        LogDocument document;
         try
         {
-            document = LogDocument.Open(fullPath);
+            var document = await Task.Run(() => LogDocument.Open(fullPath));
+            ErrorMessage = null;
+            return document;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException
                                        or NotSupportedException)
@@ -100,8 +112,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ErrorMessage = $"Could not open {displayPath}: {ex.Message}";
             return null;
         }
+    }
 
-        ErrorMessage = null;
+    /// <summary>Appends a tab for <paramref name="document"/>, not yet indexing (call <see cref="LogTabViewModel.Start"/>).</summary>
+    private LogTabViewModel AddTab(LogDocument document)
+    {
         var tab = new LogTabViewModel(document, _uiContext) { Copier = Copier, Highlighting = Highlighting, History = History,
             SettingsStore = _settings.Store };
         Tabs.Add(tab);
@@ -112,8 +127,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// Opens each path (e.g. files dropped on the window) as <see cref="OpenFileAsync"/> does; the last one
     /// ends up selected. Completes when all of them have finished indexing.
     /// </summary>
-    public Task OpenFilesAsync(IEnumerable<string> paths) =>
-        Task.WhenAll(paths.Select(OpenFileAsync).ToList());
+    public async Task OpenFilesAsync(IEnumerable<string> paths)
+    {
+        var indexing = new List<Task>();
+        foreach (var path in paths) indexing.Add(await OpenFileCoreAsync(path)); // one by one, so the tabs keep their order
+        await Task.WhenAll(indexing);
+    }
 
     /// <summary>
     /// Closes <paramref name="tab"/> (null = the selected tab, as Ctrl+W does) and releases its file.
