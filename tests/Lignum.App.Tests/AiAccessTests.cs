@@ -290,7 +290,7 @@ public sealed class AiAccessTests : IDisposable
         [
             "list_tabs", "search_all_tabs", "find_in_files", "open_file", "add_highlight_rule", "list_highlight_rules",
             "remove_highlight_rule", "clear_highlight_rules", "list_skills", "get_skill", "save_skill",
-            "list_dir", "read_file", "write_file", "edit_file",
+            "list_dir", "read_file", "write_file", "edit_file", "run_command",
         ];
         var missing = typeof(LignumMcpTools).GetMethods()
             .Select(m => (Method: m, Tool: m.GetCustomAttributes(typeof(ModelContextProtocol.Server.McpServerToolAttribute), false)

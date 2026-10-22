@@ -32,7 +32,8 @@ public abstract class CliAgent
         "When the user asks for a skill (saved instructions run with /name), write it and save it with save_skill " +
         "(local next to the log unless they want it for every log); do not ask them to save a file. " +
         "To look at other files (e.g. the source code behind a log) use list_dir and read_file; to change files use " +
-        "edit_file or write_file. Lignum asks the user to allow each of these; if they decline, do not retry. " +
+        "edit_file or write_file; to run git, PowerShell, Python, WSL and so on use run_command. Lignum asks the user " +
+        "to allow each of these; if they decline, do not retry. " +
         "Keep answers short and concrete, and quote line numbers.";
 
     /// <summary>"Claude Code" or "GitHub Copilot CLI".</summary>

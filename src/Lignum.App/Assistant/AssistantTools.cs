@@ -78,6 +78,7 @@ public sealed partial class AssistantTools(MainViewModel main)
                 "read_file" => await ReadFileAsync(call.Input, cancellationToken),
                 "write_file" => await WriteFileAsync(call.Input, cancellationToken),
                 "edit_file" => await EditFileAsync(call.Input, cancellationToken),
+                "run_command" => await RunCommandAsync(call.Input, cancellationToken),
                 _ => new ToolOutcome($"Unknown tool {call.Name}.", IsError: true),
             };
         }

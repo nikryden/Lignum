@@ -306,6 +306,19 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         Call("edit_file", new() { ["path"] = E(path), ["old_text"] = E(oldText), ["new_text"] = E(newText), ["replace_all"] = E(replaceAll) },
             cancellationToken);
 
+    [McpServerTool(Name = "run_command"), Description("Run a command on this PC (git, PowerShell, cmd, Python, WSL, ...) and get its output and exit code. The user sees the exact command and must allow it. No input can be typed, so use non-interactive options. Output is capped at 100,000 characters.")]
+    public Task<string> RunCommand(
+        [Description("The command. With shell \"none\" its first word is the program (e.g. \"git log -n 5\", \"python script.py\"); otherwise it is a script for that shell.")] string command,
+        [Description("\"none\" (run a program directly), \"pwsh\", \"powershell\", \"cmd\" or \"wsl\" (bash in WSL).")] string shell = "none",
+        [Description("Working folder (full path); default the folder of the selected log.")] string? cwd = null,
+        [Description("Stop it after this many seconds (at most 600).")] int timeoutSeconds = 120,
+        CancellationToken cancellationToken = default)
+    {
+        var arguments = new Dictionary<string, JsonElement> { ["command"] = E(command), ["shell"] = E(shell), ["timeout_seconds"] = E(timeoutSeconds) };
+        if (!string.IsNullOrWhiteSpace(cwd)) arguments["cwd"] = E(cwd);
+        return Call("run_command", arguments, cancellationToken);
+    }
+
     private static Dictionary<string, JsonElement> WithTab(Dictionary<string, JsonElement> arguments, string? tab)
     {
         if (!string.IsNullOrWhiteSpace(tab)) arguments["tab"] = E(tab);

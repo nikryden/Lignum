@@ -632,6 +632,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         "read_file" => $"Reading {Arg(call, "path")}",
         "write_file" => $"Writing {Arg(call, "path")}",
         "edit_file" => $"Editing {Arg(call, "path")}",
+        "run_command" => $"Running {(Arg(call, "shell") is { Length: > 0 } shell and not "none" ? shell + ": " : "")}{Arg(call, "command")}",
         _ => call.Name,
     };
 
