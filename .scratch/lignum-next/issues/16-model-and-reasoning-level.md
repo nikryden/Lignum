@@ -4,12 +4,12 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-**Mapping:** Claude Code `--model` (+ effort where the CLI supports it); Codex `-m` and `-c model_reasoning_effort=low|medium|high`; Cursor `--model`; Copilot `--model`; Custom agent: `{model}` / `{effort}` placeholders in the argument template.
+**Mapping (checked against each CLI's --help):** Claude Code `--model` + `--effort low|medium|high|xhigh|max`; Copilot `--model` + `--reasoning-effort none..max`; Codex `-m` + `-c model_reasoning_effort=`; Cursor `--model` only (effort is part of some model names); Custom agent: `{model}` / `{effort}` placeholders, dropped with their flag when empty.
 
-- [ ] Model (editable combo with known models) and reasoning-level dropdowns in the assistant pane
-- [ ] Saved per agent in `AssistantSettings`
-- [ ] Empty means the CLI's default (no flag passed)
-- [ ] Controls an agent does not support are hidden
-- [ ] Argument tests for each agent
+- [x] Model (editable combo with known models) and reasoning-level dropdowns in the assistant pane
+- [x] Saved per agent in `AssistantSettings`
+- [x] Empty means the CLI's default (no flag passed)
+- [x] Controls an agent does not support are hidden
+- [x] Argument tests for each agent

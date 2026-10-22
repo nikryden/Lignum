@@ -60,11 +60,22 @@
                 <ComboBox ItemsSource="{Binding AgentNames}" SelectedIndex="{Binding SelectedAgent}" Margin="0,0,4,0"
                           ToolTip="The AI agent installed on this PC that answers here" />
             </DockPanel>
+            <!-- Model and reasoning level (ticket 16): empty = the agent's own default. -->
+            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <ComboBox DockPanel.Dock="Right" Width="90" Margin="4,0,0,0"
+                          ItemsSource="{Binding EffortChoices}" SelectedItem="{Binding AgentEffort}"
+                          ToolTip="Reasoning level (empty = the agent's default)"
+                          Visibility="{Binding SupportsEffort, Converter={StaticResource BoolToVisibility}}" />
+                <TextBlock DockPanel.Dock="Left" Text="Model" VerticalAlignment="Center" Margin="0,0,6,0" Opacity="0.8" />
+                <ComboBox IsEditable="True" ItemsSource="{Binding ModelSuggestions}"
+                          Text="{Binding AgentModel, UpdateSourceTrigger=LostFocus}"
+                          ToolTip="Model name or alias (empty = the agent's default); used from the next question" />
+            </DockPanel>
             <!-- Custom agent: its command and argument template. -->
             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4" Visibility="{Binding IsCustomAgent, Converter={StaticResource BoolToVisibility}}">
                 <TextBlock Text="Command (name on PATH, or full path)" Opacity="0.8" />
                 <TextBox Text="{Binding CustomCommand, UpdateSourceTrigger=LostFocus}" Margin="0,2,0,4" />
-                <TextBlock Text="Arguments: {prompt} = the question, {mcpConfig} = MCP settings file with Lignum, {lignum} = Lignum.exe"
+                <TextBlock Text="Arguments: {prompt} = the question, {mcpConfig} = MCP settings file with Lignum, {lignum} = Lignum.exe, {model} and {effort} = the model and reasoning choices above (dropped with their flag when empty)"
                            Opacity="0.8" TextWrapping="Wrap" />
                 <TextBox Text="{Binding CustomArguments, UpdateSourceTrigger=LostFocus}" Margin="0,2,0,0" />
             </StackPanel>

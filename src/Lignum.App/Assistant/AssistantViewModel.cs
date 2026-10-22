@@ -213,7 +213,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         }
     }
 
-    /// <summary>The custom agent's arguments: {prompt}, {mcpConfig} and {lignum} are filled in.</summary>
+    /// <summary>The custom agent's arguments: {prompt}, {mcpConfig}, {lignum}, {model} and {effort} are filled in.</summary>
     public string CustomArguments
     {
         get => _settings.Value.Assistant.CustomArguments ?? "-p {prompt}";
@@ -223,6 +223,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Save();
             _agent = null;
             OnPropertyChanged();
+            OnModelChoiceChanged(); // {effort} in the template turns the reasoning box on
         }
     }
 
@@ -238,8 +239,61 @@ public sealed partial class AssistantViewModel : ObservableObject
             _agent = null;
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsCustomAgent));
+            OnModelChoiceChanged();
             _ = RefreshAgentAsync();
         }
+    }
+
+    /// <summary>The selected agent's saved model and reasoning level, or null.</summary>
+    private AgentModelChoice? ModelChoice => _settings.Value.Assistant.Models.FirstOrDefault(m => m.Agent == SelectedAgent);
+
+    /// <summary>The model for the selected agent (ticket 16); empty = the CLI's default. Takes effect on the next question.</summary>
+    public string AgentModel
+    {
+        get => ModelChoice?.Model ?? "";
+        set => SaveModelChoice(value.Trim(), ModelChoice?.Effort);
+    }
+
+    /// <summary>The reasoning level for the selected agent; "" = the CLI's default.</summary>
+    public string AgentEffort
+    {
+        get => ModelChoice?.Effort ?? "";
+        set => SaveModelChoice(ModelChoice?.Model, value);
+    }
+
+    /// <summary>Model names to offer for the selected agent; any other can be typed.</summary>
+    public IReadOnlyList<string> ModelSuggestions => CreateAgent(SelectedAgent).SuggestedModels;
+
+    /// <summary>"" (default) and the selected agent's reasoning levels; just "" when it has none.</summary>
+    public IReadOnlyList<string> EffortChoices => ["", .. CreateAgent(SelectedAgent).EffortLevels];
+
+    /// <summary>Whether the selected agent takes a reasoning level (the box is hidden otherwise).</summary>
+    public bool SupportsEffort => EffortChoices.Count > 1;
+
+    private void SaveModelChoice(string? model, string? effort)
+    {
+        var models = _settings.Value.Assistant.Models;
+        models.RemoveAll(m => m.Agent == SelectedAgent);
+        if (!string.IsNullOrWhiteSpace(model) || !string.IsNullOrWhiteSpace(effort))
+            models.Add(new AgentModelChoice { Agent = SelectedAgent, Model = model, Effort = effort });
+        _settings.Save();
+        if (_agent is not null)
+        {
+            _agent.Model = model;
+            _agent.Effort = effort;
+        }
+
+        OnPropertyChanged(nameof(AgentModel));
+        OnPropertyChanged(nameof(AgentEffort));
+    }
+
+    private void OnModelChoiceChanged()
+    {
+        OnPropertyChanged(nameof(AgentModel));
+        OnPropertyChanged(nameof(AgentEffort));
+        OnPropertyChanged(nameof(ModelSuggestions));
+        OnPropertyChanged(nameof(EffortChoices));
+        OnPropertyChanged(nameof(SupportsEffort));
     }
 
     /// <summary>Where the selected agent stands: checking, not installed, not signed in, or ready to chat.</summary>
@@ -459,6 +513,11 @@ public sealed partial class AssistantViewModel : ObservableObject
             _ => new ClaudeCodeAgent(),
         };
         if (made.WorkFolder.Length == 0) made.WorkFolder = folder;
+        if (_settings.Value.Assistant.Models.FirstOrDefault(m => m.Agent == index) is { } choice)
+        {
+            made.Model = choice.Model;
+            made.Effort = choice.Effort;
+        }
         if (made.LignumExe.Length == 0)
         {
             made.LignumExe = ExePath;

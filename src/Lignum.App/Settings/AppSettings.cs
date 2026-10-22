@@ -98,4 +98,17 @@ public sealed class AssistantSettings
 
     /// <summary>Agents the user has signed in to through the panel (for agents that cannot be asked).</summary>
     public List<int> SignedIn { get; set; } = [];
+
+    /// <summary>The model and reasoning level chosen per agent (ticket 16); an agent not listed uses its defaults.</summary>
+    public List<AgentModelChoice> Models { get; set; } = [];
+}
+
+/// <summary>The model and reasoning level for one agent (index as in <see cref="AssistantSettings.Agent"/>); empty = default.</summary>
+public sealed class AgentModelChoice
+{
+    public int Agent { get; set; }
+
+    public string? Model { get; set; }
+
+    public string? Effort { get; set; }
 }

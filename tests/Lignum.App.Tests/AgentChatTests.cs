@@ -140,6 +140,88 @@ public sealed class AgentChatTests : IDisposable
         Assert.Contains("\"lignum\"", File.ReadAllText(Path.Combine(agent.WorkFolder, ".cursor", "mcp.json")));
     }
 
+    private T Agent<T>(T agent, string? model, string? effort) where T : CliAgent
+    {
+        agent.WorkFolder = Folder(typeof(T).Name);
+        agent.LignumExe = "Lignum.exe";
+        agent.LignumArguments = ["--mcp"];
+        agent.Model = model;
+        agent.Effort = effort;
+        Directory.CreateDirectory(agent.WorkFolder);
+        return agent;
+    }
+
+    /// <summary>The value right after <paramref name="flag"/>, or null when the flag is not there.</summary>
+    private static string? After(IReadOnlyList<string> arguments, string flag)
+    {
+        var i = arguments.ToList().IndexOf(flag);
+        return i < 0 ? null : arguments[i + 1];
+    }
+
+    [Fact]
+    public void Each_agent_passes_the_chosen_model_and_reasoning_level_with_its_own_flags()
+    {
+        var claude = Agent(new ClaudeCodeAgent(), "opus", "High").BuildArguments("hi");
+        Assert.Equal("opus", After(claude, "--model"));
+        Assert.Equal("high", After(claude, "--effort"));
+
+        var copilot = Agent(new CopilotCliAgent(), "auto", "xhigh").BuildArguments("hi");
+        Assert.Equal("auto", After(copilot, "--model"));
+        Assert.Equal("xhigh", After(copilot, "--reasoning-effort"));
+
+        var cursor = Agent(new CursorCliAgent(), "gpt-5", "high").BuildArguments("hi");
+        Assert.Equal("gpt-5", After(cursor, "--model"));
+        Assert.DoesNotContain("high", cursor); // Cursor has no reasoning flag
+
+        var codex = Agent(new CodexCliAgent(), "gpt-5-codex", "medium").BuildArguments("hi");
+        Assert.Equal("gpt-5-codex", After(codex, "-m"));
+        Assert.Contains("model_reasoning_effort=\"medium\"", codex);
+    }
+
+    [Fact]
+    public void No_model_or_level_or_an_unknown_level_passes_no_flag()
+    {
+        var claude = Agent(new ClaudeCodeAgent(), " ", "turbo").BuildArguments("hi");
+
+        Assert.DoesNotContain("--model", claude);
+        Assert.DoesNotContain("--effort", claude);
+        Assert.DoesNotContain("-m", Agent(new CodexCliAgent(), null, null).BuildArguments("hi"));
+    }
+
+    [Fact]
+    public void A_custom_agent_fills_in_model_and_effort_and_drops_an_empty_one_with_its_flag()
+    {
+        var both = Agent(new CustomAgent("agy", "-p {prompt} --model {model} --effort {effort}"), "m1", "low").BuildArguments("q");
+        Assert.Equal("m1", After(both, "--model"));
+        Assert.Equal("low", After(both, "--effort"));
+
+        var none = Agent(new CustomAgent("agy", "-p {prompt} --model {model} --effort {effort}"), "", null).BuildArguments("q");
+        Assert.DoesNotContain("--model", none);
+        Assert.DoesNotContain("--effort", none);
+        Assert.Empty(new CustomAgent("agy", "-p {prompt}").EffortLevels);
+    }
+
+    [Fact]
+    public void The_model_and_level_are_saved_per_agent()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 0;
+        main.Assistant.AgentModel = "sonnet";
+        main.Assistant.AgentEffort = "max";
+        main.Assistant.SelectedAgent = 2;
+        Assert.Equal("", main.Assistant.AgentModel);
+        Assert.False(main.Assistant.SupportsEffort);
+        main.Assistant.AgentModel = "gpt-5";
+
+        var again = Start();
+        again.Assistant.SelectedAgent = 0;
+        Assert.Equal("sonnet", again.Assistant.AgentModel);
+        Assert.Equal("max", again.Assistant.AgentEffort);
+        Assert.Contains("max", again.Assistant.EffortChoices);
+        again.Assistant.SelectedAgent = 2;
+        Assert.Equal("gpt-5", again.Assistant.AgentModel);
+    }
+
     [Fact]
     public void Cursor_trusts_the_conversation_folder_it_runs_in_because_print_mode_cannot_ask()
     {

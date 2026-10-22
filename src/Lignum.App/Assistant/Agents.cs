@@ -124,6 +124,31 @@ public abstract class CliAgent
 
     public IReadOnlyList<string> LignumArguments { get; set; } = [];
 
+    /// <summary>The model to use (ticket 16); null or empty leaves the CLI's default and passes no flag.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>The reasoning level, one of <see cref="EffortLevels"/>; null or empty leaves the CLI's default.</summary>
+    public string? Effort { get; set; }
+
+    /// <summary>The reasoning levels the CLI takes, lowest first; empty when it has no such option.</summary>
+    public virtual IReadOnlyList<string> EffortLevels => [];
+
+    /// <summary>Model names offered in the model box; the user can type any other.</summary>
+    public virtual IReadOnlyList<string> SuggestedModels => [];
+
+    /// <summary>Appends <paramref name="modelFlag"/> and <paramref name="effortFlag"/> (when set) with their values.</summary>
+    protected void AddModelArguments(List<string> arguments, string modelFlag, string? effortFlag)
+    {
+        if (!string.IsNullOrWhiteSpace(Model)) arguments.AddRange([modelFlag, Model.Trim()]);
+        if (effortFlag is not null && EffortValue is { } effort) arguments.AddRange([effortFlag, effort]);
+    }
+
+    /// <summary><see cref="Effort"/> when the CLI supports it, else null.</summary>
+    protected string? EffortValue =>
+        !string.IsNullOrWhiteSpace(Effort) && EffortLevels.Contains(Effort.Trim(), StringComparer.OrdinalIgnoreCase)
+            ? Effort.Trim().ToLowerInvariant()
+            : null;
+
     /// <summary>The program to run, or null when the agent is not installed. Overridable for tests.</summary>
     public string? Executable { get; init; }
 
@@ -241,8 +266,13 @@ public sealed class ClaudeCodeAgent : CliAgent
             "--append-system-prompt-file", instructions,
         ];
         arguments.AddRange(HasStarted ? ["--resume", _sessionId] : ["--session-id", _sessionId]);
+        AddModelArguments(arguments, "--model", "--effort");
         return arguments;
     }
+
+    public override IReadOnlyList<string> EffortLevels => ["low", "medium", "high", "xhigh", "max"];
+
+    public override IReadOnlyList<string> SuggestedModels => ["fable", "opus", "sonnet", "haiku"];
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
@@ -321,8 +351,13 @@ public sealed class CopilotCliAgent : CliAgent
             .Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' ');
         List<string> arguments = ["-p", text, "--additional-mcp-config", "@" + mcp, "--allow-tool", "lignum", "--no-color"];
         if (HasStarted) arguments.Add("--continue");
+        AddModelArguments(arguments, "--model", "--reasoning-effort");
         return arguments;
     }
+
+    public override IReadOnlyList<string> EffortLevels => ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+    public override IReadOnlyList<string> SuggestedModels => ["auto"];
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
@@ -376,6 +411,7 @@ public sealed class CursorCliAgent : CliAgent
         List<string> arguments = ["-p", OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}"),
                                   "--approve-mcps", "--trust", "--workspace", WorkFolder, "--output-format", "text"];
         if (HasStarted) arguments.Add("--continue");
+        AddModelArguments(arguments, "--model", null); // effort is part of some model names, e.g. "...-thinking"
         return arguments;
     }
 
@@ -416,6 +452,8 @@ public sealed class CodexCliAgent : CliAgent
     protected internal override IReadOnlyList<string> BuildArguments(string prompt)
     {
         List<string> arguments = ["exec"];
+        if (!string.IsNullOrWhiteSpace(Model)) arguments.AddRange(["-m", Model.Trim()]);
+        if (EffortValue is { } effort) arguments.AddRange(["-c", "model_reasoning_effort=" + JsonSerializer.Serialize(effort)]);
         if (HasStarted) arguments.AddRange(["resume", "--last"]);
         arguments.AddRange(
         [
@@ -435,6 +473,8 @@ public sealed class CodexCliAgent : CliAgent
 
     protected override string? FailureText(string errors) =>
         string.IsNullOrWhiteSpace(errors) ? "OpenAI Codex CLI stopped with an error." : $"OpenAI Codex CLI: {errors.Trim().Split('\n')[^1]}";
+
+    public override IReadOnlyList<string> EffortLevels => ["minimal", "low", "medium", "high", "xhigh"];
 }
 
 /// <summary>
@@ -463,9 +503,29 @@ public sealed class CustomAgent(string command, string argumentTemplate) : CliAg
             mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
         }));
         var question = OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}");
-        return [.. SplitArguments(argumentTemplate).Select(a => a
-            .Replace("{prompt}", question).Replace("{mcpConfig}", mcp).Replace("{lignum}", LignumExe))];
+        var model = Model?.Trim() ?? "";
+        var effort = EffortValue ?? "";
+        // An argument that is only {model} or {effort} is dropped when that value is empty, with the flag before it.
+        var parts = SplitArguments(argumentTemplate);
+        var result = new List<string>();
+        foreach (var part in parts)
+        {
+            if ((part == "{model}" && model.Length == 0) || (part == "{effort}" && effort.Length == 0))
+            {
+                if (result.Count > 0 && result[^1].StartsWith('-')) result.RemoveAt(result.Count - 1);
+                continue;
+            }
+
+            result.Add(part.Replace("{prompt}", question).Replace("{mcpConfig}", mcp).Replace("{lignum}", LignumExe)
+                .Replace("{model}", model).Replace("{effort}", effort));
+        }
+
+        return result;
     }
+
+    /// <summary>Only when the template has an {effort} placeholder.</summary>
+    public override IReadOnlyList<string> EffortLevels =>
+        argumentTemplate.Contains("{effort}", StringComparison.Ordinal) ? ["low", "medium", "high"] : [];
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
