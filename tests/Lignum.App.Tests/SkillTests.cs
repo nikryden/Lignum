@@ -102,9 +102,9 @@ public sealed class SkillTests : IDisposable
 
         assistant.Input = "/";
         Assert.True(assistant.IsSkillListOpen);
-        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Where(s => s.Scope != SkillScope.Command).Select(s => s.Name));
+        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Where(s => s.Scope is SkillScope.Global or SkillScope.Local).Select(s => s.Name));
 
-        assistant.Input = "/ti";
+        assistant.Input = "/timel";
         Assert.Equal("timeline", Assert.Single(assistant.SkillSuggestions).Name);
 
         assistant.AcceptSkillSuggestion();
@@ -127,6 +127,34 @@ public sealed class SkillTests : IDisposable
         Assert.Contains("clear", assistant.SkillSuggestions.Select(s => s.Name));
         Assert.Contains(GlobalFolder, assistant.SkillListHint);
         Assert.Contains("this log's folder only", assistant.SkillListHint);
+    }
+
+    [Fact]
+    public void Lignum_ships_built_in_skills_and_a_users_skill_of_the_same_name_replaces_one()
+    {
+        Assert.Equal(["compare-runs", "explain-exception", "timeline", "trace-to-source", "triage-errors"],
+            SkillLibrary.BuiltIn.Select(s => s.Name));
+        Assert.All(SkillLibrary.BuiltIn, s => Assert.NotEmpty(s.Description));
+        Assert.Contains("search", SkillLibrary.BuiltIn.Single(s => s.Name == "triage-errors").ReadInstructions());
+
+        WriteSkill(GlobalFolder, "t", "timeline", "my own timeline", "mine");
+        var skills = SkillLibrary.Load(GlobalFolder, null, builtIn: true);
+
+        Assert.Equal(SkillScope.Global, skills.Single(s => s.Name == "timeline").Scope);
+        Assert.Equal("built-in", skills.Single(s => s.Name == "triage-errors").ScopeText);
+        Assert.DoesNotContain(SkillLibrary.Load(GlobalFolder, null), s => s.Scope == SkillScope.BuiltIn);
+    }
+
+    [Fact]
+    public async Task The_agent_can_fetch_a_built_in_skill_with_get_skill()
+    {
+        var main = await Start();
+
+        var outcome = await main.Assistant.HandleToolCallAsync(Call("get_skill", new { name = "explain-exception" }), default);
+
+        Assert.False(outcome.IsError, outcome.Content);
+        Assert.Contains("(built-in)", outcome.Content);
+        Assert.Contains("stack trace", outcome.Content);
     }
 
     [Fact]
@@ -172,7 +200,7 @@ public sealed class SkillTests : IDisposable
         Assert.Contains("Search for ERROR and bookmark each in red.", tool.Content);
         Assert.Contains("errors (local): find errors", list.Content);
         Assert.True(missing.IsError);
-        var skill = main.Assistant.Tools.LoadSkills()[0];
+        var skill = main.Assistant.Tools.LoadSkills().Single(s => s.Name == "errors");
         var prompt = SkillLibrary.PromptFor(skill, "only today");
         Assert.Contains("get_skill", prompt);
         Assert.Contains("\"errors\"", prompt);
@@ -202,7 +230,7 @@ public sealed class SkillTests : IDisposable
         var replaced = await main.Assistant.HandleToolCallAsync(Call("save_skill",
             new { name = "first-error", instructions = "changed", overwrite = true }), default);
         Assert.False(replaced.IsError);
-        var skills = main.Assistant.Tools.LoadSkills();
+        var skills = main.Assistant.Tools.LoadSkills().Where(s => s.Scope != SkillScope.BuiltIn).ToList();
         Assert.Equal(["first-error", "timeline"], skills.Select(s => s.Name));
         Assert.Equal("changed", skills[0].ReadInstructions());
         Assert.Equal(SkillScope.Local, skills[0].Scope);

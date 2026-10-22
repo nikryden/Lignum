@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Skills shipped with Lignum (the "/" list shows them as built-in); named BuiltInSkills/<name>. -->
+    <EmbeddedResource Include="Assistant\BuiltInSkills\*\SKILL.md" LogicalName="BuiltInSkills/%(RecursiveDir)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Lignum.App.Tests" />
   </ItemGroup>
 

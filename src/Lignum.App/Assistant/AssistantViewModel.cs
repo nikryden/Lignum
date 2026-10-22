@@ -86,8 +86,8 @@ public sealed partial class AssistantViewModel : ObservableObject
         SelectedSkillSuggestion = SkillSuggestions.FirstOrDefault();
         // With nothing to suggest, say where skills were looked for instead of showing nothing.
         SkillListHint = SkillSuggestions.Count == 0 ? $"No command or skill matches /{prefix}."
-            : _skills.Any(s => s.Scope != SkillScope.Command) ? null
-            : "No skills for this log yet. Global skills: " + _tools.GlobalSkillsFolder
+            : _skills.Any(s => s.Scope is SkillScope.Global or SkillScope.Local) ? null
+            : "No skills of your own for this log yet. Global skills: " + _tools.GlobalSkillsFolder
               + (_tools.LocalSkillsFolder is { } local ? $"\nLocal skills (this log's folder only): {local}" : "")
               + "\nAsk the AI to make one, or put a SKILL.md in a subfolder there.";
         IsSkillListOpen = true;

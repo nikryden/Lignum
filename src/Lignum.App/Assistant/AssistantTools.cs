@@ -32,7 +32,7 @@ public sealed partial class AssistantTools(MainViewModel main)
     public string? LocalSkillsFolder => SkillLibrary.LocalFolderFor(main.SelectedTab?.SourcePath);
 
     /// <summary>The skills for the selected tab: global ones, and local ones next to its log.</summary>
-    public IReadOnlyList<Skill> LoadSkills() => SkillLibrary.Load(GlobalSkillsFolder, LocalSkillsFolder);
+    public IReadOnlyList<Skill> LoadSkills() => SkillLibrary.Load(GlobalSkillsFolder, LocalSkillsFolder, builtIn: true);
 
     /// <summary>Raised after a tool read log lines: (file name, number of lines).</summary>
     public event Action<string, int>? LinesRead;

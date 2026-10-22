@@ -62,10 +62,18 @@ public static partial class SkillLibrary
             ? null
             : Path.Combine(folder, ".lignum", "skills");
 
-    /// <summary>Every skill in <paramref name="globalFolder"/> and <paramref name="localFolder"/>, by name; local wins.</summary>
-    public static IReadOnlyList<Skill> Load(string globalFolder, string? localFolder)
+    /// <summary>
+    /// Every skill in <paramref name="globalFolder"/> and <paramref name="localFolder"/>, by name; local wins over
+    /// global. With <paramref name="builtIn"/>, Lignum's own skills come too, and the user's skills win over them.
+    /// </summary>
+    public static IReadOnlyList<Skill> Load(string globalFolder, string? localFolder, bool builtIn = false)
     {
         var byName = new Dictionary<string, Skill>(StringComparer.OrdinalIgnoreCase);
+        if (builtIn)
+        {
+            foreach (var skill in BuiltIn) byName[skill.Name] = skill;
+        }
+
         foreach (var skill in LoadFolder(globalFolder, SkillScope.Global)) byName[skill.Name] = skill;
         if (localFolder is not null)
         {
@@ -73,6 +81,25 @@ public static partial class SkillLibrary
         }
 
         return [.. byName.Values.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    /// <summary>The skills shipped inside Lignum.exe (Assistant\BuiltInSkills\&lt;name&gt;\SKILL.md, embedded).</summary>
+    public static IReadOnlyList<Skill> BuiltIn { get; } = LoadBuiltIn();
+
+    private static List<Skill> LoadBuiltIn()
+    {
+        var assembly = typeof(SkillLibrary).Assembly;
+        var skills = new List<Skill>();
+        foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.StartsWith("BuiltInSkills/", StringComparison.Ordinal)))
+        {
+            using var stream = assembly.GetManifestResourceStream(resource)!;
+            using var reader = new StreamReader(stream);
+            var text = reader.ReadToEnd();
+            var parsed = Parse(text, resource["BuiltInSkills/".Length..].Trim('/', Path.DirectorySeparatorChar));
+            if (parsed.Name.Length > 0) skills.Add(new Skill(parsed.Name, parsed.Description, SkillScope.BuiltIn, "", text));
+        }
+
+        return [.. skills.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
     private static IEnumerable<Skill> LoadFolder(string folder, SkillScope scope)
