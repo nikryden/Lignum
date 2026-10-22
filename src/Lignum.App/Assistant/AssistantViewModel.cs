@@ -138,10 +138,16 @@ public sealed partial class AssistantViewModel : ObservableObject
                 if (rest.Length > 0) AgentModel = rest == "default" ? "" : rest;
                 Add(ChatEntryKind.Activity, $"Model: {(AgentModel.Length > 0 ? AgentModel : "the agent's default")}");
                 break;
+            case "effort" when EffortChoices.Count <= 1:
+                Add(ChatEntryKind.Error, $"{AgentNames[SelectedAgent]} has no reasoning level setting.");
+                break;
+            case "effort" when !SupportsEffort:
+                Add(ChatEntryKind.Error, $"With model \"{(AgentModel.Length > 0 ? AgentModel : "default")}\" {AgentNames[SelectedAgent]} " +
+                    "picks the model itself and takes no reasoning level. Choose a model first, e.g. /model <name>.");
+                break;
             case "effort" when rest.Length > 0 && !EffortChoices.Contains(rest.ToLowerInvariant()) && rest != "default":
-                Add(ChatEntryKind.Error, SupportsEffort
-                    ? $"Reasoning levels for {AgentNames[SelectedAgent]}: {string.Join(", ", EffortChoices.Skip(1))} (or default)."
-                    : $"{AgentNames[SelectedAgent]} has no reasoning level setting.");
+                Add(ChatEntryKind.Error,
+                    $"Reasoning levels for {AgentNames[SelectedAgent]}: {string.Join(", ", EffortChoices.Skip(1))} (or default).");
                 break;
             case "effort":
                 if (rest.Length > 0) AgentEffort = rest == "default" ? "" : rest.ToLowerInvariant();
@@ -359,7 +365,7 @@ public sealed partial class AssistantViewModel : ObservableObject
     public IReadOnlyList<string> EffortChoices => ["", .. CreateAgent(SelectedAgent).EffortLevels];
 
     /// <summary>Whether the selected agent takes a reasoning level (the box is hidden otherwise).</summary>
-    public bool SupportsEffort => EffortChoices.Count > 1;
+    public bool SupportsEffort => EffortChoices.Count > 1 && CreateAgent(SelectedAgent).AcceptsEffort(AgentModel);
 
     private void SaveModelChoice(string? model, string? effort)
     {
@@ -376,6 +382,7 @@ public sealed partial class AssistantViewModel : ObservableObject
 
         OnPropertyChanged(nameof(AgentModel));
         OnPropertyChanged(nameof(AgentEffort));
+        OnPropertyChanged(nameof(SupportsEffort)); // Copilot's "auto" takes no reasoning level
     }
 
     private void OnModelChoiceChanged()

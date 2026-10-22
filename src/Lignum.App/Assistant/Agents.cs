@@ -142,6 +142,9 @@ public abstract class CliAgent
     /// <summary>The reasoning levels the CLI takes, lowest first; empty when it has no such option.</summary>
     public virtual IReadOnlyList<string> EffortLevels => [];
 
+    /// <summary>Whether a reasoning level can go with <paramref name="model"/> (some CLIs refuse one for some models).</summary>
+    public virtual bool AcceptsEffort(string? model) => EffortLevels.Count > 0;
+
     /// <summary>Model names offered in the model box; the user can type any other.</summary>
     public virtual IReadOnlyList<string> SuggestedModels => [];
 
@@ -412,13 +415,20 @@ public sealed class CopilotCliAgent : CliAgent
             .Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' ');
         List<string> arguments = ["-p", text, "--additional-mcp-config", "@" + mcp, "--allow-tool", "lignum", "--no-color"];
         if (HasStarted) arguments.Add("--continue");
-        AddModelArguments(arguments, "--model", "--reasoning-effort");
+        AddModelArguments(arguments, "--model", AcceptsEffort(Model) ? "--reasoning-effort" : null);
         return arguments;
     }
 
     public override IReadOnlyList<string> EffortLevels => ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
 
     public override IReadOnlyList<string> SuggestedModels => ["auto"];
+
+    /// <summary>
+    /// "auto" (and no model, which may mean auto) lets Copilot pick the model, and Copilot then refuses a reasoning
+    /// level ("Model "auto" does not support reasoning effort configuration"): only a named model takes one.
+    /// </summary>
+    public override bool AcceptsEffort(string? model) =>
+        !string.IsNullOrWhiteSpace(model) && !model.Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {

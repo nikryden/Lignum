@@ -212,8 +212,8 @@ public sealed class AgentChatTests : IDisposable
         Assert.Equal("opus", After(claude, "--model"));
         Assert.Equal("high", After(claude, "--effort"));
 
-        var copilot = Agent(new CopilotCliAgent(), "auto", "xhigh").BuildArguments("hi");
-        Assert.Equal("auto", After(copilot, "--model"));
+        var copilot = Agent(new CopilotCliAgent(), "gpt-5", "xhigh").BuildArguments("hi");
+        Assert.Equal("gpt-5", After(copilot, "--model"));
         Assert.Equal("xhigh", After(copilot, "--reasoning-effort"));
 
         var cursor = Agent(new CursorCliAgent(), "gpt-5", "high").BuildArguments("hi");
@@ -223,6 +223,29 @@ public sealed class AgentChatTests : IDisposable
         var codex = Agent(new CodexCliAgent(), "gpt-5-codex", "medium").BuildArguments("hi");
         Assert.Equal("gpt-5-codex", After(codex, "-m"));
         Assert.Contains("model_reasoning_effort=\"medium\"", codex);
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("")]
+    public void Copilot_gets_no_reasoning_level_when_it_picks_the_model_itself(string model)
+    {
+        var copilot = Agent(new CopilotCliAgent(), model, "medium").BuildArguments("hi");
+
+        Assert.DoesNotContain("--reasoning-effort", copilot);
+        Assert.DoesNotContain("medium", copilot);
+    }
+
+    [Fact]
+    public void The_reasoning_box_is_hidden_while_Copilot_picks_the_model_itself()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 1;
+        main.Assistant.AgentModel = "auto";
+        Assert.False(main.Assistant.SupportsEffort);
+
+        main.Assistant.AgentModel = "gpt-5";
+        Assert.True(main.Assistant.SupportsEffort);
     }
 
     [Fact]
