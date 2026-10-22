@@ -11,6 +11,6 @@
 - [x] Reproduced: on this machine headless `agent -p` fails with "Authentication required… run 'agent login'"; `agent status` exits 0 even when not logged in
 - [x] Sign in runs `agent login`; sign-in check reads `agent status` output
 - [x] Turns pass `--trust --workspace <conversation folder>`
-- [ ] Once ticket 17 exists, folders the user granted are added with `--add-dir`
+- [x] `--add-dir` for granted folders: not needed, since file access goes through Lignum's own tools (ADR 0002)
 - [x] Argument test in `Lignum.App.Tests`
 - [ ] Manual: sign in from Lignum, ask a question that uses a lignum tool, confirm it answers

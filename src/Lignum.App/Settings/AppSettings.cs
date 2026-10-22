@@ -67,6 +67,9 @@ public sealed class AppSettings
     /// <summary>File → Open in editor (ticket 13).</summary>
     public ExternalEditorSettings ExternalEditor { get; set; } = new();
 
+    /// <summary>AI permissions granted "always" (ticket 17, ADR 0002); revoked under View → AI permissions….</summary>
+    public List<Assistant.Permissions.PermissionGrant> AiPermissions { get; set; } = [];
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

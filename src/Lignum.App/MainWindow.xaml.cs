@@ -17,6 +17,7 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         InitializeFindWindow();
+        _viewModel.Assistant.Approver = new DialogPermissionApprover();
         _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
             $"{notes:N0} of the bookmarks have notes. Remove every bookmark, with its note and color?",
             "Clear all bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
@@ -37,6 +38,9 @@ public partial class MainWindow : Window
     {
         if (Highlighting is not null) new HighlightRulesDialog(Highlighting) { Owner = this }.ShowDialog();
     }
+
+    private void OnAiPermissionsClick(object sender, RoutedEventArgs e) =>
+        new AiPermissionsDialog(_viewModel.Assistant.Permissions) { Owner = this }.ShowDialog();
 
     private void OnExternalEditorClick(object sender, RoutedEventArgs e)
     {

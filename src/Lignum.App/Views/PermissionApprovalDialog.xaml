@@ -1,0 +1,24 @@
+<!-- AI permission request (ticket 17, ADR 0002): what the AI wants to do, on which scope, and for how long. -->
+<Window x:Class="Lignum.App.Views.PermissionApprovalDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AI permission" Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Topmost="True"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+    <StackPanel Margin="16">
+        <TextBlock x:Name="Heading" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6" />
+        <TextBox x:Name="TargetBox" IsReadOnly="True" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas"
+                 BorderThickness="0" Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}" Margin="0,0,0,8" />
+        <TextBox x:Name="DetailBox" IsReadOnly="True" FontFamily="Cascadia Mono, Consolas" MaxHeight="260"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Margin="0,0,0,8" Visibility="Collapsed" />
+        <TextBlock Text="Allow it on" Margin="0,0,0,4" />
+        <ListBox x:Name="ScopeList" Margin="0,0,0,12" />
+        <WrapPanel HorizontalAlignment="Right">
+            <Button Content="Allow _once" MinWidth="100" Margin="0,0,8,0" Click="OnOnceClick" />
+            <Button Content="Allow for this _session" MinWidth="100" Margin="0,0,8,0" Click="OnSessionClick" />
+            <Button Content="_Always allow" MinWidth="100" Margin="0,0,8,0" Click="OnAlwaysClick" />
+            <Button Content="_Deny" MinWidth="80" IsCancel="True" IsDefault="True" />
+        </WrapPanel>
+    </StackPanel>
+</Window>

@@ -119,6 +119,7 @@
                 <MenuItem Header="_Font…" Click="OnFontClick" />
                 <MenuItem Header="_Highlight rules…" Click="OnHighlightRulesClick" />
                 <MenuItem Header="_External editor…" Click="OnExternalEditorClick" />
+                <MenuItem Header="AI _permissions…" Click="OnAiPermissionsClick" />
                 <MenuItem Header="Tab _width">
                     <MenuItem Header="_2" Command="{Binding SetTabWidthCommand}"
                               IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">

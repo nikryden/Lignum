@@ -4,14 +4,14 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
 **Decision (ADR 0002):** Lignum enforces permissions itself instead of relying on each CLI's own flags. The agents' native write/shell tools stay off; Lignum offers MCP tools (tickets 18, 19) that check every call against a permission store and ask the user through an approval dialog. This works the same for every agent (print-mode CLIs cannot show their own prompts in our UI) and lets Lignum refuse writes to open log files.
 
 **Grant:** scope (folder path, or executable / exact command), access (read, write, execute), lifetime (once, this session, always).
 
-- [ ] `docs/adr/0002-ai-permissions.md`
-- [ ] Permission store: session grants in memory, "always" grants in settings
-- [ ] Approval dialog: Allow once / Allow this session / Always allow / Deny
-- [ ] Settings → AI permissions: list "always" grants with Revoke (and Revoke all)
-- [ ] Path matching tests: subfolders, `..`, case, trailing separators, symlinks/junctions resolved before checking
+- [x] `docs/adr/0002-ai-permissions.md`
+- [x] Permission store: session grants in memory, "always" grants in settings
+- [x] Approval dialog: Allow once / Allow this session / Always allow / Deny
+- [x] View → AI permissions…: lists session and "always" grants with Revoke (and Revoke all)
+- [x] Path matching tests: subfolders, `..`, case, trailing separators, symlinks/junctions resolved before checking

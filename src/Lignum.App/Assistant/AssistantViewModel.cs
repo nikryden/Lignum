@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Lignum.App.Assistant.Permissions;
 using Lignum.App.Settings;
 using Serilog;
 
@@ -143,7 +144,22 @@ public sealed partial class AssistantViewModel : ObservableObject
         _uiContext = uiContext;
         _log = log;
         _tools.LinesRead += (file, lines) => Add(ChatEntryKind.Activity, $"Read {lines:N0} line{(lines == 1 ? "" : "s")} from {file}");
+        Permissions = new PermissionStore(settings);
     }
+
+    /// <summary>What the AI may do beyond the open logs (ticket 17, ADR 0002); revoked under View → AI permissions….</summary>
+    public PermissionStore Permissions { get; }
+
+    /// <summary>Asks the user about a permission; null (tests, no window) denies everything not already granted.</summary>
+    public IPermissionApprover? Approver { get; set; }
+
+    /// <summary>
+    /// The one gate for powerful tools: true when a grant covers <paramref name="request"/> or the user allows it now.
+    /// </summary>
+    internal Task<bool> RequestPermissionAsync(PermissionRequest request, CancellationToken cancellationToken) =>
+        Approver is { } approver
+            ? Permissions.RequestAsync(request, approver, cancellationToken)
+            : Task.FromResult(Permissions.IsAllowed(request));
 
     public ObservableCollection<ChatEntry> Entries { get; } = [];
 
