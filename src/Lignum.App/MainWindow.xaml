@@ -22,6 +22,7 @@
         <KeyBinding Gesture="Ctrl+F" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding AllTabsSearch.OpenCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding Assistant.TogglePanelCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+E" Command="{Binding OpenInEditorCommand}" />
         <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
         <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -60,6 +61,7 @@
                 </MenuItem>
                 <MenuItem Header="_Export with notes…" Click="OnExportClick" />
                 <MenuItem Header="Export with notes, _uncompressed (huge logs)…" Click="OnExportUncompressedClick" />
+                <MenuItem Header="Open in e_ditor" Command="{Binding OpenInEditorCommand}" InputGestureText="Ctrl+Shift+E" />
                 <MenuItem Header="Copy full _path" Command="{Binding SelectedTab.CopyFullPathCommand}" />
                 <MenuItem Header="Open containing _folder" Command="{Binding SelectedTab.OpenContainingFolderCommand}" />
                 <MenuItem Header="_Close tab" Command="{Binding CloseTabCommand}" InputGestureText="Ctrl+W" />
@@ -116,6 +118,7 @@
                 </MenuItem>
                 <MenuItem Header="_Font…" Click="OnFontClick" />
                 <MenuItem Header="_Highlight rules…" Click="OnHighlightRulesClick" />
+                <MenuItem Header="_External editor…" Click="OnExternalEditorClick" />
                 <MenuItem Header="Tab _width">
                     <MenuItem Header="_2" Command="{Binding SetTabWidthCommand}"
                               IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">

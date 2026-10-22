@@ -4,12 +4,12 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-**Settings:** `ExternalEditor { Command, Arguments }` in `AppSettings`. The argument template takes `{file}` and `{line}`. Presets: Notepad, Notepad++ (`-n{line} "{file}"`), VS Code (`-g "{file}:{line}"`). Default: Notepad.
+**Settings:** `ExternalEditor { Command, Arguments }` in `AppSettings`. The argument template takes `{file}` and `{line}`. Presets: Notepad, Notepad++ (`-n{line} "{file}"`), VS Code (`-g "{file}:{line}"`), Sublime Text. Default: Notepad.
 
-- [ ] File → Open in editor (Ctrl+Shift+E) and "Open in editor at this line" on the line context menu
-- [ ] Settings UI to choose a preset or enter a custom command and arguments
-- [ ] Template expansion is unit tested (quoting, missing `{line}`)
-- [ ] Only `Process.Start`; Lignum never writes to or locks the log
-- [ ] A missing editor shows a clear error, not a crash
+- [x] File → Open in editor (Ctrl+Shift+E) and "Open in editor at this line" on the line context menu
+- [x] View → External editor… dialog to choose a preset or enter a custom command and arguments
+- [x] Template expansion is unit tested (quoting, missing `{line}`)
+- [x] Only `Process.Start`; Lignum never writes to or locks the log
+- [x] A missing editor shows a clear error, not a crash

@@ -69,6 +69,7 @@
             </MenuItem>
             <MenuItem Header="Clear _all bookmarks" Command="{Binding ClearBookmarksCommand}" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
+            <MenuItem Header="Open in _editor at this line" Click="OnOpenInEditorClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />

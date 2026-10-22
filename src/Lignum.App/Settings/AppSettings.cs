@@ -64,6 +64,9 @@ public sealed class AppSettings
     /// <summary>Highlight search matches on lines the filter rules hide too (ticket 08).</summary>
     public bool HighlightMatchesOutsideFilter { get; set; } = true;
 
+    /// <summary>File → Open in editor (ticket 13).</summary>
+    public ExternalEditorSettings ExternalEditor { get; set; } = new();
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

@@ -19,6 +19,16 @@ public partial class LogTabView
         main.ShowFullLine(selection.Caret.Line); // this view's tab is the selected one
     }
 
+    /// <summary>"Open in editor at this line" (ticket 13): the caret line of the view the menu was opened on.</summary>
+    private void OnOpenInEditorClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LogTabViewModel tab) return;
+        if (Window.GetWindow(this)?.DataContext is not MainViewModel main) return;
+        var target = ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget;
+        var selection = ReferenceEquals(target, ResultsView) ? tab.Search.ResultsSelection : tab.Selection;
+        main.OpenInEditorCommand.Execute(selection.Caret.Line); // this view's tab is the selected one
+    }
+
     /// <summary>"Edit bookmark note…" (ticket 06) on the caret line of the view the menu was opened on.</summary>
     private void OnEditNoteClick(object sender, RoutedEventArgs e)
     {

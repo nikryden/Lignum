@@ -38,6 +38,12 @@ public partial class MainWindow : Window
         if (Highlighting is not null) new HighlightRulesDialog(Highlighting) { Owner = this }.ShowDialog();
     }
 
+    private void OnExternalEditorClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExternalEditorDialog(_viewModel.ExternalEditor) { Owner = this };
+        if (dialog.ShowDialog() == true) _viewModel.SetExternalEditor(dialog.Command, dialog.Arguments);
+    }
+
     /// <summary>Ctrl+mouse wheel zooms the text anywhere in the window.</summary>
     private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs e)
     {
