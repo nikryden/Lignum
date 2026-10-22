@@ -98,6 +98,9 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
+            <!-- Token usage (ticket 20): last turn, conversation total and context window, when the agent reports them. -->
+            <TextBlock DockPanel.Dock="Bottom" Margin="0,2,0,0" Opacity="0.7" FontSize="11" TextWrapping="Wrap"
+                       Text="{Binding UsageText}" ToolTip="Tokens as reported by the agent; in = prompt including cached tokens" />
             <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
                 <Button DockPanel.Dock="Right" Content="Send" Padding="10,1" Command="{Binding SendCommand}" />
                 <Button DockPanel.Dock="Right" Content="Stop" Padding="10,1" Margin="0,0,4,0" Command="{Binding StopCommand}" />

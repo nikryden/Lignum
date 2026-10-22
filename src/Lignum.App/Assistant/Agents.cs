@@ -127,6 +127,12 @@ public abstract class CliAgent
 
     public IReadOnlyList<string> LignumArguments { get; set; } = [];
 
+    /// <summary>
+    /// Tokens the last turn used (ticket 20), or null when the CLI does not report them. Set while the turn's output
+    /// is read; reset at the start of each turn.
+    /// </summary>
+    public TokenUsage? LastTurnUsage { get; protected set; }
+
     /// <summary>The model to use (ticket 16); null or empty leaves the CLI's default and passes no flag.</summary>
     public string? Model { get; set; }
 
@@ -161,6 +167,7 @@ public abstract class CliAgent
         var exe = FindExecutable() ?? throw new AgentException($"{Name} is not installed. {InstallHint}");
         Directory.CreateDirectory(WorkFolder);
         var arguments = BuildArguments(prompt);
+        LastTurnUsage = null;
         var output = new StringBuilder();
         var errors = new StringBuilder();
         var exitCode = await ProcessRunner.RunAsync(exe, arguments, PromptOnStdin ? prompt : null, WorkFolder,
@@ -298,13 +305,45 @@ public sealed class ClaudeCodeAgent : CliAgent
                 _sawText |= text.Length > 0;
                 onText(text);
                 break;
+            case "assistant" when message.TryGetProperty("message", out var reply) && reply.TryGetProperty("usage", out var callUsage):
+                // Each model call's prompt is what currently fills the context window; the last one counts.
+                _contextUsed = Tokens(callUsage, "input_tokens") + Tokens(callUsage, "cache_read_input_tokens")
+                               + Tokens(callUsage, "cache_creation_input_tokens") + Tokens(callUsage, "output_tokens");
+                break;
             case "result":
+                ReadUsage(message);
                 if (message.TryGetProperty("is_error", out var isError) && isError.ValueKind == JsonValueKind.True)
                     throw new AgentException($"Claude Code: {Str(message, "result") ?? Str(message, "subtype") ?? "error"}");
                 output.Append(Str(message, "result"));
                 break;
         }
     }
+
+    private long? _contextUsed;
+
+    /// <summary>The result's "usage" (totals for the turn's model calls), cost and context window (ticket 20).</summary>
+    private void ReadUsage(JsonElement result)
+    {
+        if (!result.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object) return;
+        long? window = null;
+        if (result.TryGetProperty("modelUsage", out var models) && models.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var model in models.EnumerateObject())
+            {
+                if (model.Value.TryGetProperty("contextWindow", out var w) && w.TryGetInt64(out var size)) window = Math.Max(window ?? 0, size);
+            }
+        }
+
+        LastTurnUsage = new TokenUsage(
+            Tokens(usage, "input_tokens"), Tokens(usage, "output_tokens"),
+            Tokens(usage, "cache_read_input_tokens"), Tokens(usage, "cache_creation_input_tokens"),
+            result.TryGetProperty("total_cost_usd", out var cost) && cost.TryGetDecimal(out var usd) ? usd : null,
+            _contextUsed, window);
+        _contextUsed = null;
+    }
+
+    private static long Tokens(JsonElement usage, string name) =>
+        usage.TryGetProperty(name, out var value) && value.TryGetInt64(out var tokens) ? tokens : 0;
 
     protected override void Finish(Action<string> onText, StringBuilder output)
     {
@@ -564,6 +603,22 @@ public sealed class CustomAgent(string command, string argumentTemplate) : CliAg
 
 /// <summary>An agent could not run or answered with an error; the message is shown in the panel.</summary>
 public sealed class AgentException(string message) : Exception(message);
+
+/// <summary>
+/// Tokens used (ticket 20). <see cref="Input"/> excludes cached tokens, which are in <see cref="CacheRead"/> and
+/// <see cref="CacheWrite"/>. <see cref="ContextUsed"/> and <see cref="ContextWindow"/> are null when unknown.
+/// </summary>
+public sealed record TokenUsage(long Input, long Output, long CacheRead = 0, long CacheWrite = 0, decimal? CostUsd = null,
+    long? ContextUsed = null, long? ContextWindow = null)
+{
+    public long AllInput => Input + CacheRead + CacheWrite;
+
+    /// <summary>Adds a turn to a conversation total; the context figures are the latest turn's.</summary>
+    public TokenUsage Plus(TokenUsage turn) => new(
+        Input + turn.Input, Output + turn.Output, CacheRead + turn.CacheRead, CacheWrite + turn.CacheWrite,
+        CostUsd is null && turn.CostUsd is null ? null : (CostUsd ?? 0) + (turn.CostUsd ?? 0),
+        turn.ContextUsed ?? ContextUsed, turn.ContextWindow ?? ContextWindow);
+}
 
 /// <summary>Starts a process with arguments, feeds stdin, streams stdout and stderr lines, and kills it on cancel.</summary>
 internal static class ProcessRunner

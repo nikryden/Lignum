@@ -253,6 +253,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Value.Assistant.Agent = value;
             _settings.Save();
             _agent = null;
+            ResetUsage();
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsCustomAgent));
             OnModelChoiceChanged();
@@ -456,6 +457,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         _cancel?.Cancel();
         _agent = null;
         Entries.Clear();
+        ResetUsage();
     }
 
     private bool CanSend() => IsEnabled && !IsBusy && !string.IsNullOrWhiteSpace(Input);
@@ -510,7 +512,55 @@ public sealed partial class AssistantViewModel : ObservableObject
             IsBusy = false;
             _cancel.Dispose();
             _cancel = null;
+            OnUi(() => CountUsage(agent));
         }
+    }
+
+    /// <summary>The last turn's tokens (ticket 20); null when the agent does not report them.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private TokenUsage? _lastTurnUsage;
+
+    /// <summary>All turns of this conversation that reported tokens.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private TokenUsage? _conversationUsage;
+
+    /// <summary>Whether a turn has run in this conversation (before that the usage line is empty).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private bool _hasTurns;
+
+    /// <summary>The usage line under the chat: last turn, conversation and context window, or why there is none.</summary>
+    public string UsageText => !HasTurns ? ""
+        : ConversationUsage is not { } total ? $"Token usage: not reported by {AgentNames[SelectedAgent]}"
+        : FormatUsage(LastTurnUsage, total);
+
+    internal static string FormatUsage(TokenUsage? last, TokenUsage total)
+    {
+        static string K(long tokens) => tokens >= 10_000 ? $"{tokens / 1000.0:0}k" : tokens >= 1000 ? $"{tokens / 1000.0:0.0}k" : $"{tokens}";
+        var parts = new List<string>();
+        if (last is not null) parts.Add($"Last: {K(last.AllInput)} in, {K(last.Output)} out");
+        parts.Add($"Conversation: {K(total.AllInput)} in, {K(total.Output)} out"
+                  + (total.CostUsd is { } cost ? $" (${cost:0.00})" : ""));
+        if (total.ContextUsed is { } used && total.ContextWindow is { } window && window > 0)
+            parts.Add($"Context: {K(used)} of {K(window)} ({K(Math.Max(0, window - used))} left)");
+        return string.Join(" · ", parts);
+    }
+
+    private void CountUsage(CliAgent agent)
+    {
+        if (!ReferenceEquals(agent, _agent)) return; // a new conversation started meanwhile
+        HasTurns = true;
+        LastTurnUsage = agent.LastTurnUsage;
+        if (agent.LastTurnUsage is { } turn) ConversationUsage = ConversationUsage?.Plus(turn) ?? turn;
+    }
+
+    private void ResetUsage()
+    {
+        HasTurns = false;
+        LastTurnUsage = null;
+        ConversationUsage = null;
     }
 
     [RelayCommand(CanExecute = nameof(IsBusy))]

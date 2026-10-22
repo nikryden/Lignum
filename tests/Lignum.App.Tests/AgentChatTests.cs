@@ -113,6 +113,53 @@ public sealed class AgentChatTests : IDisposable
     }
 
     [Fact]
+    public async Task Claude_Codes_token_usage_is_shown_per_turn_and_per_conversation_with_the_context_window()
+    {
+        var exe = FakeClaude(
+            """{"type":"assistant","message":{"usage":{"input_tokens":10,"cache_read_input_tokens":40000,"cache_creation_input_tokens":2000,"output_tokens":300}}}""",
+            """{"type":"result","subtype":"success","is_error":false,"result":"ok","total_cost_usd":0.25,"usage":{"input_tokens":20,"cache_read_input_tokens":80000,"cache_creation_input_tokens":2000,"output_tokens":500},"modelUsage":{"claude-x":{"contextWindow":200000}}}""");
+        var main = Start();
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+        Assert.Equal("", main.Assistant.UsageText);
+
+        await Ask(main.Assistant, "one");
+        await Ask(main.Assistant, "two");
+
+        Assert.Equal(new TokenUsage(20, 500, 80000, 2000, 0.25m, 42310, 200000), main.Assistant.LastTurnUsage);
+        Assert.Equal(164040, main.Assistant.ConversationUsage!.AllInput);
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            Assert.Equal("Last: 82k in, 500 out · Conversation: 164k in, 1.0k out ($0.50) · Context: 42k of 200k (158k left)",
+                main.Assistant.UsageText);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+
+        main.Assistant.NewConversationCommand.Execute(null);
+        Assert.Equal("", main.Assistant.UsageText);
+    }
+
+    [Fact]
+    public async Task An_agent_that_reports_no_usage_says_so()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 1;
+        var exe = Path.Combine(_dir, "copilot.cmd");
+        File.WriteAllLines(exe, ["@echo off", "echo An answer."]);
+        main.Assistant.AgentFactory = (_, folder) => new CopilotCliAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+
+        await Ask(main.Assistant, "hi");
+
+        Assert.Equal("Token usage: not reported by GitHub Copilot CLI", main.Assistant.UsageText);
+    }
+
+    [Fact]
     public void Codex_runs_read_only_with_Lignum_added_and_resumes_the_last_session()
     {
         var agent = new CodexCliAgent { WorkFolder = Folder("codex"), LignumExe = @"C:\L\Lignum.exe", LignumArguments = ["--mcp"] };
