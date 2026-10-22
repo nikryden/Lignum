@@ -123,7 +123,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         Call("search_all_tabs", new() { ["pattern"] = E(pattern), ["is_regex"] = E(isRegex), ["match_case"] = E(matchCase), ["max_lines_per_tab"] = E(maxLinesPerTab) },
             cancellationToken);
 
-    [McpServerTool(Name = "find_in_files"), Description("Search the log files in a folder that are not open in Lignum (like Find in files). Binary files are skipped. Returns matching files with their match counts and first matches.")]
+    [McpServerTool(Name = "find_in_files"), Description("Search the log files in a folder that are not open in Lignum (like Find in files). Binary files are skipped. Returns matching files with their match counts and first matches. Lignum asks the user for permission to read the folder unless already granted.")]
     public Task<string> FindInFiles(
         [Description("Folder to search.")] string folder,
         [Description("Text or .NET regex to find.")] string pattern,
@@ -230,7 +230,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
                                      CancellationToken cancellationToken = default) =>
         Call("show_full_line", WithTab(new() { ["line"] = E(line) }, tab), cancellationToken);
 
-    [McpServerTool(Name = "open_file"), Description("Open a log file or .lm package in a new Lignum tab (or switch to it if open). Returns once the tab is there; big files keep indexing in the background.")]
+    [McpServerTool(Name = "open_file"), Description("Open a log file or .lm package in a new Lignum tab (or switch to it if open). Returns once the tab is there; big files keep indexing in the background. A file not already open needs the user's permission to read it.")]
     public Task<string> OpenFile([Description("Full path of the file.")] string path, CancellationToken cancellationToken = default) =>
         Call("open_file", new() { ["path"] = E(path) }, cancellationToken);
 

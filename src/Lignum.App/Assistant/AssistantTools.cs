@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Lignum.App.Assistant.Permissions;
 using Lignum.App.Packaging;
 using Lignum.App.Settings;
 using Lignum.App.ViewModels;
@@ -68,7 +69,7 @@ public sealed partial class AssistantTools(MainViewModel main)
                 "remove_highlight_rule" => RemoveHighlightRule(call.Input),
                 "clear_highlight_rules" => ClearHighlightRules(),
                 "show_full_line" => ShowFullLine(call.Input),
-                "open_file" => await OpenFileAsync(call.Input),
+                "open_file" => await OpenFileAsync(call.Input, cancellationToken),
                 "close_tab" => CloseTab(call.Input),
                 "export_package" => await ExportPackageAsync(call.Input),
                 "list_skills" => ListSkills(),
@@ -325,10 +326,14 @@ public sealed partial class AssistantTools(MainViewModel main)
     }
 
     /// <summary>Opens a log file or .lm package in a new tab (or selects its tab); returns once the tab is there.</summary>
-    private async Task<ToolOutcome> OpenFileAsync(IReadOnlyDictionary<string, JsonElement> input)
+    private async Task<ToolOutcome> OpenFileAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken cancellationToken)
     {
         var path = String(input, "path");
         if (!File.Exists(path)) throw new ToolInputException($"There is no file \"{path}\".");
+        // A file already open in a tab is readable anyway; any other needs a read grant (ADR 0002).
+        var alreadyOpen = main.Tabs.Any(t => string.Equals(t.SourcePath, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase));
+        if (!alreadyOpen && !await AllowedAsync(new PermissionRequest(AiAccess.Read, Path.GetFullPath(path)), cancellationToken))
+            return Denied($"opening {path}");
         main.ErrorMessage = null;
         await main.OpenFileCoreAsync(path); // indexing goes on in the background
         var full = Path.GetFullPath(path);
@@ -508,6 +513,8 @@ public sealed partial class AssistantTools(MainViewModel main)
     {
         var folder = String(input, "folder");
         if (!Directory.Exists(folder)) return new ToolOutcome($"Folder not found: {folder}", IsError: true);
+        if (!await AllowedAsync(new PermissionRequest(AiAccess.Read, Path.GetFullPath(folder), IsFolder: true), token))
+            return Denied($"searching {folder}");
         var query = Query.Find(String(input, "pattern"), Bool(input, "match_case"), Bool(input, "is_regex"));
         var patterns = input.TryGetValue("file_patterns", out var p) && p.ValueKind == JsonValueKind.String ? p.GetString()! : "*.log;*.txt";
         var subfolders = !input.TryGetValue("include_subfolders", out var sub) || sub.ValueKind != JsonValueKind.False;

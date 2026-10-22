@@ -249,6 +249,10 @@ public sealed class AiAccessTests : IDisposable
         var main = await Open();
         var other = Path.Combine(_dir, "other.log");
         File.WriteAllLines(other, ["x"]);
+        // Opening a file that is not in a tab needs a read grant (ADR 0002); without an approver it is denied.
+        Assert.True((await main.Assistant.HandleToolCallAsync(Call("open_file", new { path = other }), default)).IsError);
+        main.Assistant.Permissions.Add(Lignum.App.Assistant.Permissions.AiAccess.Read,
+            Lignum.App.Assistant.Permissions.GrantScopeKind.File, other, Lignum.App.Assistant.Permissions.GrantLifetime.Session);
 
         var opened = await main.Assistant.HandleToolCallAsync(Call("open_file", new { path = other }), default);
         Assert.False(opened.IsError, opened.Content);
@@ -346,6 +350,9 @@ public sealed class AiAccessTests : IDisposable
         File.WriteAllLines(Path.Combine(folder, "x.log"), ["fine", "ERROR in x"]);
         File.WriteAllLines(Path.Combine(folder, "y.log"), ["nothing"]);
         main.SelectedTab!.Bookmarks.SetNote(1, "disk problem");
+        Assert.True((await main.Assistant.HandleToolCallAsync(Call("find_in_files", new { folder, pattern = "error" }), default)).IsError);
+        main.Assistant.Permissions.Add(Lignum.App.Assistant.Permissions.AiAccess.Read,
+            Lignum.App.Assistant.Permissions.GrantScopeKind.Folder, folder, Lignum.App.Assistant.Permissions.GrantLifetime.Session);
 
         var files = await main.Assistant.HandleToolCallAsync(Call("find_in_files", new { folder, pattern = "error" }), default);
         var bookmarks = await main.Assistant.HandleToolCallAsync(Call("list_bookmarks", new { }), default);

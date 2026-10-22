@@ -11,7 +11,7 @@ Each CLI has its own permission flags and config files, and they differ in shape
 ## Decision
 
 - **Agents keep only Lignum's tools.** Their built-in file, shell and web tools stay off, as they are today (`--tools ""` for Claude Code, a read-only sandbox for Codex, and so on).
-- **Lignum adds the powerful tools as MCP tools:** `list_dir`, `read_file`, `write_file` and `edit_file` (ticket 18), and `run_command` (ticket 19). Each call goes through one **permission store** in the running app before it does anything.
+- **Lignum adds the powerful tools as MCP tools:** `list_dir`, `read_file`, `write_file` and `edit_file` (ticket 18), and `run_command` (ticket 19). Each call goes through one **permission store** in the running app before it does anything. The older tools that reach outside the open tabs, `find_in_files` (a folder) and `open_file` (a file not already open), need a read grant too.
 - **A grant** is an access (read, write or execute) on a scope: a file, a folder and its subfolders, an executable (any arguments), or one exact command line. Write implies read. Execute is separate.
 - **Lifetimes:** *once* (nothing is stored), *this session* (in memory, gone when Lignum exits) and *always* (saved in `settings.json` under `aiPermissions`).
 - **Approval:** with no matching grant, Lignum shows a modal dialog in the app. It names the agent's request and offers the scopes that make sense (this file or its folder; this exact command or every command of that program). The buttons are Allow once, Allow for this session, Always allow and Deny.
