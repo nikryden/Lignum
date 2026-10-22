@@ -141,6 +141,18 @@ public sealed class AgentChatTests : IDisposable
     }
 
     [Fact]
+    public void Cursor_trusts_the_conversation_folder_it_runs_in_because_print_mode_cannot_ask()
+    {
+        var agent = new CursorCliAgent { WorkFolder = Folder("cursor"), LignumExe = "Lignum.exe", LignumArguments = ["--mcp"] };
+        Directory.CreateDirectory(agent.WorkFolder);
+
+        var arguments = agent.BuildArguments("hi").ToList();
+
+        Assert.Contains("--trust", arguments);
+        Assert.Equal(agent.WorkFolder, arguments[arguments.IndexOf("--workspace") + 1]);
+    }
+
+    [Fact]
     public void A_custom_agent_fills_in_its_argument_template()
     {
         var agent = new CustomAgent("agy", "-p {prompt} --mcp-config \"{mcpConfig}\" --name \"two words\"")

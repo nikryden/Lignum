@@ -4,11 +4,13 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** ready-for-human (code done; needs a manual check with a signed-in Cursor account)
 
-**Likely cause:** `CursorCliAgent.BuildArguments` runs `agent -p` without `--trust`. In print mode the workspace-trust prompt cannot be answered, and the working folder is the conversation folder, not the one the user trusted at sign-in.
+**Cause:** Two things. (1) "Sign in" started a bare `agent` in the user profile folder, so the "Yes" trusted that folder rather than signing in for good (`agent status` then said "Not logged in"). (2) Turns run `agent -p` in the conversation folder, which was never trusted, and print mode cannot answer the trust prompt.
 
-- [ ] Reproduce (headless run, check the output for the trust message)
-- [ ] Pass `--trust` so the conversation folder is trusted
-- [ ] Once ticket 17 exists, folders the user granted are added as workspace
-- [ ] Argument test in `Lignum.App.Tests`
+- [x] Reproduced: on this machine headless `agent -p` fails with "Authentication required… run 'agent login'"; `agent status` exits 0 even when not logged in
+- [x] Sign in runs `agent login`; sign-in check reads `agent status` output
+- [x] Turns pass `--trust --workspace <conversation folder>`
+- [ ] Once ticket 17 exists, folders the user granted are added with `--add-dir`
+- [x] Argument test in `Lignum.App.Tests`
+- [ ] Manual: sign in from Lignum, ask a question that uses a lignum tool, confirm it answers

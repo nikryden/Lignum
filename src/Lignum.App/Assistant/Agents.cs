@@ -83,15 +83,26 @@ public abstract class CliAgent
     protected virtual IReadOnlyList<string> SignInArguments => [];
 
     /// <summary>Runs the agent with <paramref name="arguments"/>: true for exit code 0, null when it could not tell.</summary>
-    protected async Task<bool?> ExitCodeIsZeroAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    protected Task<bool?> ExitCodeIsZeroAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken) =>
+        CheckOutputAsync(arguments, (exitCode, _) => exitCode == 0, cancellationToken);
+
+    /// <summary>
+    /// Runs the agent with <paramref name="arguments"/> and lets <paramref name="judge"/> decide from the exit code
+    /// and the output (stdout and stderr together); null when it could not run or <paramref name="judge"/> cannot tell.
+    /// </summary>
+    protected async Task<bool?> CheckOutputAsync(IReadOnlyList<string> arguments, Func<int, string, bool?> judge,
+        CancellationToken cancellationToken)
     {
         if (FindExecutable() is not { } exe) return false;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        var output = new StringBuilder();
         try
         {
             Directory.CreateDirectory(WorkFolder);
-            return await ProcessRunner.RunAsync(exe, arguments, null, WorkFolder, _ => { }, _ => { }, timeout.Token) == 0;
+            var exitCode = await ProcessRunner.RunAsync(exe, arguments, null, WorkFolder,
+                line => { lock (output) output.AppendLine(line); }, line => { lock (output) output.AppendLine(line); }, timeout.Token);
+            lock (output) return judge(exitCode, output.ToString());
         }
         catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException)
         {
@@ -334,7 +345,17 @@ public sealed class CursorCliAgent : CliAgent
 
     public override string InstallCommand => "irm 'https://cursor.com/install?win32=true' | iex";
 
-    public override string SignInHint => "Cursor CLI opens in a terminal: sign in when it asks, then close the window.";
+    public override string SignInHint => "A terminal runs \"agent login\" and opens Cursor in the browser: sign in there, then close the window.";
+
+    // A bare "agent" in the sign-in window only trusts that window's folder; "login" is what signs in.
+    protected override IReadOnlyList<string> SignInArguments => ["login"];
+
+    /// <summary>"agent status" exits 0 either way, so read what it says.</summary>
+    public override Task<bool?> IsSignedInAsync(CancellationToken cancellationToken) =>
+        CheckOutputAsync(["status"], (exitCode, output) =>
+            output.Contains("Not logged in", StringComparison.OrdinalIgnoreCase) ? false
+            : exitCode == 0 && output.Contains("logged in", StringComparison.OrdinalIgnoreCase) ? true
+            : null, cancellationToken);
 
     protected override IEnumerable<string> KnownLocations =>
     [
@@ -350,8 +371,10 @@ public sealed class CursorCliAgent : CliAgent
         {
             mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
         }));
+        // Print mode cannot answer the workspace-trust prompt, and the conversation folder is never the one trusted
+        // at sign-in: trust it explicitly (ticket 15). It only holds Lignum's MCP config.
         List<string> arguments = ["-p", OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}"),
-                                  "--approve-mcps", "--output-format", "text"];
+                                  "--approve-mcps", "--trust", "--workspace", WorkFolder, "--output-format", "text"];
         if (HasStarted) arguments.Add("--continue");
         return arguments;
     }
