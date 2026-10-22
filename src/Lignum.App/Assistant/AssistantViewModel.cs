@@ -84,8 +84,18 @@ public sealed partial class AssistantViewModel : ObservableObject
                      .OrderBy(s => !s.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
             SkillSuggestions.Add(skill);
         SelectedSkillSuggestion = SkillSuggestions.FirstOrDefault();
-        IsSkillListOpen = SkillSuggestions.Count > 0;
+        // With nothing to suggest, say where skills were looked for instead of showing nothing.
+        SkillListHint = SkillSuggestions.Count > 0 ? null
+            : _skills.Count > 0 ? $"No skill matches /{prefix}."
+            : "No skills for this log. Global skills: " + _tools.GlobalSkillsFolder
+              + (_tools.LocalSkillsFolder is { } local ? $"\nLocal skills (this log's folder only): {local}" : "")
+              + "\nAsk the AI to make one, or put a SKILL.md in a subfolder there.";
+        IsSkillListOpen = true;
     }
+
+    /// <summary>Shown in the skill list when nothing matches the "/name" being typed; null when there are suggestions.</summary>
+    [ObservableProperty]
+    private string? _skillListHint;
 
     /// <summary>Puts "/name " in the input for the chosen suggestion (Tab, Enter or a click).</summary>
     public void AcceptSkillSuggestion(Skill? skill = null)

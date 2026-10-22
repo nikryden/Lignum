@@ -128,6 +128,19 @@
                        Width="{Binding ActualWidth, ElementName=InputBox}">
                     <Border Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
                             BorderThickness="1" CornerRadius="4" Padding="2">
+                        <StackPanel>
+                        <TextBlock Text="{Binding SkillListHint}" TextWrapping="Wrap" Margin="4,2" Opacity="0.8"
+                                   Foreground="{DynamicResource WindowForegroundBrush}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SkillListHint}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <ListBox x:Name="SkillList" ItemsSource="{Binding SkillSuggestions}" MaxHeight="220"
                                  SelectedItem="{Binding SelectedSkillSuggestion}" Focusable="False" BorderThickness="0"
                                  Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
@@ -150,6 +163,7 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
+                        </StackPanel>
                     </Border>
                 </Popup>
             </Grid>

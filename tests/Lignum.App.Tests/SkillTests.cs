@@ -112,7 +112,21 @@ public sealed class SkillTests : IDisposable
         Assert.False(assistant.IsSkillListOpen);
 
         assistant.Input = "/nothing-like-this";
-        Assert.False(assistant.IsSkillListOpen);
+        Assert.Empty(assistant.SkillSuggestions);
+        Assert.Equal("No skill matches /nothing-like-this.", assistant.SkillListHint);
+    }
+
+    [Fact]
+    public async Task With_no_skills_a_slash_says_where_skills_are_looked_for()
+    {
+        var assistant = (await Start()).Assistant;
+
+        assistant.Input = "/";
+
+        Assert.True(assistant.IsSkillListOpen);
+        Assert.Empty(assistant.SkillSuggestions);
+        Assert.Contains(GlobalFolder, assistant.SkillListHint);
+        Assert.Contains("this log's folder only", assistant.SkillListHint);
     }
 
     [Fact]

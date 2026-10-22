@@ -183,9 +183,15 @@
                     </Style.Triggers>
                 </Style>
             </TabControl.Style>
+            <!-- The whole tab (not only its text) shows the file's full path on hover (ticket 12). -->
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                    <Setter Property="ToolTip" Value="{Binding SourcePath}" />
+                </Style>
+            </TabControl.ItemContainerStyle>
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Orientation="Horizontal" ToolTip="{Binding SourcePath}" Background="Transparent">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
                         <StackPanel.ContextMenu>
                             <ContextMenu>
                                 <MenuItem Header="Copy full _path" Command="{Binding CopyFullPathCommand}" />
