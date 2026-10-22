@@ -64,6 +64,12 @@ public sealed class AppSettings
     /// <summary>Highlight search matches on lines the filter rules hide too (ticket 08).</summary>
     public bool HighlightMatchesOutsideFilter { get; set; } = true;
 
+    /// <summary>File → Open in editor (ticket 13).</summary>
+    public ExternalEditorSettings ExternalEditor { get; set; } = new();
+
+    /// <summary>AI permissions granted "always" (ticket 17, ADR 0002); revoked under View → AI permissions….</summary>
+    public List<Assistant.Permissions.PermissionGrant> AiPermissions { get; set; } = [];
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }
@@ -95,4 +101,17 @@ public sealed class AssistantSettings
 
     /// <summary>Agents the user has signed in to through the panel (for agents that cannot be asked).</summary>
     public List<int> SignedIn { get; set; } = [];
+
+    /// <summary>The model and reasoning level chosen per agent (ticket 16); an agent not listed uses its defaults.</summary>
+    public List<AgentModelChoice> Models { get; set; } = [];
+}
+
+/// <summary>The model and reasoning level for one agent (index as in <see cref="AssistantSettings.Agent"/>); empty = default.</summary>
+public sealed class AgentModelChoice
+{
+    public int Agent { get; set; }
+
+    public string? Model { get; set; }
+
+    public string? Effort { get; set; }
 }

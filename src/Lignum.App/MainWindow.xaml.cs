@@ -17,6 +17,11 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         InitializeFindWindow();
+        _viewModel.Assistant.Approver = new DialogPermissionApprover();
+        _viewModel.Assistant.PermissionsRequested += (_, _) => OnAiPermissionsClick(this, new RoutedEventArgs());
+        _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
+            $"{notes:N0} of the bookmarks have notes. Remove every bookmark, with its note and color?",
+            "Clear all bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
@@ -33,6 +38,15 @@ public partial class MainWindow : Window
     private void OnHighlightRulesClick(object sender, RoutedEventArgs e)
     {
         if (Highlighting is not null) new HighlightRulesDialog(Highlighting) { Owner = this }.ShowDialog();
+    }
+
+    private void OnAiPermissionsClick(object sender, RoutedEventArgs e) =>
+        new AiPermissionsDialog(_viewModel.Assistant.Permissions) { Owner = this }.ShowDialog();
+
+    private void OnExternalEditorClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new ExternalEditorDialog(_viewModel.ExternalEditor) { Owner = this };
+        if (dialog.ShowDialog() == true) _viewModel.SetExternalEditor(dialog.Command, dialog.Arguments);
     }
 
     /// <summary>Ctrl+mouse wheel zooms the text anywhere in the window.</summary>

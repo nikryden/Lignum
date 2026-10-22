@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Lignum.App.Assistant.Permissions;
 using Lignum.App.Settings;
 using Serilog;
 
@@ -76,15 +77,95 @@ public sealed partial class AssistantViewModel : ObservableObject
             return;
         }
 
-        if (!IsSkillListOpen || value == "/") _skills = _tools.LoadSkills();
+        if (!IsSkillListOpen || value == "/") _skills = LoadSlashEntries();
         var prefix = value[1..];
         SkillSuggestions.Clear();
         foreach (var skill in _skills.Where(s => s.Name.Contains(prefix, StringComparison.OrdinalIgnoreCase))
                      .OrderBy(s => !s.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
             SkillSuggestions.Add(skill);
         SelectedSkillSuggestion = SkillSuggestions.FirstOrDefault();
-        IsSkillListOpen = SkillSuggestions.Count > 0;
+        // With nothing to suggest, say where skills were looked for instead of showing nothing.
+        SkillListHint = SkillSuggestions.Count == 0 ? $"No command or skill matches /{prefix}."
+            : _skills.Any(s => s.Scope is SkillScope.Global or SkillScope.Local) ? null
+            : "No skills of your own for this log yet. Global skills: " + _tools.GlobalSkillsFolder
+              + (_tools.LocalSkillsFolder is { } local ? $"\nLocal skills (this log's folder only): {local}" : "")
+              + "\nAsk the AI to make one, or put a SKILL.md in a subfolder there.";
+        IsSkillListOpen = true;
     }
+
+    /// <summary>
+    /// Commands Lignum runs itself when typed as "/name" (nothing goes to the agent). Their names win over any skill.
+    /// </summary>
+    public static IReadOnlyList<Skill> ChatCommands { get; } =
+    [
+        new("clear", "Start a new conversation (the agent forgets this one)", SkillScope.Command, ""),
+        new("new", "Same as /clear", SkillScope.Command, ""),
+        new("model", "Show or set the model, e.g. /model opus (empty: the agent's default)", SkillScope.Command, ""),
+        new("effort", "Show or set the reasoning level, e.g. /effort high", SkillScope.Command, ""),
+        new("permissions", "Show and revoke what the AI may do without asking", SkillScope.Command, ""),
+        new("help", "List the commands and skills", SkillScope.Command, ""),
+    ];
+
+    /// <summary>Raised by /permissions: the window opens View → AI permissions….</summary>
+    public event EventHandler? PermissionsRequested;
+
+    /// <summary>
+    /// Everything "/" offers: chat commands first, then Lignum's skills (one named like a command is hidden), then the
+    /// agent's own skills whose names are not taken.
+    /// </summary>
+    private IReadOnlyList<Skill> LoadSlashEntries()
+    {
+        List<Skill> entries = [.. ChatCommands, .. _tools.LoadSkills().Where(s => !IsChatCommand(s.Name))];
+        var taken = entries.Select(e => e.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        entries.AddRange((_agent ?? CreateAgent(SelectedAgent)).LoadOwnSkills().Where(s => !taken.Contains(s.Name)));
+        return entries;
+    }
+
+    private static bool IsChatCommand(string name) =>
+        ChatCommands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Runs a chat command; the input is cleared and the command echoed as an activity line.</summary>
+    private void RunChatCommand(string name, string rest)
+    {
+        Input = "";
+        IsSkillListOpen = false;
+        switch (name)
+        {
+            case "clear" or "new":
+                NewConversation();
+                break;
+            case "model":
+                if (rest.Length > 0) AgentModel = rest == "default" ? "" : rest;
+                Add(ChatEntryKind.Activity, $"Model: {(AgentModel.Length > 0 ? AgentModel : "the agent's default")}");
+                break;
+            case "effort" when EffortChoices.Count <= 1:
+                Add(ChatEntryKind.Error, $"{AgentNames[SelectedAgent]} has no reasoning level setting.");
+                break;
+            case "effort" when !SupportsEffort:
+                Add(ChatEntryKind.Error, $"With model \"{(AgentModel.Length > 0 ? AgentModel : "default")}\" {AgentNames[SelectedAgent]} " +
+                    "picks the model itself and takes no reasoning level. Choose a model first, e.g. /model <name>.");
+                break;
+            case "effort" when rest.Length > 0 && !EffortChoices.Contains(rest.ToLowerInvariant()) && rest != "default":
+                Add(ChatEntryKind.Error,
+                    $"Reasoning levels for {AgentNames[SelectedAgent]}: {string.Join(", ", EffortChoices.Skip(1))} (or default).");
+                break;
+            case "effort":
+                if (rest.Length > 0) AgentEffort = rest == "default" ? "" : rest.ToLowerInvariant();
+                Add(ChatEntryKind.Activity, $"Reasoning level: {(AgentEffort.Length > 0 ? AgentEffort : "the agent's default")}");
+                break;
+            case "permissions":
+                PermissionsRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case "help":
+                var lines = LoadSlashEntries().Select(s => $"/{s.Name} ({s.ScopeText}): {s.Description}");
+                Add(ChatEntryKind.Activity, "Commands and skills:\n" + string.Join("\n", lines));
+                break;
+        }
+    }
+
+    /// <summary>Shown in the skill list when nothing matches the "/name" being typed; null when there are suggestions.</summary>
+    [ObservableProperty]
+    private string? _skillListHint;
 
     /// <summary>Puts "/name " in the input for the chosen suggestion (Tab, Enter or a click).</summary>
     public void AcceptSkillSuggestion(Skill? skill = null)
@@ -143,7 +224,22 @@ public sealed partial class AssistantViewModel : ObservableObject
         _uiContext = uiContext;
         _log = log;
         _tools.LinesRead += (file, lines) => Add(ChatEntryKind.Activity, $"Read {lines:N0} line{(lines == 1 ? "" : "s")} from {file}");
+        Permissions = new PermissionStore(settings);
     }
+
+    /// <summary>What the AI may do beyond the open logs (ticket 17, ADR 0002); revoked under View → AI permissions….</summary>
+    public PermissionStore Permissions { get; }
+
+    /// <summary>Asks the user about a permission; null (tests, no window) denies everything not already granted.</summary>
+    public IPermissionApprover? Approver { get; set; }
+
+    /// <summary>
+    /// The one gate for powerful tools: true when a grant covers <paramref name="request"/> or the user allows it now.
+    /// </summary>
+    internal Task<bool> RequestPermissionAsync(PermissionRequest request, CancellationToken cancellationToken) =>
+        Approver is { } approver
+            ? Permissions.RequestAsync(request, approver, cancellationToken)
+            : Task.FromResult(Permissions.IsAllowed(request));
 
     public ObservableCollection<ChatEntry> Entries { get; } = [];
 
@@ -213,7 +309,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         }
     }
 
-    /// <summary>The custom agent's arguments: {prompt}, {mcpConfig} and {lignum} are filled in.</summary>
+    /// <summary>The custom agent's arguments: {prompt}, {mcpConfig}, {lignum}, {model} and {effort} are filled in.</summary>
     public string CustomArguments
     {
         get => _settings.Value.Assistant.CustomArguments ?? "-p {prompt}";
@@ -223,6 +319,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Save();
             _agent = null;
             OnPropertyChanged();
+            OnModelChoiceChanged(); // {effort} in the template turns the reasoning box on
         }
     }
 
@@ -236,10 +333,65 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Value.Assistant.Agent = value;
             _settings.Save();
             _agent = null;
+            ResetUsage();
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsCustomAgent));
+            OnModelChoiceChanged();
             _ = RefreshAgentAsync();
         }
+    }
+
+    /// <summary>The selected agent's saved model and reasoning level, or null.</summary>
+    private AgentModelChoice? ModelChoice => _settings.Value.Assistant.Models.FirstOrDefault(m => m.Agent == SelectedAgent);
+
+    /// <summary>The model for the selected agent (ticket 16); empty = the CLI's default. Takes effect on the next question.</summary>
+    public string AgentModel
+    {
+        get => ModelChoice?.Model ?? "";
+        set => SaveModelChoice(value.Trim(), ModelChoice?.Effort);
+    }
+
+    /// <summary>The reasoning level for the selected agent; "" = the CLI's default.</summary>
+    public string AgentEffort
+    {
+        get => ModelChoice?.Effort ?? "";
+        set => SaveModelChoice(ModelChoice?.Model, value);
+    }
+
+    /// <summary>Model names to offer for the selected agent; any other can be typed.</summary>
+    public IReadOnlyList<string> ModelSuggestions => CreateAgent(SelectedAgent).SuggestedModels;
+
+    /// <summary>"" (default) and the selected agent's reasoning levels; just "" when it has none.</summary>
+    public IReadOnlyList<string> EffortChoices => ["", .. CreateAgent(SelectedAgent).EffortLevels];
+
+    /// <summary>Whether the selected agent takes a reasoning level (the box is hidden otherwise).</summary>
+    public bool SupportsEffort => EffortChoices.Count > 1 && CreateAgent(SelectedAgent).AcceptsEffort(AgentModel);
+
+    private void SaveModelChoice(string? model, string? effort)
+    {
+        var models = _settings.Value.Assistant.Models;
+        models.RemoveAll(m => m.Agent == SelectedAgent);
+        if (!string.IsNullOrWhiteSpace(model) || !string.IsNullOrWhiteSpace(effort))
+            models.Add(new AgentModelChoice { Agent = SelectedAgent, Model = model, Effort = effort });
+        _settings.Save();
+        if (_agent is not null)
+        {
+            _agent.Model = model;
+            _agent.Effort = effort;
+        }
+
+        OnPropertyChanged(nameof(AgentModel));
+        OnPropertyChanged(nameof(AgentEffort));
+        OnPropertyChanged(nameof(SupportsEffort)); // Copilot's "auto" takes no reasoning level
+    }
+
+    private void OnModelChoiceChanged()
+    {
+        OnPropertyChanged(nameof(AgentModel));
+        OnPropertyChanged(nameof(AgentEffort));
+        OnPropertyChanged(nameof(ModelSuggestions));
+        OnPropertyChanged(nameof(EffortChoices));
+        OnPropertyChanged(nameof(SupportsEffort));
     }
 
     /// <summary>Where the selected agent stands: checking, not installed, not signed in, or ready to chat.</summary>
@@ -386,6 +538,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         _cancel?.Cancel();
         _agent = null;
         Entries.Clear();
+        ResetUsage();
     }
 
     private bool CanSend() => IsEnabled && !IsBusy && !string.IsNullOrWhiteSpace(Input);
@@ -398,14 +551,21 @@ public sealed partial class AssistantViewModel : ObservableObject
         var prompt = question;
         if (SkillLibrary.ParseCommand(question) is { } command)
         {
-            var skill = _tools.LoadSkills().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
+            if (IsChatCommand(command.Name))
+            {
+                RunChatCommand(command.Name, command.Text);
+                return;
+            }
+
+            var skill = LoadSlashEntries().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
             if (skill is null)
             {
                 Add(ChatEntryKind.Error, $"There is no skill /{command.Name}. Type / to see the skills, or add one under Skills.");
                 return; // the input stays, to fix the name
             }
 
-            prompt = SkillLibrary.PromptFor(skill, command.Text);
+            // The agent's own skill goes as typed ("/name text"): the agent expands it. Lignum's are fetched with get_skill.
+            if (skill.Scope != SkillScope.Agent) prompt = SkillLibrary.PromptFor(skill, command.Text);
         }
 
         Input = "";
@@ -440,7 +600,55 @@ public sealed partial class AssistantViewModel : ObservableObject
             IsBusy = false;
             _cancel.Dispose();
             _cancel = null;
+            OnUi(() => CountUsage(agent));
         }
+    }
+
+    /// <summary>The last turn's tokens (ticket 20); null when the agent does not report them.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private TokenUsage? _lastTurnUsage;
+
+    /// <summary>All turns of this conversation that reported tokens.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private TokenUsage? _conversationUsage;
+
+    /// <summary>Whether a turn has run in this conversation (before that the usage line is empty).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsageText))]
+    private bool _hasTurns;
+
+    /// <summary>The usage line under the chat: last turn, conversation and context window, or why there is none.</summary>
+    public string UsageText => !HasTurns ? ""
+        : ConversationUsage is not { } total ? $"Token usage: not reported by {AgentNames[SelectedAgent]}"
+        : FormatUsage(LastTurnUsage, total);
+
+    internal static string FormatUsage(TokenUsage? last, TokenUsage total)
+    {
+        static string K(long tokens) => tokens >= 10_000 ? $"{tokens / 1000.0:0}k" : tokens >= 1000 ? $"{tokens / 1000.0:0.0}k" : $"{tokens}";
+        var parts = new List<string>();
+        if (last is not null) parts.Add($"Last: {K(last.AllInput)} in, {K(last.Output)} out");
+        parts.Add($"Conversation: {K(total.AllInput)} in, {K(total.Output)} out"
+                  + (total.CostUsd is { } cost ? $" (${cost:0.00})" : ""));
+        if (total.ContextUsed is { } used && total.ContextWindow is { } window && window > 0)
+            parts.Add($"Context: {K(used)} of {K(window)} ({K(Math.Max(0, window - used))} left)");
+        return string.Join(" · ", parts);
+    }
+
+    private void CountUsage(CliAgent agent)
+    {
+        if (!ReferenceEquals(agent, _agent)) return; // a new conversation started meanwhile
+        HasTurns = true;
+        LastTurnUsage = agent.LastTurnUsage;
+        if (agent.LastTurnUsage is { } turn) ConversationUsage = ConversationUsage?.Plus(turn) ?? turn;
+    }
+
+    private void ResetUsage()
+    {
+        HasTurns = false;
+        LastTurnUsage = null;
+        ConversationUsage = null;
     }
 
     [RelayCommand(CanExecute = nameof(IsBusy))]
@@ -459,6 +667,11 @@ public sealed partial class AssistantViewModel : ObservableObject
             _ => new ClaudeCodeAgent(),
         };
         if (made.WorkFolder.Length == 0) made.WorkFolder = folder;
+        if (_settings.Value.Assistant.Models.FirstOrDefault(m => m.Agent == index) is { } choice)
+        {
+            made.Model = choice.Model;
+            made.Effort = choice.Effort;
+        }
         if (made.LignumExe.Length == 0)
         {
             made.LignumExe = ExePath;
@@ -553,6 +766,11 @@ public sealed partial class AssistantViewModel : ObservableObject
         "list_skills" => "Listing the skills",
         "get_skill" => $"Reading skill /{Arg(call, "name")}",
         "save_skill" => $"Saving skill /{Arg(call, "name")} ({(Arg(call, "scope") is "global" ? "global" : "local")})",
+        "list_dir" => $"Listing {Arg(call, "path")}",
+        "read_file" => $"Reading {Arg(call, "path")}",
+        "write_file" => $"Writing {Arg(call, "path")}",
+        "edit_file" => $"Editing {Arg(call, "path")}",
+        "run_command" => $"Running {(Arg(call, "shell") is { Length: > 0 } shell and not "none" ? shell + ": " : "")}{Arg(call, "command")}",
         _ => call.Name,
     };
 

@@ -29,6 +29,38 @@ public sealed class TabsTests : IDisposable
     }
 
     [Fact]
+    public async Task The_tab_menu_copies_the_full_path_and_the_file_name()
+    {
+        var clipboard = new FakeClipboard();
+        using var vm = UiContext.None(() =>
+            new MainViewModel(new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName))
+            {
+                Copier = new SelectionCopier(clipboard, new NoPrompt()),
+            });
+        var path = WriteLog("a.log", "1\n");
+        await vm.OpenFileAsync(path);
+
+        vm.SelectedTab!.CopyFullPathCommand.Execute(null);
+        vm.SelectedTab.CopyFileNameCommand.Execute(null);
+
+        Assert.Equal([path, "a.log"], clipboard.Texts);
+    }
+
+    private sealed class FakeClipboard : IClipboardService
+    {
+        public List<string> Texts { get; } = [];
+
+        public void SetText(string text) => Texts.Add(text);
+    }
+
+    private sealed class NoPrompt : ICopyPrompt
+    {
+        public LargeCopyChoice AskLargeCopy(long approximateBytes) => LargeCopyChoice.Cancel;
+
+        public string? AskSavePath() => null;
+    }
+
+    [Fact]
     public async Task Opening_a_second_file_adds_a_tab_and_selects_it()
     {
         using var vm = Create();

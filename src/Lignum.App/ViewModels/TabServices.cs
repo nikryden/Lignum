@@ -10,8 +10,10 @@ namespace Lignum.App.ViewModels;
 /// <param name="Highlighting">The app-wide highlight rules ("Add as highlight rule").</param>
 /// <param name="History">The app-wide find / filter history.</param>
 /// <param name="SettingsStore">Where each tab's bookmarks file lives; null: bookmarks are not saved.</param>
+/// <param name="ConfirmClearBookmarks">Asks before clearing bookmarks, given how many have notes; null: no question.</param>
 internal sealed record TabServices(
     SelectionCopier? Copier = null,
     HighlightingViewModel? Highlighting = null,
     SearchHistory? History = null,
-    SettingsStore? SettingsStore = null);
+    SettingsStore? SettingsStore = null,
+    Func<int, bool>? ConfirmClearBookmarks = null);

@@ -67,7 +67,11 @@
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPurpleBrush}" /></MenuItem.Icon>
                 </MenuItem>
             </MenuItem>
+            <MenuItem Header="Clear _all bookmarks" Command="{Binding ClearBookmarksCommand}" />
+            <MenuItem Header="Highlight _line…" Click="OnHighlightLineClick" />
+            <MenuItem Header="Remove highligh_t" Click="OnRemoveHighlightClick" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
+            <MenuItem Header="Open in _editor at this line" Click="OnOpenInEditorClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
             <MenuItem Header="_Copy" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />
@@ -165,6 +169,7 @@
                                         Bookmarks="{Binding Bookmarks.Lines}"
                                         BookmarkNotes="{Binding Bookmarks.Notes}"
                                         BookmarkColors="{Binding Bookmarks.Colors}"
+                                        LineHighlights="{Binding Bookmarks.Highlights}"
                                         ContextMenu="{StaticResource MainViewMenu}"
                                         Highlight="{Binding Search.Highlight}"
                                         LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
@@ -205,6 +210,7 @@
                                             Bookmarks="{Binding Bookmarks.Lines}"
                                             BookmarkNotes="{Binding Bookmarks.Notes}"
                                             BookmarkColors="{Binding Bookmarks.Colors}"
+                                            LineHighlights="{Binding Bookmarks.Highlights}"
                                             ContextMenu="{StaticResource ResultsViewMenu}"
                                             LineHighlighter="{Binding Highlighting.Highlighter, RelativeSource={RelativeSource AncestorType=Window}, FallbackValue={x:Static viewer:LineHighlighter.None}}"
                                             FullLineRequested="OnFullLineRequested"

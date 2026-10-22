@@ -43,6 +43,12 @@ public sealed partial class MainViewModel
                     Line = b.Line, Note = b.Note, Color = b.Color == BookmarkColor.Blue ? null : b.Color,
                 }),
             ],
+            Highlights = tab.Bookmarks.Highlights.IsEmpty
+                ? null
+                : [.. tab.Bookmarks.Highlights.OrderBy(h => h.Key).Select(h => new LineHighlightEntry
+                {
+                    Line = h.Key, Foreground = h.Value.Foreground, Background = h.Value.Background,
+                })],
         };
         try
         {

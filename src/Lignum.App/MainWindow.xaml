@@ -22,6 +22,7 @@
         <KeyBinding Gesture="Ctrl+F" Command="{Binding SelectedTab.Search.OpenFindBarCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+F" Command="{Binding AllTabsSearch.OpenCommand}" />
         <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding Assistant.TogglePanelCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+E" Command="{Binding OpenInEditorCommand}" />
         <KeyBinding Gesture="F3" Command="{Binding SelectedTab.Search.FindNextCommand}" />
         <KeyBinding Gesture="Shift+F3" Command="{Binding SelectedTab.Search.FindPreviousCommand}" />
         <KeyBinding Gesture="Ctrl+OemPlus" Command="{Binding Appearance.ZoomInCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
@@ -60,6 +61,9 @@
                 </MenuItem>
                 <MenuItem Header="_Export with notes…" Click="OnExportClick" />
                 <MenuItem Header="Export with notes, _uncompressed (huge logs)…" Click="OnExportUncompressedClick" />
+                <MenuItem Header="Open in e_ditor" Command="{Binding OpenInEditorCommand}" InputGestureText="Ctrl+Shift+E" />
+                <MenuItem Header="Copy full _path" Command="{Binding SelectedTab.CopyFullPathCommand}" />
+                <MenuItem Header="Open containing _folder" Command="{Binding SelectedTab.OpenContainingFolderCommand}" />
                 <MenuItem Header="_Close tab" Command="{Binding CloseTabCommand}" InputGestureText="Ctrl+W" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
@@ -77,6 +81,7 @@
                 <MenuItem Header="Toggle _bookmark" Command="{Binding SelectedTab.ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
                 <MenuItem Header="_Next bookmark" Command="{Binding SelectedTab.NextBookmarkCommand}" InputGestureText="F2" />
                 <MenuItem Header="_Previous bookmark" Command="{Binding SelectedTab.PreviousBookmarkCommand}" InputGestureText="Shift+F2" />
+                <MenuItem Header="C_lear all bookmarks" Command="{Binding SelectedTab.ClearBookmarksCommand}" />
                 <MenuItem Header="Bookmarks _pane" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.IsBookmarksPaneOpen, Mode=TwoWay, FallbackValue=False}" />
             </MenuItem>
@@ -113,6 +118,8 @@
                 </MenuItem>
                 <MenuItem Header="_Font…" Click="OnFontClick" />
                 <MenuItem Header="_Highlight rules…" Click="OnHighlightRulesClick" />
+                <MenuItem Header="_External editor…" Click="OnExternalEditorClick" />
+                <MenuItem Header="AI _permissions…" Click="OnAiPermissionsClick" />
                 <MenuItem Header="Tab _width">
                     <MenuItem Header="_2" Command="{Binding SetTabWidthCommand}"
                               IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">
@@ -176,9 +183,29 @@
                     </Style.Triggers>
                 </Style>
             </TabControl.Style>
+            <!-- The whole tab (not only its text) shows the file's full path on hover (ticket 12). -->
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                    <Setter Property="ToolTip" Value="{Binding SourcePath}" />
+                </Style>
+            </TabControl.ItemContainerStyle>
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Orientation="Horizontal" ToolTip="{Binding Path}">
+                    <StackPanel Orientation="Horizontal" Background="Transparent">
+                        <StackPanel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copy full _path" Command="{Binding CopyFullPathCommand}" />
+                                <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
+                                <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
+                                <Separator />
+                                <MenuItem Header="_Close" InputGestureText="Ctrl+W"
+                                          Command="{Binding PlacementTarget.Tag.CloseTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                            </ContextMenu>
+                        </StackPanel.ContextMenu>
+                        <StackPanel.Tag>
+                            <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=Window}" />
+                        </StackPanel.Tag>
                         <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
                         <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
                                 FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"
@@ -193,6 +220,7 @@
             </TabControl.ContentTemplate>
         </TabControl>
         <StatusBar DockPanel.Dock="Bottom"
+                   Height="50"
                    Background="{DynamicResource StatusBarBackgroundBrush}"
                    Foreground="{DynamicResource StatusBarForegroundBrush}">
             <StatusBarItem>

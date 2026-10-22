@@ -70,6 +70,7 @@ public partial class AssistantPanel : UserControl
                 return true;
             case System.Windows.Input.Key.Tab:
             case System.Windows.Input.Key.Enter:
+                if (assistant.SkillSuggestions.Count == 0) return false; // only the "no skills" hint: Enter sends
                 AcceptSkill(assistant, null);
                 return true;
             case System.Windows.Input.Key.Escape:

@@ -73,6 +73,40 @@ public sealed class BookmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task Clear_all_removes_every_bookmark_note_and_color_and_saves_it()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        Assert.False(tab.ClearBookmarksCommand.CanExecute(null));
+        ToggleAt(tab, 3);
+        tab.Bookmarks.SetColor(5, BookmarkColor.Red);
+        Assert.True(tab.ClearBookmarksCommand.CanExecute(null));
+
+        tab.ClearBookmarksCommand.Execute(null);
+
+        Assert.Empty(tab.Bookmarks.Lines);
+        Assert.Empty(tab.Bookmarks.Colors);
+        Assert.False(tab.ClearBookmarksCommand.CanExecute(null));
+        Assert.Empty((await Open(Start(), a)).Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Clear_all_asks_first_when_a_bookmark_has_a_note_and_keeps_them_on_no()
+    {
+        var vm = Start();
+        int? asked = null;
+        vm.ConfirmClearBookmarks = notes => { asked = notes; return false; };
+        var tab = await Open(vm, WriteLog("a.log"));
+        tab.Bookmarks.SetNote(4, "keep me");
+        ToggleAt(tab, 8);
+
+        tab.ClearBookmarksCommand.Execute(null);
+
+        Assert.Equal(1, asked);
+        Assert.Equal([4L, 8L], tab.Bookmarks.Lines);
+    }
+
+    [Fact]
     public async Task A_note_on_an_unbookmarked_line_bookmarks_it()
     {
         var tab = await Open(Start(), WriteLog("a.log"));
@@ -115,6 +149,50 @@ public sealed class BookmarkTests : IDisposable
 
         Assert.Equal([12L], reopened.Bookmarks.Lines);
         Assert.Empty(reopened.Bookmarks.Notes);
+    }
+
+    [Fact]
+    public async Task A_line_highlight_is_saved_and_restored_without_bookmarking_the_line()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+
+        tab.Bookmarks.SetHighlight([3, 4], "red", "#fff59d");
+        tab.Bookmarks.SetHighlight([7], "", "#BBDEFB");
+
+        var reopened = await Open(Start(), a);
+        Assert.Empty(reopened.Bookmarks.Lines);
+        Assert.Equal(new LineHighlight("#FF0000", "#FFF59D"), reopened.Bookmarks.HighlightFor(3));
+        Assert.Equal(new LineHighlight("#FF0000", "#FFF59D"), reopened.Bookmarks.HighlightFor(4));
+        Assert.Equal(new LineHighlight(null, "#BBDEFB"), reopened.Bookmarks.HighlightFor(7));
+    }
+
+    [Fact]
+    public async Task Removing_a_highlight_or_giving_no_valid_color_clears_it_and_clear_all_bookmarks_keeps_it()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        tab.Bookmarks.SetHighlight([1, 2, 3], null, "#FFCDD2");
+        ToggleAt(tab, 2);
+
+        tab.Bookmarks.RemoveHighlight([1]);
+        tab.Bookmarks.SetHighlight([3], "not a color", "");
+        tab.ClearBookmarksCommand.Execute(null);
+
+        var reopened = await Open(Start(), a);
+        Assert.Equal([2L], reopened.Bookmarks.Highlights.Keys);
+        Assert.Empty(reopened.Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task A_bookmarks_file_without_highlights_writes_none()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        ToggleAt(tab, 12);
+        SettingsStore.Flush();
+
+        var file = Directory.GetFiles(Path.Combine(SettingsDir, "bookmarks"), "*.json").Single();
+        Assert.DoesNotContain("highlights", File.ReadAllText(file), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

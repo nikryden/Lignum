@@ -123,7 +123,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         Call("search_all_tabs", new() { ["pattern"] = E(pattern), ["is_regex"] = E(isRegex), ["match_case"] = E(matchCase), ["max_lines_per_tab"] = E(maxLinesPerTab) },
             cancellationToken);
 
-    [McpServerTool(Name = "find_in_files"), Description("Search the log files in a folder that are not open in Lignum (like Find in files). Binary files are skipped. Returns matching files with their match counts and first matches.")]
+    [McpServerTool(Name = "find_in_files"), Description("Search the log files in a folder that are not open in Lignum (like Find in files). Binary files are skipped. Returns matching files with their match counts and first matches. Lignum asks the user for permission to read the folder unless already granted.")]
     public Task<string> FindInFiles(
         [Description("Folder to search.")] string folder,
         [Description("Text or .NET regex to find.")] string pattern,
@@ -230,7 +230,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
                                      CancellationToken cancellationToken = default) =>
         Call("show_full_line", WithTab(new() { ["line"] = E(line) }, tab), cancellationToken);
 
-    [McpServerTool(Name = "open_file"), Description("Open a log file or .lm package in a new Lignum tab (or switch to it if open). Returns once the tab is there; big files keep indexing in the background.")]
+    [McpServerTool(Name = "open_file"), Description("Open a log file or .lm package in a new Lignum tab (or switch to it if open). Returns once the tab is there; big files keep indexing in the background. A file not already open needs the user's permission to read it.")]
     public Task<string> OpenFile([Description("Full path of the file.")] string path, CancellationToken cancellationToken = default) =>
         Call("open_file", new() { ["path"] = E(path) }, cancellationToken);
 
@@ -271,6 +271,52 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         if (description is not null) arguments["description"] = E(description);
         if (scope is not null) arguments["scope"] = E(scope);
         return Call("save_skill", arguments, cancellationToken);
+    }
+
+    // File tools (ticket 18): each call is checked against the user's AI permissions; without one, Lignum asks the user.
+
+    [McpServerTool(Name = "list_dir"), Description("List a folder anywhere on this PC (subfolders first, then files with sizes; at most 500 entries). Lignum asks the user for permission unless already granted.")]
+    public Task<string> ListDir(
+        [Description("Full path of the folder.")] string path,
+        CancellationToken cancellationToken = default) =>
+        Call("list_dir", new() { ["path"] = E(path) }, cancellationToken);
+
+    [McpServerTool(Name = "read_file"), Description("Read lines of a text file anywhere on this PC (e.g. source code in another repository), with 1-based line numbers; at most 500 lines per call, files up to 50 MB (open bigger logs with open_file). Lignum asks the user for permission unless already granted.")]
+    public Task<string> ReadFile(
+        [Description("Full path of the file.")] string path,
+        [Description("1-based line to start at.")] int firstLine = 1,
+        [Description("How many lines (at most 500).")] int count = 200,
+        CancellationToken cancellationToken = default) =>
+        Call("read_file", new() { ["path"] = E(path), ["first_line"] = E(firstLine), ["count"] = E(count) }, cancellationToken);
+
+    [McpServerTool(Name = "write_file"), Description("Create a text file or replace its whole content. The user sees the content and must allow it. Log files open in Lignum can never be written.")]
+    public Task<string> WriteFile(
+        [Description("Full path of the file.")] string path,
+        [Description("The complete new content.")] string content,
+        CancellationToken cancellationToken = default) =>
+        Call("write_file", new() { ["path"] = E(path), ["content"] = E(content) }, cancellationToken);
+
+    [McpServerTool(Name = "edit_file"), Description("Replace exact text in a text file: oldText must occur exactly once unless replaceAll is true. Read the file first and copy oldText exactly. The user sees the change and must allow it. Log files open in Lignum can never be written.")]
+    public Task<string> EditFile(
+        [Description("Full path of the file.")] string path,
+        [Description("The exact text to replace (with enough context to be unique).")] string oldText,
+        [Description("The text to put in its place (may be empty).")] string newText,
+        [Description("Replace every occurrence.")] bool replaceAll = false,
+        CancellationToken cancellationToken = default) =>
+        Call("edit_file", new() { ["path"] = E(path), ["old_text"] = E(oldText), ["new_text"] = E(newText), ["replace_all"] = E(replaceAll) },
+            cancellationToken);
+
+    [McpServerTool(Name = "run_command"), Description("Run a command on this PC (git, PowerShell, cmd, Python, WSL, ...) and get its output and exit code. The user sees the exact command and must allow it. No input can be typed, so use non-interactive options. Output is capped at 100,000 characters.")]
+    public Task<string> RunCommand(
+        [Description("The command. With shell \"none\" its first word is the program (e.g. \"git log -n 5\", \"python script.py\"); otherwise it is a script for that shell.")] string command,
+        [Description("\"none\" (run a program directly), \"pwsh\", \"powershell\", \"cmd\" or \"wsl\" (bash in WSL).")] string shell = "none",
+        [Description("Working folder (full path); default the folder of the selected log.")] string? cwd = null,
+        [Description("Stop it after this many seconds (at most 600).")] int timeoutSeconds = 120,
+        CancellationToken cancellationToken = default)
+    {
+        var arguments = new Dictionary<string, JsonElement> { ["command"] = E(command), ["shell"] = E(shell), ["timeout_seconds"] = E(timeoutSeconds) };
+        if (!string.IsNullOrWhiteSpace(cwd)) arguments["cwd"] = E(cwd);
+        return Call("run_command", arguments, cancellationToken);
     }
 
     private static Dictionary<string, JsonElement> WithTab(Dictionary<string, JsonElement> arguments, string? tab)

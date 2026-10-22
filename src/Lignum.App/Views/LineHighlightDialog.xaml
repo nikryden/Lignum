@@ -1,0 +1,41 @@
+<!-- "Highlight line…" (ticket 14): a text color and a background color for the selected lines. Empty = none. -->
+<Window x:Class="Lignum.App.Views.LineHighlightDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Highlight line" SizeToContent="Height" Width="420" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+    <Window.Resources>
+        <DataTemplate x:Key="Swatch">
+            <Button Width="20" Height="20" Margin="0,0,4,0" Padding="0" Tag="{Binding}" ToolTip="{Binding}"
+                    Click="OnSwatchClick" BorderThickness="1">
+                <Button.Background>
+                    <SolidColorBrush Color="{Binding}" />
+                </Button.Background>
+            </Button>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="Row">
+            <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+    </Window.Resources>
+    <StackPanel Margin="16">
+        <TextBlock x:Name="Prompt" Margin="0,0,0,8" />
+        <TextBlock Text="Text color (#RRGGBB, empty for none)" Margin="0,0,0,4" />
+        <TextBox x:Name="ForegroundBox" Margin="0,0,0,4" TextChanged="OnColorChanged" />
+        <ItemsControl x:Name="ForegroundSwatches" ItemTemplate="{StaticResource Swatch}"
+                      ItemsPanel="{StaticResource Row}" Margin="0,0,0,12" />
+        <TextBlock Text="Background color (#RRGGBB, empty for none)" Margin="0,0,0,4" />
+        <TextBox x:Name="BackgroundBox" Margin="0,0,0,4" TextChanged="OnColorChanged" />
+        <ItemsControl x:Name="BackgroundSwatches" ItemTemplate="{StaticResource Swatch}"
+                      ItemsPanel="{StaticResource Row}" Margin="0,0,0,12" />
+        <Border BorderThickness="1" BorderBrush="{DynamicResource PaneBorderBrush}" Margin="0,0,0,8">
+            <TextBlock x:Name="Sample" Text="2026-01-01 12:00:00 INFO Sample log line" Padding="6,2"
+                       FontFamily="Cascadia Mono, Consolas" />
+        </Border>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="OK" IsDefault="True" MinWidth="80" Margin="0,0,8,0" Click="OnOkClick" />
+            <Button Content="Cancel" IsCancel="True" MinWidth="80" />
+        </StackPanel>
+    </StackPanel>
+</Window>

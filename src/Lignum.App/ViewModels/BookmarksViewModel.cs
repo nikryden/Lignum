@@ -11,6 +11,9 @@ public sealed record BookmarkItem(long Line, string? Note, BookmarkColor Color =
     public long DisplayLine => Line + 1;
 }
 
+/// <summary>A line's own colors (ticket 14), <c>#RRGGBB</c>; a null color keeps the rule's or the theme's.</summary>
+public sealed record LineHighlight(string? Foreground, string? Background);
+
 /// <summary>
 /// The bookmarked lines of one file (ticket 17), with optional notes (ticket 06) and colors. Every change saves the file's <see cref="BookmarksFile"/> at once.
 /// <see cref="Lines"/> is replaced (not mutated) on every change, so a binding to it repaints the margin markers.
@@ -34,6 +37,13 @@ public sealed partial class BookmarksViewModel : ObservableObject
     [ObservableProperty]
     private ImmutableDictionary<long, BookmarkColor> _colors;
 
+    /// <summary>
+    /// Lines colored by hand (ticket 14), by 0-based line. Kept in the same file as the bookmarks but independent of
+    /// them: a highlighted line need not be bookmarked, and clearing bookmarks keeps highlights. Replaced on every change.
+    /// </summary>
+    [ObservableProperty]
+    private ImmutableDictionary<long, LineHighlight> _highlights;
+
     /// <param name="file">Where the bookmarks are loaded from and saved to; null keeps them in memory only.</param>
     /// <param name="path">The log file's full path, written into the file for people reading it.</param>
     public BookmarksViewModel(SettingsFile<BookmarksFile>? file, string path)
@@ -48,6 +58,41 @@ public sealed partial class BookmarksViewModel : ObservableObject
         _colors = file?.Value.Bookmarks.Where(b => b.Line >= 0 && b.Color is { } c && c != BookmarkColor.Blue)
                       .GroupBy(b => b.Line).ToImmutableDictionary(g => g.Key, g => g.First().Color!.Value)
                   ?? ImmutableDictionary<long, BookmarkColor>.Empty;
+        _highlights = file?.Value.Highlights?.Where(h => h.Line >= 0)
+                          .Select(h => (h.Line, Colors: Normalize(h.Foreground, h.Background)))
+                          .Where(h => h.Colors is not null)
+                          .GroupBy(h => h.Line).ToImmutableDictionary(g => g.Key, g => g.First().Colors!)
+                      ?? ImmutableDictionary<long, LineHighlight>.Empty;
+    }
+
+    /// <summary>The hand-set colors of <paramref name="line"/>, or null.</summary>
+    public LineHighlight? HighlightFor(long line) => Highlights.GetValueOrDefault(line);
+
+    /// <summary>
+    /// Colors <paramref name="lines"/> with <paramref name="foreground"/> and <paramref name="background"/>
+    /// (<c>#RRGGBB</c> or a color name; empty or invalid = none). Both none removes the highlight.
+    /// </summary>
+    public void SetHighlight(IEnumerable<long> lines, string? foreground, string? background)
+    {
+        var colors = Normalize(foreground, background);
+        var updated = Highlights;
+        foreach (var line in lines.Where(l => l >= 0))
+            updated = colors is null ? updated.Remove(line) : updated.SetItem(line, colors);
+        if (updated == Highlights) return;
+        Highlights = updated;
+        Save();
+    }
+
+    public void RemoveHighlight(IEnumerable<long> lines) => SetHighlight(lines, null, null);
+
+    /// <summary>The colors as <c>#RRGGBB</c> (or <c>#AARRGGBB</c>), dropping invalid ones; null when neither is left.</summary>
+    private static LineHighlight? Normalize(string? foreground, string? background)
+    {
+        static string? Hex(string? text) => Viewer.LineHighlighter.ParseColor(text) is { } c
+            ? (c.A == 255 ? $"#{c.R:X2}{c.G:X2}{c.B:X2}" : c.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            : null;
+        var (fg, bg) = (Hex(foreground), Hex(background));
+        return fg is null && bg is null ? null : new LineHighlight(fg, bg);
     }
 
     /// <summary>The bookmarks with their notes, ascending (the bookmarks pane).</summary>
@@ -116,6 +161,16 @@ public sealed partial class BookmarksViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>Removes every bookmark with its note and color (ticket 11).</summary>
+    public void Clear()
+    {
+        if (Lines.IsEmpty) return;
+        Lines = [];
+        Notes = Notes.Clear();
+        Colors = Colors.Clear();
+        Save();
+    }
+
     /// <summary>The first bookmark after <paramref name="line"/>, wrapping to the first; only lines below <paramref name="lineCount"/>.</summary>
     public long? Next(long line, long lineCount)
     {
@@ -155,6 +210,17 @@ public sealed partial class BookmarksViewModel : ObservableObject
             entry.Note = Notes.GetValueOrDefault(entry.Line);
             entry.Color = Colors.TryGetValue(entry.Line, out var color) ? color : null;
         }
+
+        var highlights = (value.Highlights ?? []).GroupBy(h => h.Line).ToDictionary(g => g.Key, g => g.First());
+        value.Highlights = Highlights.IsEmpty
+            ? null
+            : [.. Highlights.OrderBy(h => h.Key).Select(h =>
+            {
+                var entry = highlights.TryGetValue(h.Key, out var old) ? old : new LineHighlightEntry { Line = h.Key };
+                entry.Foreground = h.Value.Foreground;
+                entry.Background = h.Value.Background;
+                return entry;
+            })];
         _file.Save();
     }
 }

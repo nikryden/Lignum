@@ -28,6 +28,22 @@ public sealed class SkillTests : IDisposable
 
     private string LocalFolder => Path.Combine(_dir, "logs", ".lignum", "skills");
 
+    /// <summary>Stands in for ~/.claude/skills, so the tests never see the real user's skills.</summary>
+    private string ClaudeSkillsFolder => Path.Combine(_dir, "claude-skills");
+
+    /// <summary>A stand-in for claude.cmd that saves what it was asked (stdin) and answers in stream-json.</summary>
+    private string FakeClaude()
+    {
+        var path = Path.Combine(_dir, "claude.cmd");
+        File.WriteAllLines(path,
+        [
+            "@echo off",
+            "more > \"%~dp0stdin.txt\"",
+            """echo {"type":"result","subtype":"success","is_error":false,"result":"done"}""",
+        ]);
+        return path;
+    }
+
     private static void WriteSkill(string folder, string directory, string name, string description, string body)
     {
         Directory.CreateDirectory(Path.Combine(folder, directory));
@@ -44,6 +60,8 @@ public sealed class SkillTests : IDisposable
         File.WriteAllLines(LogPath, ["start", "ERROR disk full"]);
         await main.OpenFileAsync(LogPath);
         main.Assistant.Tools.GlobalSkillsFolder = GlobalFolder;
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = FakeClaude(), SkillsFolder = ClaudeSkillsFolder };
         main.Assistant.IsEnabled = true;
         return main;
     }
@@ -102,9 +120,9 @@ public sealed class SkillTests : IDisposable
 
         assistant.Input = "/";
         Assert.True(assistant.IsSkillListOpen);
-        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Select(s => s.Name));
+        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Where(s => s.Scope is SkillScope.Global or SkillScope.Local).Select(s => s.Name));
 
-        assistant.Input = "/ti";
+        assistant.Input = "/timel";
         Assert.Equal("timeline", Assert.Single(assistant.SkillSuggestions).Name);
 
         assistant.AcceptSkillSuggestion();
@@ -112,7 +130,99 @@ public sealed class SkillTests : IDisposable
         Assert.False(assistant.IsSkillListOpen);
 
         assistant.Input = "/nothing-like-this";
-        Assert.False(assistant.IsSkillListOpen);
+        Assert.Empty(assistant.SkillSuggestions);
+        Assert.Equal("No command or skill matches /nothing-like-this.", assistant.SkillListHint);
+    }
+
+    [Fact]
+    public async Task With_no_skills_a_slash_lists_the_commands_and_says_where_skills_are_looked_for()
+    {
+        var assistant = (await Start()).Assistant;
+
+        assistant.Input = "/";
+
+        Assert.True(assistant.IsSkillListOpen);
+        Assert.Contains("clear", assistant.SkillSuggestions.Select(s => s.Name));
+        Assert.Contains(GlobalFolder, assistant.SkillListHint);
+        Assert.Contains("this log's folder only", assistant.SkillListHint);
+    }
+
+    [Fact]
+    public void Lignum_ships_built_in_skills_and_a_users_skill_of_the_same_name_replaces_one()
+    {
+        Assert.Equal(["compare-runs", "explain-exception", "timeline", "trace-to-source", "triage-errors"],
+            SkillLibrary.BuiltIn.Select(s => s.Name));
+        Assert.All(SkillLibrary.BuiltIn, s => Assert.NotEmpty(s.Description));
+        Assert.Contains("search", SkillLibrary.BuiltIn.Single(s => s.Name == "triage-errors").ReadInstructions());
+
+        WriteSkill(GlobalFolder, "t", "timeline", "my own timeline", "mine");
+        var skills = SkillLibrary.Load(GlobalFolder, null, builtIn: true);
+
+        Assert.Equal(SkillScope.Global, skills.Single(s => s.Name == "timeline").Scope);
+        Assert.Equal("built-in", skills.Single(s => s.Name == "triage-errors").ScopeText);
+        Assert.DoesNotContain(SkillLibrary.Load(GlobalFolder, null), s => s.Scope == SkillScope.BuiltIn);
+    }
+
+    [Fact]
+    public async Task The_agent_can_fetch_a_built_in_skill_with_get_skill()
+    {
+        var main = await Start();
+
+        var outcome = await main.Assistant.HandleToolCallAsync(Call("get_skill", new { name = "explain-exception" }), default);
+
+        Assert.False(outcome.IsError, outcome.Content);
+        Assert.Contains("(built-in)", outcome.Content);
+        Assert.Contains("stack trace", outcome.Content);
+    }
+
+    [Fact]
+    public async Task Claude_Codes_own_skills_are_listed_and_sent_as_typed_for_Claude_to_expand()
+    {
+        WriteSkill(Path.Combine(ClaudeSkillsFolder, "synced", "abc"), "pdf", "pdf", "work with PDF files", "x");
+        WriteSkill(ClaudeSkillsFolder, "t", "timeline", "Claude's own timeline", "y"); // hidden: Lignum has one
+        var assistant = (await Start()).Assistant;
+
+        assistant.Input = "/pd";
+        var pdf = Assert.Single(assistant.SkillSuggestions);
+        assistant.Input = "/timeline";
+        var timeline = assistant.SkillSuggestions.Single(s => s.Name == "timeline");
+        assistant.Input = "/pdf summarize report.pdf";
+        await assistant.SendCommand.ExecuteAsync(null);
+
+        Assert.Equal(("Claude Code", SkillScope.Agent), (pdf.ScopeText, pdf.Scope));
+        Assert.Equal(SkillScope.BuiltIn, timeline.Scope);
+        Assert.Equal("/pdf summarize report.pdf", File.ReadAllText(Path.Combine(_dir, "stdin.txt")).Trim());
+        Assert.Contains(assistant.Entries, e => e.Kind == ChatEntryKind.Assistant && e.Text == "done");
+    }
+
+    [Fact]
+    public async Task Chat_commands_run_in_Lignum_and_are_never_sent_to_the_agent()
+    {
+        WriteSkill(GlobalFolder, "a", "clear", "a skill named like a command", "x");
+        var assistant = (await Start()).Assistant;
+        var permissions = 0;
+        assistant.PermissionsRequested += (_, _) => permissions++;
+        assistant.Entries.Add(new ChatEntry(ChatEntryKind.User, "old question"));
+
+        foreach (var command in new[] { "/model opus", "/effort high", "/effort turbo", "/permissions", "/help", "/model" })
+        {
+            assistant.Input = command;
+            await assistant.SendCommand.ExecuteAsync(null);
+            Assert.Equal("", assistant.Input);
+        }
+
+        Assert.Equal("opus", assistant.AgentModel);
+        Assert.Equal("high", assistant.AgentEffort);
+        Assert.Equal(1, permissions);
+        var texts = assistant.Entries.Select(e => e.Text).ToList();
+        Assert.Contains(texts, t => t.StartsWith("Reasoning levels for Claude Code:"));
+        Assert.Contains(texts, t => t.Contains("/clear (command)") && !t.Contains("a skill named like a command"));
+        Assert.Equal("Model: opus", texts[^1]);
+
+        assistant.Input = "/clear";
+        await assistant.SendCommand.ExecuteAsync(null);
+        Assert.Empty(assistant.Entries);
+        Assert.False(assistant.IsBusy);
     }
 
     [Fact]
@@ -128,7 +238,7 @@ public sealed class SkillTests : IDisposable
         Assert.Contains("Search for ERROR and bookmark each in red.", tool.Content);
         Assert.Contains("errors (local): find errors", list.Content);
         Assert.True(missing.IsError);
-        var skill = main.Assistant.Tools.LoadSkills()[0];
+        var skill = main.Assistant.Tools.LoadSkills().Single(s => s.Name == "errors");
         var prompt = SkillLibrary.PromptFor(skill, "only today");
         Assert.Contains("get_skill", prompt);
         Assert.Contains("\"errors\"", prompt);
@@ -158,7 +268,7 @@ public sealed class SkillTests : IDisposable
         var replaced = await main.Assistant.HandleToolCallAsync(Call("save_skill",
             new { name = "first-error", instructions = "changed", overwrite = true }), default);
         Assert.False(replaced.IsError);
-        var skills = main.Assistant.Tools.LoadSkills();
+        var skills = main.Assistant.Tools.LoadSkills().Where(s => s.Scope != SkillScope.BuiltIn).ToList();
         Assert.Equal(["first-error", "timeline"], skills.Select(s => s.Name));
         Assert.Equal("changed", skills[0].ReadInstructions());
         Assert.Equal(SkillScope.Local, skills[0].Scope);

@@ -113,6 +113,53 @@ public sealed class AgentChatTests : IDisposable
     }
 
     [Fact]
+    public async Task Claude_Codes_token_usage_is_shown_per_turn_and_per_conversation_with_the_context_window()
+    {
+        var exe = FakeClaude(
+            """{"type":"assistant","message":{"usage":{"input_tokens":10,"cache_read_input_tokens":40000,"cache_creation_input_tokens":2000,"output_tokens":300}}}""",
+            """{"type":"result","subtype":"success","is_error":false,"result":"ok","total_cost_usd":0.25,"usage":{"input_tokens":20,"cache_read_input_tokens":80000,"cache_creation_input_tokens":2000,"output_tokens":500},"modelUsage":{"claude-x":{"contextWindow":200000}}}""");
+        var main = Start();
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+        Assert.Equal("", main.Assistant.UsageText);
+
+        await Ask(main.Assistant, "one");
+        await Ask(main.Assistant, "two");
+
+        Assert.Equal(new TokenUsage(20, 500, 80000, 2000, 0.25m, 42310, 200000), main.Assistant.LastTurnUsage);
+        Assert.Equal(164040, main.Assistant.ConversationUsage!.AllInput);
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
+        try
+        {
+            Assert.Equal("Last: 82k in, 500 out · Conversation: 164k in, 1.0k out ($0.50) · Context: 42k of 200k (158k left)",
+                main.Assistant.UsageText);
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = culture;
+        }
+
+        main.Assistant.NewConversationCommand.Execute(null);
+        Assert.Equal("", main.Assistant.UsageText);
+    }
+
+    [Fact]
+    public async Task An_agent_that_reports_no_usage_says_so()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 1;
+        var exe = Path.Combine(_dir, "copilot.cmd");
+        File.WriteAllLines(exe, ["@echo off", "echo An answer."]);
+        main.Assistant.AgentFactory = (_, folder) => new CopilotCliAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+
+        await Ask(main.Assistant, "hi");
+
+        Assert.Equal("Token usage: not reported by GitHub Copilot CLI", main.Assistant.UsageText);
+    }
+
+    [Fact]
     public void Codex_runs_read_only_with_Lignum_added_and_resumes_the_last_session()
     {
         var agent = new CodexCliAgent { WorkFolder = Folder("codex"), LignumExe = @"C:\L\Lignum.exe", LignumArguments = ["--mcp"] };
@@ -138,6 +185,123 @@ public sealed class AgentChatTests : IDisposable
         Assert.Contains("--approve-mcps", arguments);
         Assert.Equal("-p", arguments[0]);
         Assert.Contains("\"lignum\"", File.ReadAllText(Path.Combine(agent.WorkFolder, ".cursor", "mcp.json")));
+    }
+
+    private T Agent<T>(T agent, string? model, string? effort) where T : CliAgent
+    {
+        agent.WorkFolder = Folder(typeof(T).Name);
+        agent.LignumExe = "Lignum.exe";
+        agent.LignumArguments = ["--mcp"];
+        agent.Model = model;
+        agent.Effort = effort;
+        Directory.CreateDirectory(agent.WorkFolder);
+        return agent;
+    }
+
+    /// <summary>The value right after <paramref name="flag"/>, or null when the flag is not there.</summary>
+    private static string? After(IReadOnlyList<string> arguments, string flag)
+    {
+        var i = arguments.ToList().IndexOf(flag);
+        return i < 0 ? null : arguments[i + 1];
+    }
+
+    [Fact]
+    public void Each_agent_passes_the_chosen_model_and_reasoning_level_with_its_own_flags()
+    {
+        var claude = Agent(new ClaudeCodeAgent(), "opus", "High").BuildArguments("hi");
+        Assert.Equal("opus", After(claude, "--model"));
+        Assert.Equal("high", After(claude, "--effort"));
+
+        var copilot = Agent(new CopilotCliAgent(), "gpt-5", "xhigh").BuildArguments("hi");
+        Assert.Equal("gpt-5", After(copilot, "--model"));
+        Assert.Equal("xhigh", After(copilot, "--reasoning-effort"));
+
+        var cursor = Agent(new CursorCliAgent(), "gpt-5", "high").BuildArguments("hi");
+        Assert.Equal("gpt-5", After(cursor, "--model"));
+        Assert.DoesNotContain("high", cursor); // Cursor has no reasoning flag
+
+        var codex = Agent(new CodexCliAgent(), "gpt-5-codex", "medium").BuildArguments("hi");
+        Assert.Equal("gpt-5-codex", After(codex, "-m"));
+        Assert.Contains("model_reasoning_effort=\"medium\"", codex);
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("")]
+    public void Copilot_gets_no_reasoning_level_when_it_picks_the_model_itself(string model)
+    {
+        var copilot = Agent(new CopilotCliAgent(), model, "medium").BuildArguments("hi");
+
+        Assert.DoesNotContain("--reasoning-effort", copilot);
+        Assert.DoesNotContain("medium", copilot);
+    }
+
+    [Fact]
+    public void The_reasoning_box_is_hidden_while_Copilot_picks_the_model_itself()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 1;
+        main.Assistant.AgentModel = "auto";
+        Assert.False(main.Assistant.SupportsEffort);
+
+        main.Assistant.AgentModel = "gpt-5";
+        Assert.True(main.Assistant.SupportsEffort);
+    }
+
+    [Fact]
+    public void No_model_or_level_or_an_unknown_level_passes_no_flag()
+    {
+        var claude = Agent(new ClaudeCodeAgent(), " ", "turbo").BuildArguments("hi");
+
+        Assert.DoesNotContain("--model", claude);
+        Assert.DoesNotContain("--effort", claude);
+        Assert.DoesNotContain("-m", Agent(new CodexCliAgent(), null, null).BuildArguments("hi"));
+    }
+
+    [Fact]
+    public void A_custom_agent_fills_in_model_and_effort_and_drops_an_empty_one_with_its_flag()
+    {
+        var both = Agent(new CustomAgent("agy", "-p {prompt} --model {model} --effort {effort}"), "m1", "low").BuildArguments("q");
+        Assert.Equal("m1", After(both, "--model"));
+        Assert.Equal("low", After(both, "--effort"));
+
+        var none = Agent(new CustomAgent("agy", "-p {prompt} --model {model} --effort {effort}"), "", null).BuildArguments("q");
+        Assert.DoesNotContain("--model", none);
+        Assert.DoesNotContain("--effort", none);
+        Assert.Empty(new CustomAgent("agy", "-p {prompt}").EffortLevels);
+    }
+
+    [Fact]
+    public void The_model_and_level_are_saved_per_agent()
+    {
+        var main = Start();
+        main.Assistant.SelectedAgent = 0;
+        main.Assistant.AgentModel = "sonnet";
+        main.Assistant.AgentEffort = "max";
+        main.Assistant.SelectedAgent = 2;
+        Assert.Equal("", main.Assistant.AgentModel);
+        Assert.False(main.Assistant.SupportsEffort);
+        main.Assistant.AgentModel = "gpt-5";
+
+        var again = Start();
+        again.Assistant.SelectedAgent = 0;
+        Assert.Equal("sonnet", again.Assistant.AgentModel);
+        Assert.Equal("max", again.Assistant.AgentEffort);
+        Assert.Contains("max", again.Assistant.EffortChoices);
+        again.Assistant.SelectedAgent = 2;
+        Assert.Equal("gpt-5", again.Assistant.AgentModel);
+    }
+
+    [Fact]
+    public void Cursor_trusts_the_conversation_folder_it_runs_in_because_print_mode_cannot_ask()
+    {
+        var agent = new CursorCliAgent { WorkFolder = Folder("cursor"), LignumExe = "Lignum.exe", LignumArguments = ["--mcp"] };
+        Directory.CreateDirectory(agent.WorkFolder);
+
+        var arguments = agent.BuildArguments("hi").ToList();
+
+        Assert.Contains("--trust", arguments);
+        Assert.Equal(agent.WorkFolder, arguments[arguments.IndexOf("--workspace") + 1]);
     }
 
     [Fact]

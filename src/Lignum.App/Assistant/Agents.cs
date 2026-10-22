@@ -31,6 +31,9 @@ public abstract class CliAgent
         "may add filter rules, highlight rules and bookmarks and go to lines when that helps; say what you changed. " +
         "When the user asks for a skill (saved instructions run with /name), write it and save it with save_skill " +
         "(local next to the log unless they want it for every log); do not ask them to save a file. " +
+        "To look at other files (e.g. the source code behind a log) use list_dir and read_file; to change files use " +
+        "edit_file or write_file; to run git, PowerShell, Python, WSL and so on use run_command. Lignum asks the user " +
+        "to allow each of these; if they decline, do not retry. " +
         "Keep answers short and concrete, and quote line numbers.";
 
     /// <summary>"Claude Code" or "GitHub Copilot CLI".</summary>
@@ -83,15 +86,26 @@ public abstract class CliAgent
     protected virtual IReadOnlyList<string> SignInArguments => [];
 
     /// <summary>Runs the agent with <paramref name="arguments"/>: true for exit code 0, null when it could not tell.</summary>
-    protected async Task<bool?> ExitCodeIsZeroAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    protected Task<bool?> ExitCodeIsZeroAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken) =>
+        CheckOutputAsync(arguments, (exitCode, _) => exitCode == 0, cancellationToken);
+
+    /// <summary>
+    /// Runs the agent with <paramref name="arguments"/> and lets <paramref name="judge"/> decide from the exit code
+    /// and the output (stdout and stderr together); null when it could not run or <paramref name="judge"/> cannot tell.
+    /// </summary>
+    protected async Task<bool?> CheckOutputAsync(IReadOnlyList<string> arguments, Func<int, string, bool?> judge,
+        CancellationToken cancellationToken)
     {
         if (FindExecutable() is not { } exe) return false;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(20));
+        var output = new StringBuilder();
         try
         {
             Directory.CreateDirectory(WorkFolder);
-            return await ProcessRunner.RunAsync(exe, arguments, null, WorkFolder, _ => { }, _ => { }, timeout.Token) == 0;
+            var exitCode = await ProcessRunner.RunAsync(exe, arguments, null, WorkFolder,
+                line => { lock (output) output.AppendLine(line); }, line => { lock (output) output.AppendLine(line); }, timeout.Token);
+            lock (output) return judge(exitCode, output.ToString());
         }
         catch (Exception ex) when (ex is OperationCanceledException or System.ComponentModel.Win32Exception or IOException)
         {
@@ -113,6 +127,49 @@ public abstract class CliAgent
 
     public IReadOnlyList<string> LignumArguments { get; set; } = [];
 
+    /// <summary>
+    /// Tokens the last turn used (ticket 20), or null when the CLI does not report them. Set while the turn's output
+    /// is read; reset at the start of each turn.
+    /// </summary>
+    public TokenUsage? LastTurnUsage { get; protected set; }
+
+    /// <summary>The model to use (ticket 16); null or empty leaves the CLI's default and passes no flag.</summary>
+    public string? Model { get; set; }
+
+    /// <summary>The reasoning level, one of <see cref="EffortLevels"/>; null or empty leaves the CLI's default.</summary>
+    public string? Effort { get; set; }
+
+    /// <summary>The reasoning levels the CLI takes, lowest first; empty when it has no such option.</summary>
+    public virtual IReadOnlyList<string> EffortLevels => [];
+
+    /// <summary>Whether a reasoning level can go with <paramref name="model"/> (some CLIs refuse one for some models).</summary>
+    public virtual bool AcceptsEffort(string? model) => EffortLevels.Count > 0;
+
+    /// <summary>Model names offered in the model box; the user can type any other.</summary>
+    public virtual IReadOnlyList<string> SuggestedModels => [];
+
+    /// <summary>
+    /// Folders with the agent's own skills (<c>&lt;name&gt;\SKILL.md</c>), listed in the "/" box; empty when Lignum
+    /// cannot run them. Typing <c>/name</c> for one sends the message as is: the agent expands it itself.
+    /// </summary>
+    public virtual IReadOnlyList<string> OwnSkillFolders => [];
+
+    /// <summary>The agent's own skills, from <see cref="OwnSkillFolders"/>.</summary>
+    public IReadOnlyList<Skill> LoadOwnSkills() => SkillLibrary.LoadAgentSkills(OwnSkillFolders, Name);
+
+    /// <summary>Appends <paramref name="modelFlag"/> and <paramref name="effortFlag"/> (when set) with their values.</summary>
+    protected void AddModelArguments(List<string> arguments, string modelFlag, string? effortFlag)
+    {
+        if (!string.IsNullOrWhiteSpace(Model)) arguments.AddRange([modelFlag, Model.Trim()]);
+        if (effortFlag is not null && EffortValue is { } effort) arguments.AddRange([effortFlag, effort]);
+    }
+
+    /// <summary><see cref="Effort"/> when the CLI supports it, else null.</summary>
+    protected string? EffortValue =>
+        !string.IsNullOrWhiteSpace(Effort) && EffortLevels.Contains(Effort.Trim(), StringComparer.OrdinalIgnoreCase)
+            ? Effort.Trim().ToLowerInvariant()
+            : null;
+
     /// <summary>The program to run, or null when the agent is not installed. Overridable for tests.</summary>
     public string? Executable { get; init; }
 
@@ -122,6 +179,7 @@ public abstract class CliAgent
         var exe = FindExecutable() ?? throw new AgentException($"{Name} is not installed. {InstallHint}");
         Directory.CreateDirectory(WorkFolder);
         var arguments = BuildArguments(prompt);
+        LastTurnUsage = null;
         var output = new StringBuilder();
         var errors = new StringBuilder();
         var exitCode = await ProcessRunner.RunAsync(exe, arguments, PromptOnStdin ? prompt : null, WorkFolder,
@@ -230,8 +288,23 @@ public sealed class ClaudeCodeAgent : CliAgent
             "--append-system-prompt-file", instructions,
         ];
         arguments.AddRange(HasStarted ? ["--resume", _sessionId] : ["--session-id", _sessionId]);
+        AddModelArguments(arguments, "--model", "--effort");
         return arguments;
     }
+
+    public override IReadOnlyList<string> EffortLevels => ["low", "medium", "high", "xhigh", "max"];
+
+    public override IReadOnlyList<string> SuggestedModels => ["fable", "opus", "sonnet", "haiku"];
+
+    /// <summary>
+    /// The user's Claude Code skills (also the ones synced from claude.ai). In print mode Claude Code expands a
+    /// leading <c>/name</c> itself, even with every built-in tool off, so they work through Lignum's tools only.
+    /// </summary>
+    public override IReadOnlyList<string> OwnSkillFolders => [SkillsFolder];
+
+    /// <summary>Claude Code's user skills folder; tests point it elsewhere.</summary>
+    public string SkillsFolder { get; init; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
@@ -254,13 +327,45 @@ public sealed class ClaudeCodeAgent : CliAgent
                 _sawText |= text.Length > 0;
                 onText(text);
                 break;
+            case "assistant" when message.TryGetProperty("message", out var reply) && reply.TryGetProperty("usage", out var callUsage):
+                // Each model call's prompt is what currently fills the context window; the last one counts.
+                _contextUsed = Tokens(callUsage, "input_tokens") + Tokens(callUsage, "cache_read_input_tokens")
+                               + Tokens(callUsage, "cache_creation_input_tokens") + Tokens(callUsage, "output_tokens");
+                break;
             case "result":
+                ReadUsage(message);
                 if (message.TryGetProperty("is_error", out var isError) && isError.ValueKind == JsonValueKind.True)
                     throw new AgentException($"Claude Code: {Str(message, "result") ?? Str(message, "subtype") ?? "error"}");
                 output.Append(Str(message, "result"));
                 break;
         }
     }
+
+    private long? _contextUsed;
+
+    /// <summary>The result's "usage" (totals for the turn's model calls), cost and context window (ticket 20).</summary>
+    private void ReadUsage(JsonElement result)
+    {
+        if (!result.TryGetProperty("usage", out var usage) || usage.ValueKind != JsonValueKind.Object) return;
+        long? window = null;
+        if (result.TryGetProperty("modelUsage", out var models) && models.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var model in models.EnumerateObject())
+            {
+                if (model.Value.TryGetProperty("contextWindow", out var w) && w.TryGetInt64(out var size)) window = Math.Max(window ?? 0, size);
+            }
+        }
+
+        LastTurnUsage = new TokenUsage(
+            Tokens(usage, "input_tokens"), Tokens(usage, "output_tokens"),
+            Tokens(usage, "cache_read_input_tokens"), Tokens(usage, "cache_creation_input_tokens"),
+            result.TryGetProperty("total_cost_usd", out var cost) && cost.TryGetDecimal(out var usd) ? usd : null,
+            _contextUsed, window);
+        _contextUsed = null;
+    }
+
+    private static long Tokens(JsonElement usage, string name) =>
+        usage.TryGetProperty(name, out var value) && value.TryGetInt64(out var tokens) ? tokens : 0;
 
     protected override void Finish(Action<string> onText, StringBuilder output)
     {
@@ -310,8 +415,20 @@ public sealed class CopilotCliAgent : CliAgent
             .Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' ');
         List<string> arguments = ["-p", text, "--additional-mcp-config", "@" + mcp, "--allow-tool", "lignum", "--no-color"];
         if (HasStarted) arguments.Add("--continue");
+        AddModelArguments(arguments, "--model", AcceptsEffort(Model) ? "--reasoning-effort" : null);
         return arguments;
     }
+
+    public override IReadOnlyList<string> EffortLevels => ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+    public override IReadOnlyList<string> SuggestedModels => ["auto"];
+
+    /// <summary>
+    /// "auto" (and no model, which may mean auto) lets Copilot pick the model, and Copilot then refuses a reasoning
+    /// level ("Model "auto" does not support reasoning effort configuration"): only a named model takes one.
+    /// </summary>
+    public override bool AcceptsEffort(string? model) =>
+        !string.IsNullOrWhiteSpace(model) && !model.Trim().Equals("auto", StringComparison.OrdinalIgnoreCase);
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
@@ -334,7 +451,17 @@ public sealed class CursorCliAgent : CliAgent
 
     public override string InstallCommand => "irm 'https://cursor.com/install?win32=true' | iex";
 
-    public override string SignInHint => "Cursor CLI opens in a terminal: sign in when it asks, then close the window.";
+    public override string SignInHint => "A terminal runs \"agent login\" and opens Cursor in the browser: sign in there, then close the window.";
+
+    // A bare "agent" in the sign-in window only trusts that window's folder; "login" is what signs in.
+    protected override IReadOnlyList<string> SignInArguments => ["login"];
+
+    /// <summary>"agent status" exits 0 either way, so read what it says.</summary>
+    public override Task<bool?> IsSignedInAsync(CancellationToken cancellationToken) =>
+        CheckOutputAsync(["status"], (exitCode, output) =>
+            output.Contains("Not logged in", StringComparison.OrdinalIgnoreCase) ? false
+            : exitCode == 0 && output.Contains("logged in", StringComparison.OrdinalIgnoreCase) ? true
+            : null, cancellationToken);
 
     protected override IEnumerable<string> KnownLocations =>
     [
@@ -350,9 +477,12 @@ public sealed class CursorCliAgent : CliAgent
         {
             mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
         }));
+        // Print mode cannot answer the workspace-trust prompt, and the conversation folder is never the one trusted
+        // at sign-in: trust it explicitly (ticket 15). It only holds Lignum's MCP config.
         List<string> arguments = ["-p", OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}"),
-                                  "--approve-mcps", "--output-format", "text"];
+                                  "--approve-mcps", "--trust", "--workspace", WorkFolder, "--output-format", "text"];
         if (HasStarted) arguments.Add("--continue");
+        AddModelArguments(arguments, "--model", null); // effort is part of some model names, e.g. "...-thinking"
         return arguments;
     }
 
@@ -393,6 +523,8 @@ public sealed class CodexCliAgent : CliAgent
     protected internal override IReadOnlyList<string> BuildArguments(string prompt)
     {
         List<string> arguments = ["exec"];
+        if (!string.IsNullOrWhiteSpace(Model)) arguments.AddRange(["-m", Model.Trim()]);
+        if (EffortValue is { } effort) arguments.AddRange(["-c", "model_reasoning_effort=" + JsonSerializer.Serialize(effort)]);
         if (HasStarted) arguments.AddRange(["resume", "--last"]);
         arguments.AddRange(
         [
@@ -412,6 +544,8 @@ public sealed class CodexCliAgent : CliAgent
 
     protected override string? FailureText(string errors) =>
         string.IsNullOrWhiteSpace(errors) ? "OpenAI Codex CLI stopped with an error." : $"OpenAI Codex CLI: {errors.Trim().Split('\n')[^1]}";
+
+    public override IReadOnlyList<string> EffortLevels => ["minimal", "low", "medium", "high", "xhigh"];
 }
 
 /// <summary>
@@ -440,9 +574,29 @@ public sealed class CustomAgent(string command, string argumentTemplate) : CliAg
             mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
         }));
         var question = OneLine(HasStarted ? prompt : $"{Instructions}\n\nThe user asks: {prompt}");
-        return [.. SplitArguments(argumentTemplate).Select(a => a
-            .Replace("{prompt}", question).Replace("{mcpConfig}", mcp).Replace("{lignum}", LignumExe))];
+        var model = Model?.Trim() ?? "";
+        var effort = EffortValue ?? "";
+        // An argument that is only {model} or {effort} is dropped when that value is empty, with the flag before it.
+        var parts = SplitArguments(argumentTemplate);
+        var result = new List<string>();
+        foreach (var part in parts)
+        {
+            if ((part == "{model}" && model.Length == 0) || (part == "{effort}" && effort.Length == 0))
+            {
+                if (result.Count > 0 && result[^1].StartsWith('-')) result.RemoveAt(result.Count - 1);
+                continue;
+            }
+
+            result.Add(part.Replace("{prompt}", question).Replace("{mcpConfig}", mcp).Replace("{lignum}", LignumExe)
+                .Replace("{model}", model).Replace("{effort}", effort));
+        }
+
+        return result;
     }
+
+    /// <summary>Only when the template has an {effort} placeholder.</summary>
+    public override IReadOnlyList<string> EffortLevels =>
+        argumentTemplate.Contains("{effort}", StringComparison.Ordinal) ? ["low", "medium", "high"] : [];
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {
@@ -478,6 +632,22 @@ public sealed class CustomAgent(string command, string argumentTemplate) : CliAg
 
 /// <summary>An agent could not run or answered with an error; the message is shown in the panel.</summary>
 public sealed class AgentException(string message) : Exception(message);
+
+/// <summary>
+/// Tokens used (ticket 20). <see cref="Input"/> excludes cached tokens, which are in <see cref="CacheRead"/> and
+/// <see cref="CacheWrite"/>. <see cref="ContextUsed"/> and <see cref="ContextWindow"/> are null when unknown.
+/// </summary>
+public sealed record TokenUsage(long Input, long Output, long CacheRead = 0, long CacheWrite = 0, decimal? CostUsd = null,
+    long? ContextUsed = null, long? ContextWindow = null)
+{
+    public long AllInput => Input + CacheRead + CacheWrite;
+
+    /// <summary>Adds a turn to a conversation total; the context figures are the latest turn's.</summary>
+    public TokenUsage Plus(TokenUsage turn) => new(
+        Input + turn.Input, Output + turn.Output, CacheRead + turn.CacheRead, CacheWrite + turn.CacheWrite,
+        CostUsd is null && turn.CostUsd is null ? null : (CostUsd ?? 0) + (turn.CostUsd ?? 0),
+        turn.ContextUsed ?? ContextUsed, turn.ContextWindow ?? ContextWindow);
+}
 
 /// <summary>Starts a process with arguments, feeds stdin, streams stdout and stderr lines, and kills it on cancel.</summary>
 internal static class ProcessRunner

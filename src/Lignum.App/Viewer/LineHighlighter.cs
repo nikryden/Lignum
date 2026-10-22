@@ -76,7 +76,7 @@ public sealed class LineHighlighter
         }
     }
 
-    private static SolidColorBrush? ToBrush(string? text)
+    internal static SolidColorBrush? ToBrush(string? text)
     {
         if (ParseColor(text) is not { } color) return null;
         var brush = new SolidColorBrush(color);

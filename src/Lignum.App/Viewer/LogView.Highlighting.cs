@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using Lignum.App.ViewModels;
 
 namespace Lignum.App.Viewer;
 
@@ -27,8 +28,40 @@ public sealed partial class LogView
         set => SetValue(LineHighlighterProperty, value);
     }
 
-    /// <summary>The rule style of a loaded row, or null. Called from OnRender for visible rows only.</summary>
+    public static readonly DependencyProperty LineHighlightsProperty = DependencyProperty.Register(
+        nameof(LineHighlights), typeof(IReadOnlyDictionary<long, LineHighlight>), typeof(LogView),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    // Brushes for hand-set colors (ticket 14), by color text; few distinct colors, so never trimmed.
+    private readonly Dictionary<string, SolidColorBrush?> _highlightBrushes = [];
+
+    /// <summary>Colors set by hand by 0-based file line (ticket 14); they win over the rules, color by color.</summary>
+    public IReadOnlyDictionary<long, LineHighlight>? LineHighlights
+    {
+        get => (IReadOnlyDictionary<long, LineHighlight>?)GetValue(LineHighlightsProperty);
+        set => SetValue(LineHighlightsProperty, value);
+    }
+
+    /// <summary>The style of a loaded row: its hand-set colors over its rule style, or null.</summary>
     private LineStyle? LineStyleFor(long row, DisplayRow displayRow)
+    {
+        var ruleStyle = RuleStyleFor(row, displayRow);
+        if (LineHighlights is not { Count: > 0 } highlights
+            || !highlights.TryGetValue(displayRow.LineNumber, out var own)) return ruleStyle;
+        return new LineStyle(HighlightBrush(own.Foreground) ?? ruleStyle?.Foreground,
+                             HighlightBrush(own.Background) ?? ruleStyle?.Background);
+    }
+
+    private SolidColorBrush? HighlightBrush(string? color)
+    {
+        if (color is null) return null;
+        if (!_highlightBrushes.TryGetValue(color, out var brush))
+            _highlightBrushes[color] = brush = LineHighlighter.ToBrush(color);
+        return brush;
+    }
+
+    /// <summary>The rule style of a loaded row, or null. Called from OnRender for visible rows only.</summary>
+    private LineStyle? RuleStyleFor(long row, DisplayRow displayRow)
     {
         var highlighter = LineHighlighter ?? LineHighlighter.None;
         if (highlighter.IsEmpty) return null;
