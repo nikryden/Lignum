@@ -6,7 +6,7 @@
 
 **Status:** done
 
-**Mapping (checked against each CLI's --help):** Claude Code `--model` + `--effort low|medium|high|xhigh|max`; Copilot `--model` + `--reasoning-effort none..max`; Codex `-m` + `-c model_reasoning_effort=`; Cursor `--model` only (effort is part of some model names); Custom agent: `{model}` / `{effort}` placeholders, dropped with their flag when empty.
+**Mapping (Claude, Copilot and Cursor checked against --help; Codex is not installed here, flags from its docs):** Claude Code `--model` + `--effort low|medium|high|xhigh|max`; Copilot `--model` + `--reasoning-effort none..max`; Codex `-m` + `-c model_reasoning_effort=`; Cursor `--model` only (effort is part of some model names); Custom agent: `{model}` / `{effort}` placeholders, dropped with their flag when empty.
 
 - [x] Model (editable combo with known models) and reasoning-level dropdowns in the assistant pane
 - [x] Saved per agent in `AssistantSettings`
