@@ -28,6 +28,22 @@ public sealed class SkillTests : IDisposable
 
     private string LocalFolder => Path.Combine(_dir, "logs", ".lignum", "skills");
 
+    /// <summary>Stands in for ~/.claude/skills, so the tests never see the real user's skills.</summary>
+    private string ClaudeSkillsFolder => Path.Combine(_dir, "claude-skills");
+
+    /// <summary>A stand-in for claude.cmd that saves what it was asked (stdin) and answers in stream-json.</summary>
+    private string FakeClaude()
+    {
+        var path = Path.Combine(_dir, "claude.cmd");
+        File.WriteAllLines(path,
+        [
+            "@echo off",
+            "more > \"%~dp0stdin.txt\"",
+            """echo {"type":"result","subtype":"success","is_error":false,"result":"done"}""",
+        ]);
+        return path;
+    }
+
     private static void WriteSkill(string folder, string directory, string name, string description, string body)
     {
         Directory.CreateDirectory(Path.Combine(folder, directory));
@@ -44,6 +60,8 @@ public sealed class SkillTests : IDisposable
         File.WriteAllLines(LogPath, ["start", "ERROR disk full"]);
         await main.OpenFileAsync(LogPath);
         main.Assistant.Tools.GlobalSkillsFolder = GlobalFolder;
+        main.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = FakeClaude(), SkillsFolder = ClaudeSkillsFolder };
         main.Assistant.IsEnabled = true;
         return main;
     }
@@ -155,6 +173,26 @@ public sealed class SkillTests : IDisposable
         Assert.False(outcome.IsError, outcome.Content);
         Assert.Contains("(built-in)", outcome.Content);
         Assert.Contains("stack trace", outcome.Content);
+    }
+
+    [Fact]
+    public async Task Claude_Codes_own_skills_are_listed_and_sent_as_typed_for_Claude_to_expand()
+    {
+        WriteSkill(Path.Combine(ClaudeSkillsFolder, "synced", "abc"), "pdf", "pdf", "work with PDF files", "x");
+        WriteSkill(ClaudeSkillsFolder, "t", "timeline", "Claude's own timeline", "y"); // hidden: Lignum has one
+        var assistant = (await Start()).Assistant;
+
+        assistant.Input = "/pd";
+        var pdf = Assert.Single(assistant.SkillSuggestions);
+        assistant.Input = "/timeline";
+        var timeline = assistant.SkillSuggestions.Single(s => s.Name == "timeline");
+        assistant.Input = "/pdf summarize report.pdf";
+        await assistant.SendCommand.ExecuteAsync(null);
+
+        Assert.Equal(("Claude Code", SkillScope.Agent), (pdf.ScopeText, pdf.Scope));
+        Assert.Equal(SkillScope.BuiltIn, timeline.Scope);
+        Assert.Equal("/pdf summarize report.pdf", File.ReadAllText(Path.Combine(_dir, "stdin.txt")).Trim());
+        Assert.Contains(assistant.Entries, e => e.Kind == ChatEntryKind.Assistant && e.Text == "done");
     }
 
     [Fact]

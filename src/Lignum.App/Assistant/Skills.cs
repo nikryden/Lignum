@@ -102,13 +102,29 @@ public static partial class SkillLibrary
         return [.. skills.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
     }
 
-    private static IEnumerable<Skill> LoadFolder(string folder, SkillScope scope)
+    /// <summary>
+    /// An agent's own skills (e.g. Claude Code's <c>~/.claude/skills</c>), found up to <paramref name="depth"/>
+    /// folders down; each is marked with <paramref name="owner"/>. The agent runs them itself.
+    /// </summary>
+    public static IReadOnlyList<Skill> LoadAgentSkills(IEnumerable<string> folders, string owner, int depth = 4)
+    {
+        var byName = new Dictionary<string, Skill>(StringComparer.OrdinalIgnoreCase);
+        foreach (var folder in folders)
+        {
+            foreach (var skill in LoadFolder(folder, SkillScope.Agent, depth)) byName.TryAdd(skill.Name, skill with { Owner = owner });
+        }
+
+        return [.. byName.Values.OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    private static IEnumerable<Skill> LoadFolder(string folder, SkillScope scope, int depth = 1)
     {
         string[] files;
         try
         {
             if (!Directory.Exists(folder)) yield break;
-            files = Directory.GetFiles(folder, FileName, new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 1 });
+            files = Directory.GetFiles(folder, FileName,
+                new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = depth, IgnoreInaccessible = true });
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

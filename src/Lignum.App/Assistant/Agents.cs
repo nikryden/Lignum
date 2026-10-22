@@ -145,6 +145,15 @@ public abstract class CliAgent
     /// <summary>Model names offered in the model box; the user can type any other.</summary>
     public virtual IReadOnlyList<string> SuggestedModels => [];
 
+    /// <summary>
+    /// Folders with the agent's own skills (<c>&lt;name&gt;\SKILL.md</c>), listed in the "/" box; empty when Lignum
+    /// cannot run them. Typing <c>/name</c> for one sends the message as is: the agent expands it itself.
+    /// </summary>
+    public virtual IReadOnlyList<string> OwnSkillFolders => [];
+
+    /// <summary>The agent's own skills, from <see cref="OwnSkillFolders"/>.</summary>
+    public IReadOnlyList<Skill> LoadOwnSkills() => SkillLibrary.LoadAgentSkills(OwnSkillFolders, Name);
+
     /// <summary>Appends <paramref name="modelFlag"/> and <paramref name="effortFlag"/> (when set) with their values.</summary>
     protected void AddModelArguments(List<string> arguments, string modelFlag, string? effortFlag)
     {
@@ -283,6 +292,16 @@ public sealed class ClaudeCodeAgent : CliAgent
     public override IReadOnlyList<string> EffortLevels => ["low", "medium", "high", "xhigh", "max"];
 
     public override IReadOnlyList<string> SuggestedModels => ["fable", "opus", "sonnet", "haiku"];
+
+    /// <summary>
+    /// The user's Claude Code skills (also the ones synced from claude.ai). In print mode Claude Code expands a
+    /// leading <c>/name</c> itself, even with every built-in tool off, so they work through Lignum's tools only.
+    /// </summary>
+    public override IReadOnlyList<string> OwnSkillFolders => [SkillsFolder];
+
+    /// <summary>Claude Code's user skills folder; tests point it elsewhere.</summary>
+    public string SkillsFolder { get; init; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".claude", "skills");
 
     protected override void OnOutputLine(string line, Action<string> onText, StringBuilder output)
     {

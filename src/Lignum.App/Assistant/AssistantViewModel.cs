@@ -109,9 +109,17 @@ public sealed partial class AssistantViewModel : ObservableObject
     /// <summary>Raised by /permissions: the window opens View → AI permissions….</summary>
     public event EventHandler? PermissionsRequested;
 
-    /// <summary>Everything "/" offers: chat commands first, then skills (a skill named like a command is hidden).</summary>
-    private IReadOnlyList<Skill> LoadSlashEntries() =>
-        [.. ChatCommands, .. _tools.LoadSkills().Where(s => !IsChatCommand(s.Name))];
+    /// <summary>
+    /// Everything "/" offers: chat commands first, then Lignum's skills (one named like a command is hidden), then the
+    /// agent's own skills whose names are not taken.
+    /// </summary>
+    private IReadOnlyList<Skill> LoadSlashEntries()
+    {
+        List<Skill> entries = [.. ChatCommands, .. _tools.LoadSkills().Where(s => !IsChatCommand(s.Name))];
+        var taken = entries.Select(e => e.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        entries.AddRange((_agent ?? CreateAgent(SelectedAgent)).LoadOwnSkills().Where(s => !taken.Contains(s.Name)));
+        return entries;
+    }
 
     private static bool IsChatCommand(string name) =>
         ChatCommands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
@@ -542,14 +550,15 @@ public sealed partial class AssistantViewModel : ObservableObject
                 return;
             }
 
-            var skill = _tools.LoadSkills().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
+            var skill = LoadSlashEntries().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
             if (skill is null)
             {
                 Add(ChatEntryKind.Error, $"There is no skill /{command.Name}. Type / to see the skills, or add one under Skills.");
                 return; // the input stays, to fix the name
             }
 
-            prompt = SkillLibrary.PromptFor(skill, command.Text);
+            // The agent's own skill goes as typed ("/name text"): the agent expands it. Lignum's are fetched with get_skill.
+            if (skill.Scope != SkillScope.Agent) prompt = SkillLibrary.PromptFor(skill, command.Text);
         }
 
         Input = "";
