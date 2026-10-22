@@ -628,6 +628,10 @@ public sealed partial class AssistantViewModel : ObservableObject
         "list_skills" => "Listing the skills",
         "get_skill" => $"Reading skill /{Arg(call, "name")}",
         "save_skill" => $"Saving skill /{Arg(call, "name")} ({(Arg(call, "scope") is "global" ? "global" : "local")})",
+        "list_dir" => $"Listing {Arg(call, "path")}",
+        "read_file" => $"Reading {Arg(call, "path")}",
+        "write_file" => $"Writing {Arg(call, "path")}",
+        "edit_file" => $"Editing {Arg(call, "path")}",
         _ => call.Name,
     };
 

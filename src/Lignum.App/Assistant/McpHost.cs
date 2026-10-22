@@ -273,6 +273,39 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
         return Call("save_skill", arguments, cancellationToken);
     }
 
+    // File tools (ticket 18): each call is checked against the user's AI permissions; without one, Lignum asks the user.
+
+    [McpServerTool(Name = "list_dir"), Description("List a folder anywhere on this PC (subfolders first, then files with sizes; at most 500 entries). Lignum asks the user for permission unless already granted.")]
+    public Task<string> ListDir(
+        [Description("Full path of the folder.")] string path,
+        CancellationToken cancellationToken = default) =>
+        Call("list_dir", new() { ["path"] = E(path) }, cancellationToken);
+
+    [McpServerTool(Name = "read_file"), Description("Read lines of a text file anywhere on this PC (e.g. source code in another repository), with 1-based line numbers; at most 500 lines per call, files up to 50 MB (open bigger logs with open_file). Lignum asks the user for permission unless already granted.")]
+    public Task<string> ReadFile(
+        [Description("Full path of the file.")] string path,
+        [Description("1-based line to start at.")] int firstLine = 1,
+        [Description("How many lines (at most 500).")] int count = 200,
+        CancellationToken cancellationToken = default) =>
+        Call("read_file", new() { ["path"] = E(path), ["first_line"] = E(firstLine), ["count"] = E(count) }, cancellationToken);
+
+    [McpServerTool(Name = "write_file"), Description("Create a text file or replace its whole content. The user sees the content and must allow it. Log files open in Lignum can never be written.")]
+    public Task<string> WriteFile(
+        [Description("Full path of the file.")] string path,
+        [Description("The complete new content.")] string content,
+        CancellationToken cancellationToken = default) =>
+        Call("write_file", new() { ["path"] = E(path), ["content"] = E(content) }, cancellationToken);
+
+    [McpServerTool(Name = "edit_file"), Description("Replace exact text in a text file: oldText must occur exactly once unless replaceAll is true. Read the file first and copy oldText exactly. The user sees the change and must allow it. Log files open in Lignum can never be written.")]
+    public Task<string> EditFile(
+        [Description("Full path of the file.")] string path,
+        [Description("The exact text to replace (with enough context to be unique).")] string oldText,
+        [Description("The text to put in its place (may be empty).")] string newText,
+        [Description("Replace every occurrence.")] bool replaceAll = false,
+        CancellationToken cancellationToken = default) =>
+        Call("edit_file", new() { ["path"] = E(path), ["old_text"] = E(oldText), ["new_text"] = E(newText), ["replace_all"] = E(replaceAll) },
+            cancellationToken);
+
     private static Dictionary<string, JsonElement> WithTab(Dictionary<string, JsonElement> arguments, string? tab)
     {
         if (!string.IsNullOrWhiteSpace(tab)) arguments["tab"] = E(tab);

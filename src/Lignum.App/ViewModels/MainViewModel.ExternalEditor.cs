@@ -13,6 +13,9 @@ public sealed partial class MainViewModel
     /// <summary>The editor "Open in editor" starts.</summary>
     public ExternalEditorSettings ExternalEditor => _settings.Value.ExternalEditor;
 
+    /// <summary>Lignum's settings folder; AI file tools never write there (it holds the AI permissions).</summary>
+    internal string SettingsFolder => _settings.Store.Directory;
+
     /// <summary>Starts a process; tests replace it.</summary>
     internal Action<ProcessStartInfo> StartProcess { get; set; } = info => Process.Start(info)?.Dispose();
 

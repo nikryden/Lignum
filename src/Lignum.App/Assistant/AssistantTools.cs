@@ -18,7 +18,7 @@ public sealed record ToolOutcome(string Content, bool IsError = false);
 /// shows in the UI and can be undone there; nothing ever writes to a log file. Reading tools are capped, and
 /// each read is reported through <see cref="LinesRead"/> so the user sees what was sent.
 /// </summary>
-public sealed class AssistantTools(MainViewModel main)
+public sealed partial class AssistantTools(MainViewModel main)
 {
     internal const int MaxSearchLines = 200;
     internal const int MaxReadLines = 200;
@@ -74,6 +74,10 @@ public sealed class AssistantTools(MainViewModel main)
                 "list_skills" => ListSkills(),
                 "get_skill" => GetSkill(call.Input),
                 "save_skill" => SaveSkill(call.Input),
+                "list_dir" => await ListDirAsync(call.Input, cancellationToken),
+                "read_file" => await ReadFileAsync(call.Input, cancellationToken),
+                "write_file" => await WriteFileAsync(call.Input, cancellationToken),
+                "edit_file" => await EditFileAsync(call.Input, cancellationToken),
                 _ => new ToolOutcome($"Unknown tool {call.Name}.", IsError: true),
             };
         }
