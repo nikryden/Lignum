@@ -18,6 +18,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         InitializeFindWindow();
         _viewModel.Assistant.Approver = new DialogPermissionApprover();
+        _viewModel.Assistant.PermissionsRequested += (_, _) => OnAiPermissionsClick(this, new RoutedEventArgs());
         _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
             $"{notes:N0} of the bookmarks have notes. Remove every bookmark, with its note and color?",
             "Clear all bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;

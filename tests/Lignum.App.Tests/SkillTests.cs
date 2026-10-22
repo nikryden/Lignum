@@ -102,7 +102,7 @@ public sealed class SkillTests : IDisposable
 
         assistant.Input = "/";
         Assert.True(assistant.IsSkillListOpen);
-        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Select(s => s.Name));
+        Assert.Equal(["errors", "timeline"], assistant.SkillSuggestions.Where(s => s.Scope != SkillScope.Command).Select(s => s.Name));
 
         assistant.Input = "/ti";
         Assert.Equal("timeline", Assert.Single(assistant.SkillSuggestions).Name);
@@ -113,20 +113,50 @@ public sealed class SkillTests : IDisposable
 
         assistant.Input = "/nothing-like-this";
         Assert.Empty(assistant.SkillSuggestions);
-        Assert.Equal("No skill matches /nothing-like-this.", assistant.SkillListHint);
+        Assert.Equal("No command or skill matches /nothing-like-this.", assistant.SkillListHint);
     }
 
     [Fact]
-    public async Task With_no_skills_a_slash_says_where_skills_are_looked_for()
+    public async Task With_no_skills_a_slash_lists_the_commands_and_says_where_skills_are_looked_for()
     {
         var assistant = (await Start()).Assistant;
 
         assistant.Input = "/";
 
         Assert.True(assistant.IsSkillListOpen);
-        Assert.Empty(assistant.SkillSuggestions);
+        Assert.Contains("clear", assistant.SkillSuggestions.Select(s => s.Name));
         Assert.Contains(GlobalFolder, assistant.SkillListHint);
         Assert.Contains("this log's folder only", assistant.SkillListHint);
+    }
+
+    [Fact]
+    public async Task Chat_commands_run_in_Lignum_and_are_never_sent_to_the_agent()
+    {
+        WriteSkill(GlobalFolder, "a", "clear", "a skill named like a command", "x");
+        var assistant = (await Start()).Assistant;
+        var permissions = 0;
+        assistant.PermissionsRequested += (_, _) => permissions++;
+        assistant.Entries.Add(new ChatEntry(ChatEntryKind.User, "old question"));
+
+        foreach (var command in new[] { "/model opus", "/effort high", "/effort turbo", "/permissions", "/help", "/model" })
+        {
+            assistant.Input = command;
+            await assistant.SendCommand.ExecuteAsync(null);
+            Assert.Equal("", assistant.Input);
+        }
+
+        Assert.Equal("opus", assistant.AgentModel);
+        Assert.Equal("high", assistant.AgentEffort);
+        Assert.Equal(1, permissions);
+        var texts = assistant.Entries.Select(e => e.Text).ToList();
+        Assert.Contains(texts, t => t.StartsWith("Reasoning levels for Claude Code:"));
+        Assert.Contains(texts, t => t.Contains("/clear (command)") && !t.Contains("a skill named like a command"));
+        Assert.Equal("Model: opus", texts[^1]);
+
+        assistant.Input = "/clear";
+        await assistant.SendCommand.ExecuteAsync(null);
+        Assert.Empty(assistant.Entries);
+        Assert.False(assistant.IsBusy);
     }
 
     [Fact]

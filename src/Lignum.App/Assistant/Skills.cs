@@ -3,11 +3,17 @@ using System.Text.RegularExpressions;
 
 namespace Lignum.App.Assistant;
 
-/// <summary>Where a skill comes from: the user's own (every log) or the selected log's folder.</summary>
+/// <summary>
+/// Where an entry in the "/" list comes from: the user's own skills (every log, or the selected log's folder),
+/// skills shipped with Lignum, the agent's own skills, or a chat command Lignum runs itself.
+/// </summary>
 public enum SkillScope
 {
     Global,
     Local,
+    BuiltIn,
+    Agent,
+    Command,
 }
 
 /// <summary>
@@ -15,13 +21,23 @@ public enum SkillScope
 /// Claude Code skills: a folder with a <c>SKILL.md</c> whose front matter gives <c>name:</c> and
 /// <c>description:</c>, then the instructions.
 /// </summary>
-public sealed record Skill(string Name, string Description, SkillScope Scope, string FilePath)
+/// <param name="FilePath">The SKILL.md; empty for a chat command and a built-in skill.</param>
+/// <param name="Text">A built-in skill's whole SKILL.md (it is not a file on disk).</param>
+/// <param name="Owner">For an agent's own skill, the agent's name ("Claude Code").</param>
+public sealed record Skill(string Name, string Description, SkillScope Scope, string FilePath, string? Text = null, string? Owner = null)
 {
-    /// <summary>"global" / "local", as the suggestion list shows it.</summary>
-    public string ScopeText => Scope == SkillScope.Local ? "local" : "global";
+    /// <summary>"global", "local", "built-in", "command" or the agent's name, as the suggestion list shows it.</summary>
+    public string ScopeText => Scope switch
+    {
+        SkillScope.Local => "local",
+        SkillScope.BuiltIn => "built-in",
+        SkillScope.Agent => Owner ?? "agent",
+        SkillScope.Command => "command",
+        _ => "global",
+    };
 
     /// <summary>The instructions (the file after its front matter), read fresh so edits apply at once.</summary>
-    public string ReadInstructions() => SkillLibrary.Parse(File.ReadAllText(FilePath), "").Body;
+    public string ReadInstructions() => SkillLibrary.Parse(Text ?? File.ReadAllText(FilePath), "").Body;
 }
 
 /// <summary>

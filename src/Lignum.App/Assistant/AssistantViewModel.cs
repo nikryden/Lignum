@@ -77,7 +77,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             return;
         }
 
-        if (!IsSkillListOpen || value == "/") _skills = _tools.LoadSkills();
+        if (!IsSkillListOpen || value == "/") _skills = LoadSlashEntries();
         var prefix = value[1..];
         SkillSuggestions.Clear();
         foreach (var skill in _skills.Where(s => s.Name.Contains(prefix, StringComparison.OrdinalIgnoreCase))
@@ -85,12 +85,68 @@ public sealed partial class AssistantViewModel : ObservableObject
             SkillSuggestions.Add(skill);
         SelectedSkillSuggestion = SkillSuggestions.FirstOrDefault();
         // With nothing to suggest, say where skills were looked for instead of showing nothing.
-        SkillListHint = SkillSuggestions.Count > 0 ? null
-            : _skills.Count > 0 ? $"No skill matches /{prefix}."
-            : "No skills for this log. Global skills: " + _tools.GlobalSkillsFolder
+        SkillListHint = SkillSuggestions.Count == 0 ? $"No command or skill matches /{prefix}."
+            : _skills.Any(s => s.Scope != SkillScope.Command) ? null
+            : "No skills for this log yet. Global skills: " + _tools.GlobalSkillsFolder
               + (_tools.LocalSkillsFolder is { } local ? $"\nLocal skills (this log's folder only): {local}" : "")
               + "\nAsk the AI to make one, or put a SKILL.md in a subfolder there.";
         IsSkillListOpen = true;
+    }
+
+    /// <summary>
+    /// Commands Lignum runs itself when typed as "/name" (nothing goes to the agent). Their names win over any skill.
+    /// </summary>
+    public static IReadOnlyList<Skill> ChatCommands { get; } =
+    [
+        new("clear", "Start a new conversation (the agent forgets this one)", SkillScope.Command, ""),
+        new("new", "Same as /clear", SkillScope.Command, ""),
+        new("model", "Show or set the model, e.g. /model opus (empty: the agent's default)", SkillScope.Command, ""),
+        new("effort", "Show or set the reasoning level, e.g. /effort high", SkillScope.Command, ""),
+        new("permissions", "Show and revoke what the AI may do without asking", SkillScope.Command, ""),
+        new("help", "List the commands and skills", SkillScope.Command, ""),
+    ];
+
+    /// <summary>Raised by /permissions: the window opens View → AI permissions….</summary>
+    public event EventHandler? PermissionsRequested;
+
+    /// <summary>Everything "/" offers: chat commands first, then skills (a skill named like a command is hidden).</summary>
+    private IReadOnlyList<Skill> LoadSlashEntries() =>
+        [.. ChatCommands, .. _tools.LoadSkills().Where(s => !IsChatCommand(s.Name))];
+
+    private static bool IsChatCommand(string name) =>
+        ChatCommands.Any(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Runs a chat command; the input is cleared and the command echoed as an activity line.</summary>
+    private void RunChatCommand(string name, string rest)
+    {
+        Input = "";
+        IsSkillListOpen = false;
+        switch (name)
+        {
+            case "clear" or "new":
+                NewConversation();
+                break;
+            case "model":
+                if (rest.Length > 0) AgentModel = rest == "default" ? "" : rest;
+                Add(ChatEntryKind.Activity, $"Model: {(AgentModel.Length > 0 ? AgentModel : "the agent's default")}");
+                break;
+            case "effort" when rest.Length > 0 && !EffortChoices.Contains(rest.ToLowerInvariant()) && rest != "default":
+                Add(ChatEntryKind.Error, SupportsEffort
+                    ? $"Reasoning levels for {AgentNames[SelectedAgent]}: {string.Join(", ", EffortChoices.Skip(1))} (or default)."
+                    : $"{AgentNames[SelectedAgent]} has no reasoning level setting.");
+                break;
+            case "effort":
+                if (rest.Length > 0) AgentEffort = rest == "default" ? "" : rest.ToLowerInvariant();
+                Add(ChatEntryKind.Activity, $"Reasoning level: {(AgentEffort.Length > 0 ? AgentEffort : "the agent's default")}");
+                break;
+            case "permissions":
+                PermissionsRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case "help":
+                var lines = LoadSlashEntries().Select(s => $"/{s.Name} ({s.ScopeText}): {s.Description}");
+                Add(ChatEntryKind.Activity, "Commands and skills:\n" + string.Join("\n", lines));
+                break;
+        }
     }
 
     /// <summary>Shown in the skill list when nothing matches the "/name" being typed; null when there are suggestions.</summary>
@@ -480,6 +536,12 @@ public sealed partial class AssistantViewModel : ObservableObject
         var prompt = question;
         if (SkillLibrary.ParseCommand(question) is { } command)
         {
+            if (IsChatCommand(command.Name))
+            {
+                RunChatCommand(command.Name, command.Text);
+                return;
+            }
+
             var skill = _tools.LoadSkills().FirstOrDefault(s => s.Name.Equals(command.Name, StringComparison.OrdinalIgnoreCase));
             if (skill is null)
             {
