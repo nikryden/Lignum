@@ -4,8 +4,8 @@
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Tab header tooltip shows the full path
-- [ ] Tab context menu: Copy full path, Copy file name, Open containing folder (Explorer with the file selected)
-- [ ] Same commands available for the selected tab from the File menu
+- [x] Tab header tooltip shows the full path
+- [x] Tab context menu: Copy full path, Copy file name, Open containing folder (Explorer with the file selected)
+- [x] Copy full path and Open containing folder for the selected tab in the File menu

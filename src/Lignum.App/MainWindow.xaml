@@ -60,6 +60,8 @@
                 </MenuItem>
                 <MenuItem Header="_Export with notes…" Click="OnExportClick" />
                 <MenuItem Header="Export with notes, _uncompressed (huge logs)…" Click="OnExportUncompressedClick" />
+                <MenuItem Header="Copy full _path" Command="{Binding SelectedTab.CopyFullPathCommand}" />
+                <MenuItem Header="Open containing _folder" Command="{Binding SelectedTab.OpenContainingFolderCommand}" />
                 <MenuItem Header="_Close tab" Command="{Binding CloseTabCommand}" InputGestureText="Ctrl+W" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
@@ -179,7 +181,21 @@
             </TabControl.Style>
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <StackPanel Orientation="Horizontal" ToolTip="{Binding Path}">
+                    <StackPanel Orientation="Horizontal" ToolTip="{Binding SourcePath}" Background="Transparent">
+                        <StackPanel.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copy full _path" Command="{Binding CopyFullPathCommand}" />
+                                <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
+                                <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
+                                <Separator />
+                                <MenuItem Header="_Close" InputGestureText="Ctrl+W"
+                                          Command="{Binding PlacementTarget.Tag.CloseTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                          CommandParameter="{Binding}" />
+                            </ContextMenu>
+                        </StackPanel.ContextMenu>
+                        <StackPanel.Tag>
+                            <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=Window}" />
+                        </StackPanel.Tag>
                         <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
                         <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
                                 FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"
