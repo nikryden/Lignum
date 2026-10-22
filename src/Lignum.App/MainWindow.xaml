@@ -193,6 +193,7 @@
             </TabControl.ContentTemplate>
         </TabControl>
         <StatusBar DockPanel.Dock="Bottom"
+                   Height="50"
                    Background="{DynamicResource StatusBarBackgroundBrush}"
                    Foreground="{DynamicResource StatusBarForegroundBrush}">
             <StatusBarItem>
