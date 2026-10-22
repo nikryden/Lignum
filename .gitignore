@@ -483,3 +483,4 @@ $RECYCLE.BIN/
 
 # Local MCP config (points at a local build)
 .mcp.json
+*.mcp.json
