@@ -116,6 +116,16 @@ public sealed partial class BookmarksViewModel : ObservableObject
         Save();
     }
 
+    /// <summary>Removes every bookmark with its note and color (ticket 11).</summary>
+    public void Clear()
+    {
+        if (Lines.IsEmpty) return;
+        Lines = [];
+        Notes = Notes.Clear();
+        Colors = Colors.Clear();
+        Save();
+    }
+
     /// <summary>The first bookmark after <paramref name="line"/>, wrapping to the first; only lines below <paramref name="lineCount"/>.</summary>
     public long? Next(long line, long lineCount)
     {

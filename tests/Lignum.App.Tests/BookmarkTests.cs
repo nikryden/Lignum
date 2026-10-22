@@ -73,6 +73,40 @@ public sealed class BookmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task Clear_all_removes_every_bookmark_note_and_color_and_saves_it()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        Assert.False(tab.ClearBookmarksCommand.CanExecute(null));
+        ToggleAt(tab, 3);
+        tab.Bookmarks.SetColor(5, BookmarkColor.Red);
+        Assert.True(tab.ClearBookmarksCommand.CanExecute(null));
+
+        tab.ClearBookmarksCommand.Execute(null);
+
+        Assert.Empty(tab.Bookmarks.Lines);
+        Assert.Empty(tab.Bookmarks.Colors);
+        Assert.False(tab.ClearBookmarksCommand.CanExecute(null));
+        Assert.Empty((await Open(Start(), a)).Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Clear_all_asks_first_when_a_bookmark_has_a_note_and_keeps_them_on_no()
+    {
+        var vm = Start();
+        int? asked = null;
+        vm.ConfirmClearBookmarks = notes => { asked = notes; return false; };
+        var tab = await Open(vm, WriteLog("a.log"));
+        tab.Bookmarks.SetNote(4, "keep me");
+        ToggleAt(tab, 8);
+
+        tab.ClearBookmarksCommand.Execute(null);
+
+        Assert.Equal(1, asked);
+        Assert.Equal([4L, 8L], tab.Bookmarks.Lines);
+    }
+
+    [Fact]
     public async Task A_note_on_an_unbookmarked_line_bookmarks_it()
     {
         var tab = await Open(Start(), WriteLog("a.log"));

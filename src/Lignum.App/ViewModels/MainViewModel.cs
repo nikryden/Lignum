@@ -46,6 +46,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Copies selections in every tab (the clipboard and the large-copy prompt); tests replace it.</summary>
     public SelectionCopier Copier { get; init; } = new(new WpfClipboard(), new DialogCopyPrompt());
 
+    /// <summary>"Clear all bookmarks" asks this, given how many bookmarks have notes; null: clear without asking.</summary>
+    public Func<int, bool>? ConfirmClearBookmarks { get; set; }
+
     /// <summary>The app-wide highlight rules; "Add as highlight rule" (ticket 15) adds to them. Null: no such item.</summary>
     public HighlightingViewModel? Highlighting { get; init; }
 
@@ -141,7 +144,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private LogTabViewModel AddTab(LogDocument document, OpenedPackage? package = null)
     {
         var tab = new LogTabViewModel(document, _uiContext,
-            new TabServices(Copier, Highlighting, History, _settings.Store))
+            new TabServices(Copier, Highlighting, History, _settings.Store,
+                notes => ConfirmClearBookmarks?.Invoke(notes) ?? true))
         {
             Package = package,
             EncodingOverride = package?.Manifest.Encoding,

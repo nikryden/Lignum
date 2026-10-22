@@ -17,6 +17,9 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         InitializeFindWindow();
+        _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
+            $"{notes:N0} of the bookmarks have notes. Remove every bookmark, with its note and color?",
+            "Clear all bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
