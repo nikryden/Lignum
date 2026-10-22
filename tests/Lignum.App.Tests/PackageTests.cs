@@ -49,6 +49,7 @@ public sealed class PackageTests : IDisposable
         await vm.OpenFileAsync(WriteLog("app.log"));
         vm.SelectedTab!.Bookmarks.Toggle(4);
         vm.SelectedTab.Bookmarks.SetNote(12, "first error");
+        vm.SelectedTab.Bookmarks.SetHighlight([20], "#C00000", "#FFF59D");
         var package = Path.Combine(_dir, compress ? "app.lm" : "app-stored.lm");
         await vm.ExportPackageAsync(package, compress);
         Assert.Null(vm.ErrorMessage);
@@ -70,6 +71,7 @@ public sealed class PackageTests : IDisposable
         Assert.Equal(100, tab.LineCount);
         Assert.Equal(File.ReadAllBytes(Path.Combine(_dir, "app.log")), File.ReadAllBytes(tab.Path));
         Assert.Equal([new BookmarkItem(4, null), new BookmarkItem(12, "first error")], tab.Bookmarks.Items);
+        Assert.Equal(new LineHighlight("#C00000", "#FFF59D"), tab.Bookmarks.HighlightFor(20));
         Assert.Equal(package, tab.SourcePath);
     }
 

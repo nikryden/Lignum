@@ -21,6 +21,10 @@ public sealed class BookmarksFile
 
     public List<BookmarkEntry> Bookmarks { get; set; } = [];
 
+    /// <summary>Lines colored by hand (ticket 14), bookmarked or not; null (and not written) when there are none.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<LineHighlightEntry>? Highlights { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 
@@ -50,6 +54,22 @@ public sealed class BookmarkEntry
     public BookmarkColor? Color { get; set; }
 
     /// <summary>Fields written by a newer build (e.g. a note), kept so a save here does not drop them.</summary>
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement>? Extra { get; set; }
+}
+
+/// <summary>One line colored by hand (ticket 14). Colors are <c>#RRGGBB</c>; null keeps the theme's (or a rule's).</summary>
+public sealed class LineHighlightEntry
+{
+    /// <summary>0-based file line.</summary>
+    public long Line { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Foreground { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Background { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? Extra { get; set; }
 }

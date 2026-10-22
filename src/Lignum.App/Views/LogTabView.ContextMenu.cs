@@ -29,6 +29,44 @@ public partial class LogTabView
         main.OpenInEditorCommand.Execute(selection.Caret.Line); // this view's tab is the selected one
     }
 
+    /// <summary>Most lines one "Highlight line…" colors: a highlight is stored per line, so Select All on a huge log must not.</summary>
+    private const long MaxHighlightLines = 10_000;
+
+    /// <summary>"Highlight line…" (ticket 14): colors the selected lines of the main view, or the caret line.</summary>
+    private void OnHighlightLineClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not LogTabViewModel tab || HighlightTargetLines(sender, tab) is not { } lines) return;
+        var dialog = new LineHighlightDialog(lines.Count, tab.Bookmarks.HighlightFor(lines[0])) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() == true) tab.Bookmarks.SetHighlight(lines, dialog.LineForeground, dialog.LineBackground);
+    }
+
+    /// <summary>"Remove highlight" (ticket 14) on the same lines "Highlight line…" would color.</summary>
+    private void OnRemoveHighlightClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is LogTabViewModel tab && HighlightTargetLines(sender, tab) is { } lines) tab.Bookmarks.RemoveHighlight(lines);
+    }
+
+    /// <summary>The main view's selected lines (a selection ending at column 0 stops on the line before), else the caret line.</summary>
+    private List<long>? HighlightTargetLines(object sender, LogTabViewModel tab)
+    {
+        var target = ((sender as MenuItem)?.Parent as ContextMenu)?.PlacementTarget;
+        if (ReferenceEquals(target, ResultsView)) return [tab.Search.ResultsSelection.Caret.Line];
+        var selection = tab.Selection;
+        var (first, last) = (selection.Start.Line, selection.End.Line);
+        if (last > first && selection.End.Column == 0) last--;
+        if (last - first + 1 > MaxHighlightLines)
+        {
+            MessageBox.Show(Window.GetWindow(this)!, $"Select at most {MaxHighlightLines:N0} lines to highlight by hand. " +
+                "For more, add a highlight rule (View → Highlight rules…).", "Highlight line",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return null;
+        }
+
+        var lines = new List<long>();
+        for (var line = first; line <= last; line++) lines.Add(line);
+        return lines;
+    }
+
     /// <summary>"Edit bookmark note…" (ticket 06) on the caret line of the view the menu was opened on.</summary>
     private void OnEditNoteClick(object sender, RoutedEventArgs e)
     {
