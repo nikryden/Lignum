@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -7,7 +8,8 @@ using Lignum.App.ViewModels;
 namespace Lignum.App.Views;
 
 // The bookmarks pane's right-click menu, links and resizing (ticket 23). A description is edited in the same dialog
-// as "Edit description…" in the log view; Ctrl+click on a web link in a row opens it in the browser.
+// as "Edit description…" in the log view. Ctrl+click on a link in a row opens it: a web address in the browser, a file
+// in a tab, a folder in Explorer; the right-click menu also has "Show in folder" for paths.
 public partial class LogTabView
 {
     /// <summary>A link in a row: Ctrl+click opens it; a plain click only selects the row.</summary>
@@ -16,6 +18,25 @@ public partial class LogTabView
         if (e.OriginalSource is not Hyperlink { Tag: NoteLink link } || (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
         if (DataContext is LogTabViewModel tab) tab.OpenNoteLinkCommand.Execute(link);
         e.Handled = true;
+    }
+
+    /// <summary>Adds an "Open" (and for a path "Show in folder") item per link in the selected bookmark's description.</summary>
+    private void OnBookmarkListMenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu || DataContext is not LogTabViewModel tab) return;
+        while (menu.Items.Count > 3) menu.Items.RemoveAt(3); // the fixed items stay
+        var links = NoteLinks.Find((BookmarkList.SelectedItem as BookmarkItem)?.Note);
+        if (links.Count == 0) return;
+        menu.Items.Add(new Separator());
+        foreach (var link in links)
+        {
+            // Headers are plain text, so an underscore in a path is not an access key.
+            menu.Items.Add(new MenuItem { Header = new TextBlock { Text = $"Open {link.Target}" },
+                                          Command = tab.OpenNoteLinkCommand, CommandParameter = link });
+            if (link.Kind == NoteLinkKind.Path)
+                menu.Items.Add(new MenuItem { Header = new TextBlock { Text = $"Show {link.Target} in folder" },
+                                              Command = tab.ShowNoteLinkInFolderCommand, CommandParameter = link });
+        }
     }
 
     private void OnEditBookmarkDescriptionClick(object sender, RoutedEventArgs e)

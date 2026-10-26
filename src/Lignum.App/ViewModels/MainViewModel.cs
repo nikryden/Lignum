@@ -145,7 +145,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var tab = new LogTabViewModel(document, _uiContext,
             new TabServices(Copier, Highlighting, History, _settings.Store,
-                notes => ConfirmClearBookmarks?.Invoke(notes) ?? true, OpenNoteLink))
+                notes => ConfirmClearBookmarks?.Invoke(notes) ?? true, OpenNoteLinkAsync))
         {
             Package = package,
             EncodingOverride = package?.Manifest.Encoding,

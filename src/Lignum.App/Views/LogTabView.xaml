@@ -214,7 +214,8 @@
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" Hyperlink.Click="OnNoteLinkClick"
                                  MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
                             <ListBox.ContextMenu>
-                                <ContextMenu>
+                                <!-- The selected bookmark's links are added below these when it opens (code-behind). -->
+                                <ContextMenu Opened="OnBookmarkListMenuOpened">
                                     <MenuItem Header="_Edit description…" Click="OnEditBookmarkDescriptionClick" />
                                     <MenuItem Header="_Copy description" Click="OnCopyBookmarkDescriptionClick" />
                                     <MenuItem Header="_Remove bookmark" Click="OnRemoveBookmarkClick" />

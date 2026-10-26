@@ -7,8 +7,9 @@
 **Status:** done
 
 - [x] Right-click a bookmark in the pane: "Edit description…" opens the description dialog (selectable, copy and paste), "Copy description", "Remove bookmark"
-- [x] `http(s)://` links in a description are shown as links and open in the default browser with Ctrl+left click; file paths are plain text (owner's decision after the first version)
+- [x] Links in a description open with Ctrl+left click: `http(s)://` in the default browser, a drive or UNC path (`C:\…`, `C:/…`, `\server\…`; quoted when it has spaces) in a tab, a folder in Explorer; a missing path is reported when clicked
+- [x] The pane's right-click menu adds "Open …" per link and "Show … in folder" per path
 - [x] The pane is resizable by dragging its left edge
 - [x] Smaller text and compact filter controls; the color filter is a row of color dots (faded = hidden)
-- [x] Tests for link detection (URLs, trailing punctuation, paths are not links) and opening in the browser
+- [x] Tests for link detection (URLs, both slash styles, UNC, quoted, trailing punctuation) and opening each kind
 - [x] The pane width is saved (app-wide `bookmarksPaneWidth`) and "Edit bookmark note…" is now "Edit description…" everywhere

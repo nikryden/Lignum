@@ -2,13 +2,30 @@ using System.Text.RegularExpressions;
 
 namespace Lignum.App.ViewModels;
 
-/// <summary>A web link in a bookmark note (ticket 23): where it is in the note, and its address.</summary>
-public sealed record NoteLink(int Start, int Length, string Target);
+public enum NoteLinkKind
+{
+    /// <summary>An <c>http(s)://</c> address: opens in the default browser.</summary>
+    Web,
 
-/// <summary>Finds <c>http(s)://</c> addresses in bookmark notes. File paths are plain text.</summary>
+    /// <summary>A drive or UNC path: a file opens in a tab, a folder in Explorer.</summary>
+    Path,
+}
+
+/// <summary>A link in a bookmark note (ticket 23): where it is in the note, and what it points to.</summary>
+public sealed record NoteLink(int Start, int Length, string Target, NoteLinkKind Kind = NoteLinkKind.Web);
+
+/// <summary>
+/// Finds links in bookmark notes: web addresses, and anything that looks like a drive (<c>C:\…</c>, <c>C:/…</c>) or
+/// UNC (<c>\\server\…</c>) path, whether or not it exists. A path with spaces needs quotes (<c>"C:\My logs\a.log"</c>).
+/// </summary>
 public static partial class NoteLinks
 {
-    [GeneratedRegex("""https?://[^\s"<>]+""", RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
+    // Quoted paths first (the quotes are not part of the target), then bare paths, then web addresses.
+    [GeneratedRegex("""
+        "(?<path>(?:[A-Za-z]:[\\/]|\\\\[^\\/\s"]+[\\/])[^"\r\n]*)"
+        |(?<path>(?:(?<![\w/])[A-Za-z]:[\\/]|\\\\[^\\/\s"<>|]+[\\/])[^\s"<>|?*]*)
+        |(?<web>https?://[^\s"<>]+)
+        """, RegexOptions.IgnorePatternWhitespace | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase,
         matchTimeoutMilliseconds: 200)]
     private static partial Regex LinkRegex();
 
@@ -23,9 +40,13 @@ public static partial class NoteLinks
         {
             foreach (Match match in LinkRegex().Matches(note))
             {
-                // A sentence's punctuation after a link is not part of it ("see https://example.com.").
-                var target = match.Value.TrimEnd(TrailingPunctuation);
-                links.Add(new NoteLink(match.Index, target.Length, target));
+                var web = match.Groups["web"].Success;
+                var group = web ? match.Groups["web"] : match.Groups["path"];
+                var quoted = !web && group.Index > match.Index;
+                // A sentence's punctuation after a bare link is not part of it ("see C:\logs\a.log.").
+                var target = quoted ? group.Value : group.Value.TrimEnd(TrailingPunctuation);
+                if (target.Length == 0) continue;
+                links.Add(new NoteLink(group.Index, target.Length, target, web ? NoteLinkKind.Web : NoteLinkKind.Path));
             }
         }
         catch (RegexMatchTimeoutException)
