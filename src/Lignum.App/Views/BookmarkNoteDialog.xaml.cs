@@ -9,7 +9,7 @@ public partial class BookmarkNoteDialog : Window
     public BookmarkNoteDialog(long line, string? note)
     {
         InitializeComponent();
-        Prompt.Text = string.Format(CultureInfo.CurrentCulture, "Note for line {0:N0}", line + 1);
+        Prompt.Text = string.Format(CultureInfo.CurrentCulture, "Description for line {0:N0}", line + 1);
         NoteBox.Text = note ?? "";
         Loaded += (_, _) =>
         {

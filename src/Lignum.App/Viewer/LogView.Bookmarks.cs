@@ -90,7 +90,8 @@ public sealed partial class LogView
     private void UpdateNoteToolTip(Point point)
     {
         var line = MarginLineAt(point);
-        var note = line is { } l && BookmarkNotes is { } notes ? notes.GetValueOrDefault(l) : null;
+        // Only shown bookmarks: the tab can hide some colors (ticket 24).
+        var note = line is { } l && Bookmarks?.Contains(l) == true && BookmarkNotes is { } notes ? notes.GetValueOrDefault(l) : null;
         if (note is null)
         {
             HideNoteBalloon();

@@ -82,6 +82,27 @@
                 <MenuItem Header="_Next bookmark" Command="{Binding SelectedTab.NextBookmarkCommand}" InputGestureText="F2" />
                 <MenuItem Header="_Previous bookmark" Command="{Binding SelectedTab.PreviousBookmarkCommand}" InputGestureText="Shift+F2" />
                 <MenuItem Header="C_lear all bookmarks" Command="{Binding SelectedTab.ClearBookmarksCommand}" />
+                <!-- Ticket 24; the items are the selected tab's color toggles (shared with its bookmarks pane). -->
+                <MenuItem Header="Remove bookmarks _without notes" Command="{Binding SelectedTab.RemoveBookmarksWithoutNotesCommand}" />
+                <MenuItem Header="Re_move bookmarks of color" ItemsSource="{Binding SelectedTab.BookmarkFilter.ColorToggles}">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Header" Value="{Binding Color}" />
+                            <Setter Property="Command" Value="{Binding DataContext.SelectedTab.RemoveBookmarksOfColorCommand, RelativeSource={RelativeSource AncestorType=Menu}}" />
+                            <Setter Property="CommandParameter" Value="{Binding Color}" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                </MenuItem>
+                <MenuItem Header="Show onl_y colors" ItemsSource="{Binding SelectedTab.BookmarkFilter.ColorToggles}">
+                    <MenuItem.ItemContainerStyle>
+                        <Style TargetType="MenuItem">
+                            <Setter Property="Header" Value="{Binding Color}" />
+                            <Setter Property="IsCheckable" Value="True" />
+                            <Setter Property="IsChecked" Value="{Binding IsShown}" />
+                            <Setter Property="StaysOpenOnClick" Value="True" />
+                        </Style>
+                    </MenuItem.ItemContainerStyle>
+                </MenuItem>
                 <MenuItem Header="Bookmarks _pane" IsCheckable="True"
                           IsChecked="{Binding SelectedTab.IsBookmarksPaneOpen, Mode=TwoWay, FallbackValue=False}" />
             </MenuItem>

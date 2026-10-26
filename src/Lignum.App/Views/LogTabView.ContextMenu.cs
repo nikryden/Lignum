@@ -67,7 +67,7 @@ public partial class LogTabView
         return lines;
     }
 
-    /// <summary>"Edit bookmark note…" (ticket 06) on the caret line of the view the menu was opened on.</summary>
+    /// <summary>"Edit description…" (ticket 06; the bookmark note) on the caret line of the view the menu was opened on.</summary>
     private void OnEditNoteClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not LogTabViewModel tab) return;

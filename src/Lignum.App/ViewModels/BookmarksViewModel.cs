@@ -171,10 +171,24 @@ public sealed partial class BookmarksViewModel : ObservableObject
         Save();
     }
 
-    /// <summary>The first bookmark after <paramref name="line"/>, wrapping to the first; only lines below <paramref name="lineCount"/>.</summary>
-    public long? Next(long line, long lineCount)
+    /// <summary>Removes the bookmarks on <paramref name="lines"/> with their notes and colors (ticket 24).</summary>
+    public void Remove(IEnumerable<long> lines)
     {
-        var usable = Lines.Where(l => l < lineCount).ToList();
+        var remove = lines.Where(Lines.Contains).ToList();
+        if (remove.Count == 0) return;
+        Lines = Lines.Except(remove);
+        Notes = Notes.RemoveRange(remove);
+        Colors = Colors.RemoveRange(remove);
+        Save();
+    }
+
+    /// <summary>
+    /// The first bookmark after <paramref name="line"/>, wrapping to the first; only lines below <paramref name="lineCount"/>,
+    /// and only <paramref name="among"/> when given (the shown colors).
+    /// </summary>
+    public long? Next(long line, long lineCount, IEnumerable<long>? among = null)
+    {
+        var usable = (among ?? Lines).Where(l => l < lineCount).ToList();
         if (usable.Count == 0) return null;
         foreach (var candidate in usable)
         {
@@ -184,10 +198,10 @@ public sealed partial class BookmarksViewModel : ObservableObject
         return usable[0];
     }
 
-    /// <summary>The last bookmark before <paramref name="line"/>, wrapping to the last; only lines below <paramref name="lineCount"/>.</summary>
-    public long? Previous(long line, long lineCount)
+    /// <summary>The last bookmark before <paramref name="line"/>, wrapping to the last; as <see cref="Next"/> otherwise.</summary>
+    public long? Previous(long line, long lineCount, IEnumerable<long>? among = null)
     {
-        var usable = Lines.Where(l => l < lineCount).ToList();
+        var usable = (among ?? Lines).Where(l => l < lineCount).ToList();
         if (usable.Count == 0) return null;
         for (var i = usable.Count - 1; i >= 0; i--)
         {
