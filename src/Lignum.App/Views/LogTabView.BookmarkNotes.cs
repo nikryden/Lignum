@@ -1,67 +1,42 @@
 using System.Windows;
-using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using Lignum.App.ViewModels;
 
 namespace Lignum.App.Views;
 
-// The bookmarks pane's note editor and links (ticket 23): Ctrl+click opens a link, in the list rows and in the
-// editor; the editor's right-click menu adds the link's actions to cut, copy and paste.
+// The bookmarks pane's right-click menu, links and resizing (ticket 23). A description is edited in the same dialog
+// as "Edit bookmark note…"; Ctrl+click on a web link in a row opens it in the browser.
 public partial class LogTabView
 {
-    private static bool CtrlDown => (Keyboard.Modifiers & ModifierKeys.Control) != 0;
-
-    /// <summary>A link in a list row: Ctrl+click opens it; a plain click only selects the row.</summary>
+    /// <summary>A link in a row: Ctrl+click opens it; a plain click only selects the row.</summary>
     private void OnNoteLinkClick(object sender, RoutedEventArgs e)
     {
-        if (e.OriginalSource is not Hyperlink { Tag: NoteLink link } || !CtrlDown) return;
+        if (e.OriginalSource is not Hyperlink { Tag: NoteLink link } || (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
         if (DataContext is LogTabViewModel tab) tab.OpenNoteLinkCommand.Execute(link);
         e.Handled = true;
     }
 
-    private void OnNoteBoxMouseDown(object sender, MouseButtonEventArgs e)
+    private void OnEditBookmarkDescriptionClick(object sender, RoutedEventArgs e)
     {
-        if (!CtrlDown || LinkAt(e.GetPosition(BookmarkNoteBox)) is not { } link) return;
-        if (DataContext is LogTabViewModel tab) tab.OpenNoteLinkCommand.Execute(link);
-        e.Handled = true;
+        if (DataContext is not LogTabViewModel tab || BookmarkList.SelectedItem is not BookmarkItem item) return;
+        var dialog = new BookmarkNoteDialog(item.Line, item.Note) { Owner = Window.GetWindow(this) };
+        if (dialog.ShowDialog() == true) tab.Bookmarks.SetNote(item.Line, dialog.Note);
     }
 
-    /// <summary>Ctrl+Enter saves the note; Enter alone is a new line.</summary>
-    private void OnNoteBoxKeyDown(object sender, KeyEventArgs e)
+    private void OnCopyBookmarkDescriptionClick(object sender, RoutedEventArgs e)
     {
-        if (e.Key != Key.Enter || !CtrlDown) return;
-        BookmarkNoteBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-        e.Handled = true;
+        if (DataContext is LogTabViewModel tab) tab.CopyBookmarkNoteCommand.Execute(BookmarkList.SelectedItem as BookmarkItem);
     }
 
-    /// <summary>Cut, copy and paste, plus the link's actions when the menu opens on a link (or the caret is on one).</summary>
-    private void OnNoteBoxContextMenuOpening(object sender, ContextMenuEventArgs e)
+    private void OnRemoveBookmarkClick(object sender, RoutedEventArgs e)
     {
-        if (BookmarkNoteBox.ContextMenu is not { } menu || DataContext is not LogTabViewModel tab) return;
-        menu.Items.Clear();
-        menu.Items.Add(new MenuItem { Header = "Cu_t", Command = ApplicationCommands.Cut, CommandTarget = BookmarkNoteBox });
-        menu.Items.Add(new MenuItem { Header = "_Copy", Command = ApplicationCommands.Copy, CommandTarget = BookmarkNoteBox });
-        menu.Items.Add(new MenuItem { Header = "_Paste", Command = ApplicationCommands.Paste, CommandTarget = BookmarkNoteBox });
-
-        var link = (e.CursorLeft >= 0 ? LinkAt(new Point(e.CursorLeft, e.CursorTop)) : null)
-                   ?? NoteLinks.At(BookmarkNoteBox.Text, BookmarkNoteBox.CaretIndex);
-        if (link is null) return;
-        menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem
-        {
-            Header = link.Kind == NoteLinkKind.Web ? "_Open in browser" : "_Open",
-            Command = tab.OpenNoteLinkCommand, CommandParameter = link,
-        });
-        if (link.Kind == NoteLinkKind.Path)
-            menu.Items.Add(new MenuItem { Header = "Show in _folder", Command = tab.ShowNoteLinkInFolderCommand, CommandParameter = link });
-        menu.Items.Add(new MenuItem { Header = "Copy _link", Command = tab.CopyNoteLinkCommand, CommandParameter = link });
+        if (DataContext is LogTabViewModel tab && BookmarkList.SelectedItem is BookmarkItem item) tab.Bookmarks.Remove([item.Line]);
     }
 
-    /// <summary>The link under <paramref name="point"/> (in the note box), or null.</summary>
-    private NoteLink? LinkAt(Point point)
-    {
-        var index = BookmarkNoteBox.GetCharacterIndexFromPoint(point, snapToText: false);
-        return index < 0 ? null : NoteLinks.At(BookmarkNoteBox.Text, index);
-    }
+    /// <summary>Dragging the pane's left edge: left makes it wider. At most two thirds of the tab.</summary>
+    private void OnBookmarksPaneResize(object sender, DragDeltaEventArgs e) =>
+        BookmarksPane.Width = Math.Clamp(BookmarksPane.Width - e.HorizontalChange, BookmarksPane.MinWidth,
+            Math.Max(BookmarksPane.MinWidth, ActualWidth * 2 / 3));
 }

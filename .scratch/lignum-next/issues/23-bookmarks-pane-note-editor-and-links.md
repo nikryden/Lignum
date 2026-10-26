@@ -1,17 +1,13 @@
-# 23: Bookmarks pane: note editor and links
+# 23: Bookmarks pane: description editing, links and layout
 
-**What to build:** Edit and copy the selected bookmark's note in the pane, and open links written in notes.
+**What to build:** Edit and copy a bookmark's description from the pane, open web links written in descriptions, and make the pane compact and resizable.
 
 **Blocked by:** 22
 
 **Status:** done
 
-- [x] The selected bookmark's note can be edited in place in the pane (saved like "Edit bookmark note…")
-- [x] Note text can be selected, copied and pasted (a real text box, not a label)
-- [x] Links in a note are shown as links and open with Ctrl+left click:
-  - `http(s)://…` opens in the default browser
-  - a local or UNC file path (`C:\…`, `\server\…`) opens in a Lignum tab
-  - a folder path opens in Explorer
-- [x] A path counts as a link when it looks like one; if it does not exist when clicked, show an error
-- [x] A link's right-click menu: "Open in tab" (files), "Show in folder" (Explorer `/select`), "Copy link"
-- [x] Tests for link detection (URLs, drive paths, UNC paths, trailing punctuation)
+- [x] Right-click a bookmark in the pane: "Edit description…" opens the description dialog (selectable, copy and paste), "Copy description", "Remove bookmark"
+- [x] `http(s)://` links in a description are shown as links and open in the default browser with Ctrl+left click; file paths are plain text (owner's decision after the first version)
+- [x] The pane is resizable by dragging its left edge
+- [x] Smaller text and compact filter controls; the color filter is a row of color dots (faded = hidden)
+- [x] Tests for link detection (URLs, trailing punctuation, paths are not links) and opening in the browser

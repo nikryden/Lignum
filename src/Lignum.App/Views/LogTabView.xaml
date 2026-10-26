@@ -139,24 +139,28 @@
             PaneHeight="{Binding DataContext.DetailPane.PaneHeight, RelativeSource={RelativeSource AncestorType=Window}}">
             <views:DetailPaneLayout.Main>
                 <DockPanel>
-                <!-- The bookmarks pane (ticket 06): every bookmark and note in this file; a click jumps to it. -->
-                <Border DockPanel.Dock="Right" Width="260" BorderThickness="1,0,0,0"
+                <!-- The bookmarks pane (ticket 06): every bookmark and note in this file; a click jumps to it. Drag its left
+                     edge to resize it. Smaller text than the rest of the window, so more bookmarks fit. -->
+                <Border x:Name="BookmarksPane" DockPanel.Dock="Right" Width="260" MinWidth="160" BorderThickness="1,0,0,0"
+                        TextElement.FontSize="12"
                         Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
                         Visibility="{Binding IsBookmarksPaneOpen, Converter={StaticResource BoolToVisibility}}">
                     <DockPanel>
-                        <DockPanel DockPanel.Dock="Top" Margin="8,6">
-                            <Button DockPanel.Dock="Right" Content="✕" Padding="6,0" ToolTip="Close the bookmarks pane"
-                                    Command="{Binding ToggleBookmarksPaneCommand}" />
-                            <TextBlock FontWeight="SemiBold" Text="{Binding BookmarkFilter.Header}" VerticalAlignment="Center" />
+                        <Thumb DockPanel.Dock="Left" Width="4" Cursor="SizeWE" Opacity="0" DragDelta="OnBookmarksPaneResize"
+                               ToolTip="Drag to resize the bookmarks pane" />
+                        <DockPanel DockPanel.Dock="Top" Margin="6,4">
+                            <Button DockPanel.Dock="Right" Content="✕" Padding="5,0" MinHeight="0" MinWidth="0" FontSize="11"
+                                    ToolTip="Close the bookmarks pane" Command="{Binding ToggleBookmarksPaneCommand}" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding BookmarkFilter.Header}" VerticalAlignment="Center"
+                                       ToolTip="Ctrl+F2 or double-click the margin to add one. Right-click a bookmark to edit its description." />
                         </DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" TextWrapping="Wrap"
-                                   Text="Ctrl+F2 or double-click the margin to add one; right-click for a note or a color." />
                         <!-- Sort and filter (ticket 22): view state only, never saved. -->
-                        <Grid DockPanel.Dock="Top" Margin="8,0,8,4">
-                            <TextBox x:Name="BookmarkSearchBox" ToolTip="Search the notes; * matches any text (disk*full)"
+                        <Grid DockPanel.Dock="Top" Margin="6,0,6,4">
+                            <TextBox x:Name="BookmarkSearchBox" MinHeight="0" Padding="4,2" FontSize="12"
+                                     ToolTip="Search the descriptions; * matches any text (disk*full)"
                                      Text="{Binding BookmarkFilter.SearchText, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock Margin="5,0" VerticalAlignment="Center" IsHitTestVisible="False" Opacity="0.5"
-                                       Text="Search notes (* = any)">
+                            <TextBlock Margin="7,0" VerticalAlignment="Center" IsHitTestVisible="False" Opacity="0.5"
+                                       Text="Search descriptions (* = any)">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed" />
@@ -169,7 +173,8 @@
                                 </TextBlock.Style>
                             </TextBlock>
                         </Grid>
-                        <WrapPanel DockPanel.Dock="Top" Margin="8,0,8,6">
+                        <WrapPanel DockPanel.Dock="Top" Margin="6,0,6,4">
+                            <!-- One dot per color: click to show or hide that color (faded = hidden). -->
                             <ItemsControl ItemsSource="{Binding BookmarkFilter.ColorToggles}" VerticalAlignment="Center"
                                           Margin="0,0,8,0">
                                 <ItemsControl.ItemsPanel>
@@ -177,47 +182,67 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <CheckBox IsChecked="{Binding IsShown}" Margin="0,0,4,0" VerticalContentAlignment="Center"
-                                                  ToolTip="{Binding Color, StringFormat=Show {0} bookmarks}">
-                                            <Ellipse Width="10" Height="10" Style="{StaticResource BookmarkColorDot}" />
-                                        </CheckBox>
+                                        <ToggleButton IsChecked="{Binding IsShown}" Cursor="Hand"
+                                                      ToolTip="{Binding Color, StringFormat=Show or hide {0} bookmarks}">
+                                            <ToggleButton.Template>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border x:Name="Ring" Width="18" Height="18" CornerRadius="9" Margin="0,0,2,0"
+                                                            Background="Transparent" BorderThickness="1.5"
+                                                            BorderBrush="{DynamicResource WindowForegroundBrush}">
+                                                        <Ellipse x:Name="Dot" Width="10" Height="10" Style="{StaticResource BookmarkColorDot}" />
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="False">
+                                                            <Setter TargetName="Ring" Property="BorderBrush" Value="Transparent" />
+                                                            <Setter TargetName="Dot" Property="Opacity" Value="0.25" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </ToggleButton.Template>
+                                        </ToggleButton>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <CheckBox Content="Notes only" IsChecked="{Binding BookmarkFilter.NotesOnly}" Margin="0,0,8,0"
-                                      ToolTip="Only bookmarks with a note" />
+                            <CheckBox Content="With description" IsChecked="{Binding BookmarkFilter.NotesOnly}" Margin="0,0,8,0"
+                                      MinWidth="0" MinHeight="0" FontSize="12" ToolTip="Only bookmarks with a description" />
                             <CheckBox Content="By color" IsChecked="{Binding BookmarkFilter.SortByColor}"
-                                      ToolTip="Sort by color, then line (otherwise by line)" />
+                                      MinWidth="0" MinHeight="0" FontSize="12" ToolTip="Sort by color, then line (otherwise by line)" />
                         </WrapPanel>
-                        <!-- The selected bookmark's note (ticket 23): edit, select, copy and paste; Ctrl+click opens a link.
-                             Saved when the box loses focus or on Ctrl+Enter. -->
-                        <DockPanel DockPanel.Dock="Bottom" Margin="8,4,8,8"
-                                   IsEnabled="{Binding BookmarkFilter.HasSelection}">
-                            <TextBlock DockPanel.Dock="Top" Margin="0,0,0,2" Opacity="0.7"
-                                       Text="{Binding BookmarkFilter.SelectedItem.DisplayLine, StringFormat=Note on line {0:N0} (Ctrl+click a link to open it), FallbackValue=Select a bookmark to edit its note}" />
-                            <TextBox x:Name="BookmarkNoteBox" MinHeight="48" MaxHeight="160" AcceptsReturn="True"
-                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                                     Text="{Binding BookmarkFilter.SelectedNote, UpdateSourceTrigger=LostFocus}"
-                                     PreviewMouseLeftButtonDown="OnNoteBoxMouseDown" PreviewKeyDown="OnNoteBoxKeyDown"
-                                     ContextMenuOpening="OnNoteBoxContextMenuOpening">
-                                <TextBox.ContextMenu>
-                                    <ContextMenu />
-                                </TextBox.ContextMenu>
-                            </TextBox>
-                        </DockPanel>
                         <ListBox x:Name="BookmarkList" ItemsSource="{Binding BookmarkFilter.Items}" BorderThickness="0"
-                                 SelectedItem="{Binding BookmarkFilter.SelectedItem}"
                                  Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" Hyperlink.Click="OnNoteLinkClick"
                                  MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
+                            <ListBox.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="_Edit description…" Click="OnEditBookmarkDescriptionClick" />
+                                    <MenuItem Header="_Copy description" Click="OnCopyBookmarkDescriptionClick" />
+                                    <MenuItem Header="_Remove bookmark" Click="OnRemoveBookmarkClick" />
+                                </ContextMenu>
+                            </ListBox.ContextMenu>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                    <Setter Property="Padding" Value="6,2" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <DockPanel Margin="0,2">
-                                        <Ellipse DockPanel.Dock="Left" Width="10" Height="10" Margin="0,4,8,0"
+                                    <DockPanel>
+                                        <Ellipse DockPanel.Dock="Left" Width="8" Height="8" Margin="0,4,6,0"
                                                  VerticalAlignment="Top" Style="{StaticResource BookmarkColorDot}" />
                                         <StackPanel>
                                             <TextBlock FontWeight="SemiBold" Text="{Binding DisplayLine, StringFormat=Line {0:N0}}" />
-                                            <TextBlock views:NoteText.Note="{Binding Note}" TextWrapping="Wrap" />
+                                            <TextBlock views:NoteText.Note="{Binding Note}" TextWrapping="Wrap" Opacity="0.85">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Note}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                         </StackPanel>
                                     </DockPanel>
                                 </DataTemplate>
