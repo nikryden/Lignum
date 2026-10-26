@@ -171,9 +171,26 @@
                             <CheckBox Content="By color" IsChecked="{Binding BookmarkFilter.SortByColor}"
                                       ToolTip="Sort by color, then line (otherwise by line)" />
                         </WrapPanel>
+                        <!-- The selected bookmark's note (ticket 23): edit, select, copy and paste; Ctrl+click opens a link.
+                             Saved when the box loses focus or on Ctrl+Enter. -->
+                        <DockPanel DockPanel.Dock="Bottom" Margin="8,4,8,8"
+                                   IsEnabled="{Binding BookmarkFilter.HasSelection}">
+                            <TextBlock DockPanel.Dock="Top" Margin="0,0,0,2" Opacity="0.7"
+                                       Text="{Binding BookmarkFilter.SelectedItem.DisplayLine, StringFormat=Note on line {0:N0} (Ctrl+click a link to open it), FallbackValue=Select a bookmark to edit its note}" />
+                            <TextBox x:Name="BookmarkNoteBox" MinHeight="48" MaxHeight="160" AcceptsReturn="True"
+                                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                                     Text="{Binding BookmarkFilter.SelectedNote, UpdateSourceTrigger=LostFocus}"
+                                     PreviewMouseLeftButtonDown="OnNoteBoxMouseDown" PreviewKeyDown="OnNoteBoxKeyDown"
+                                     ContextMenuOpening="OnNoteBoxContextMenuOpening">
+                                <TextBox.ContextMenu>
+                                    <ContextMenu />
+                                </TextBox.ContextMenu>
+                            </TextBox>
+                        </DockPanel>
                         <ListBox x:Name="BookmarkList" ItemsSource="{Binding BookmarkFilter.Items}" BorderThickness="0"
+                                 SelectedItem="{Binding BookmarkFilter.SelectedItem}"
                                  Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" Hyperlink.Click="OnNoteLinkClick"
                                  MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -182,7 +199,7 @@
                                                  VerticalAlignment="Top" Style="{StaticResource BookmarkColorDot}" />
                                         <StackPanel>
                                             <TextBlock FontWeight="SemiBold" Text="{Binding DisplayLine, StringFormat=Line {0:N0}}" />
-                                            <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                                            <TextBlock views:NoteText.Note="{Binding Note}" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </DockPanel>
                                 </DataTemplate>

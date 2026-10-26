@@ -78,6 +78,22 @@ public sealed partial class LogTabViewModel
         if (item is not null) Navigation.GoToLine(item.Line);
     }
 
+    /// <summary>Ctrl+click on a link in a bookmark note (ticket 23): a browser, a tab or Explorer.</summary>
+    [RelayCommand]
+    private Task OpenNoteLink(NoteLink? link) =>
+        link is not null && _services.OpenNoteLink is { } open ? open(link, false) : Task.CompletedTask;
+
+    /// <summary>"Show in folder" on a path in a bookmark note: Explorer with the file or folder selected.</summary>
+    [RelayCommand]
+    private Task ShowNoteLinkInFolder(NoteLink? link) =>
+        link is { Kind: NoteLinkKind.Path } && _services.OpenNoteLink is { } open ? open(link, true) : Task.CompletedTask;
+
+    [RelayCommand]
+    private void CopyNoteLink(NoteLink? link)
+    {
+        if (link is not null) _services.Copier?.SetText(link.Target);
+    }
+
     /// <summary>F2: the next bookmark after the caret, wrapping to the first.</summary>
     [RelayCommand]
     private void NextBookmark() => JumpToBookmark(Bookmarks.Next(Navigation.Caret.Line, LineCount));

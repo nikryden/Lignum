@@ -11,9 +11,11 @@ namespace Lignum.App.ViewModels;
 /// <param name="History">The app-wide find / filter history.</param>
 /// <param name="SettingsStore">Where each tab's bookmarks file lives; null: bookmarks are not saved.</param>
 /// <param name="ConfirmClearBookmarks">Asks before clearing bookmarks, given how many have notes; null: no question.</param>
+/// <param name="OpenNoteLink">Opens a link in a bookmark note (true: show it in Explorer instead); null: links do nothing.</param>
 internal sealed record TabServices(
     SelectionCopier? Copier = null,
     HighlightingViewModel? Highlighting = null,
     SearchHistory? History = null,
     SettingsStore? SettingsStore = null,
-    Func<int, bool>? ConfirmClearBookmarks = null);
+    Func<int, bool>? ConfirmClearBookmarks = null,
+    Func<NoteLink, bool, Task>? OpenNoteLink = null);

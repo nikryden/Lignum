@@ -76,6 +76,39 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
         }
     }
 
+    private long? _selectedLine;
+
+    /// <summary>
+    /// The pane's selected bookmark (ticket 23), or null when there is none or the filter hides it. Setting null is
+    /// ignored: the list sets it while its items are replaced, and the selection should survive that.
+    /// </summary>
+    public BookmarkItem? SelectedItem
+    {
+        get => _selectedLine is { } line ? Items.FirstOrDefault(b => b.Line == line) : null;
+        set
+        {
+            if (value is null || value.Line == _selectedLine) return;
+            _selectedLine = value.Line;
+            OnSelectionChanged();
+        }
+    }
+
+    /// <summary>
+    /// The selected bookmark's note, edited in the pane. Setting it saves the note; empty removes the note and keeps
+    /// the bookmark.
+    /// </summary>
+    public string SelectedNote
+    {
+        get => SelectedItem?.Note ?? "";
+        set
+        {
+            if (SelectedItem is { } item && (item.Note ?? "") != value) _bookmarks.SetNote(item.Line, value);
+        }
+    }
+
+    /// <summary>Whether a bookmark is selected, so its note can be edited.</summary>
+    public bool HasSelection => SelectedItem is not null;
+
     partial void OnSortByColorChanged(bool value) => OnFilterChanged();
 
     partial void OnNotesOnlyChanged(bool value) => OnFilterChanged();
@@ -85,8 +118,10 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
     private void OnBookmarksChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(BookmarksViewModel.Items)) return;
+        if (_selectedLine is { } line && !_bookmarks.Lines.Contains(line)) _selectedLine = null; // removed
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(Header));
+        OnSelectionChanged();
     }
 
     private void OnFilterChanged()
@@ -94,5 +129,14 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
         OnPropertyChanged(nameof(ShownColors));
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(Header));
+        OnSelectionChanged();
+    }
+
+    // After Items: the list then selects the new row object for the same line.
+    private void OnSelectionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedItem));
+        OnPropertyChanged(nameof(SelectedNote));
+        OnPropertyChanged(nameof(HasSelection));
     }
 }
