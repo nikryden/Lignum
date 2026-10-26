@@ -12,3 +12,4 @@
 - [x] In the margin/line context menu and the Bookmarks menu
 - [x] Removing asks for confirmation when any removed bookmark has a note (as ticket 11)
 - [x] View-model tests for both removals and for navigation with hidden colors
+- [x] Toggling (Ctrl+F2 / margin double-click) a bookmark whose color is hidden does nothing; "Clear all bookmarks" still removes hidden ones (owner decision)

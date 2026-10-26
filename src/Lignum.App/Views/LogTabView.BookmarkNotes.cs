@@ -7,7 +7,7 @@ using Lignum.App.ViewModels;
 namespace Lignum.App.Views;
 
 // The bookmarks pane's right-click menu, links and resizing (ticket 23). A description is edited in the same dialog
-// as "Edit bookmark note…"; Ctrl+click on a web link in a row opens it in the browser.
+// as "Edit description…" in the log view; Ctrl+click on a web link in a row opens it in the browser.
 public partial class LogTabView
 {
     /// <summary>A link in a row: Ctrl+click opens it; a plain click only selects the row.</summary>
@@ -37,6 +37,6 @@ public partial class LogTabView
 
     /// <summary>Dragging the pane's left edge: left makes it wider. At most two thirds of the tab.</summary>
     private void OnBookmarksPaneResize(object sender, DragDeltaEventArgs e) =>
-        BookmarksPane.Width = Math.Clamp(BookmarksPane.Width - e.HorizontalChange, BookmarksPane.MinWidth,
-            Math.Max(BookmarksPane.MinWidth, ActualWidth * 2 / 3));
+        BookmarksPane.SetCurrentValue(WidthProperty, Math.Clamp(BookmarksPane.Width - e.HorizontalChange, BookmarksPane.MinWidth,
+            Math.Max(BookmarksPane.MinWidth, ActualWidth * 2 / 3))); // keeps the binding to the saved width
 }

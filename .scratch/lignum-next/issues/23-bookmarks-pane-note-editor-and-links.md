@@ -11,3 +11,4 @@
 - [x] The pane is resizable by dragging its left edge
 - [x] Smaller text and compact filter controls; the color filter is a row of color dots (faded = hidden)
 - [x] Tests for link detection (URLs, trailing punctuation, paths are not links) and opening in the browser
+- [x] The pane width is saved (app-wide `bookmarksPaneWidth`) and "Edit bookmark note…" is now "Edit description…" everywhere

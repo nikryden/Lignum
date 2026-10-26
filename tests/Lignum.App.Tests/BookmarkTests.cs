@@ -492,4 +492,35 @@ public sealed class BookmarkTests : IDisposable
         tab.PreviousBookmarkCommand.Execute(null);
         Assert.Equal(5, tab.Navigation.Caret.Line);
     }
+
+    [Fact]
+    public async Task Toggling_a_hidden_bookmark_does_nothing_but_clear_all_removes_it()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        tab.Bookmarks.SetColor(4, BookmarkColor.Red);
+        tab.BookmarkFilter.ColorToggles.Single(t => t.Color == BookmarkColor.Red).IsShown = false;
+
+        ToggleAt(tab, 4);
+        tab.ToggleBookmarkAtCommand.Execute(4L);
+        Assert.Equal([4L], tab.Bookmarks.Lines);
+        Assert.Equal(BookmarkColor.Red, tab.Bookmarks.ColorFor(4));
+
+        ToggleAt(tab, 6); // a shown line still toggles
+        Assert.Equal([4L, 6], tab.Bookmarks.Lines);
+
+        tab.ClearBookmarksCommand.Execute(null);
+        Assert.Empty(tab.Bookmarks.Lines);
+    }
+
+    [Fact]
+    public void The_bookmarks_pane_width_is_saved_for_the_next_start()
+    {
+        var vm = Start();
+        Assert.Equal(AppSettings.DefaultBookmarksPaneWidth, vm.BookmarksPaneWidth);
+
+        vm.BookmarksPaneWidth = 333;
+        vm.BookmarksPaneWidth = 10; // too narrow: clamped
+
+        Assert.Equal(160, Start().BookmarksPaneWidth);
+    }
 }

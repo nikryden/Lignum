@@ -70,12 +70,21 @@ public sealed partial class LogTabViewModel
     /// own); null = the main view's.
     /// </summary>
     [RelayCommand]
-    private void ToggleBookmark(TextSelection? selection) =>
-        Bookmarks.Toggle((selection ?? Selection).Caret.Line);
+    private void ToggleBookmark(TextSelection? selection) => ToggleShown((selection ?? Selection).Caret.Line);
 
     /// <summary>Double-click in the line-number margin (ticket 04): toggles that 0-based file line.</summary>
     [RelayCommand]
-    private void ToggleBookmarkAt(long line) => Bookmarks.Toggle(line);
+    private void ToggleBookmarkAt(long line) => ToggleShown(line);
+
+    /// <summary>
+    /// Toggles the bookmark on <paramref name="line"/>, unless its color is hidden (ticket 24): then nothing happens, so
+    /// a bookmark the user cannot see is never removed by accident. "Clear all" still removes hidden ones.
+    /// </summary>
+    private void ToggleShown(long line)
+    {
+        if (Bookmarks.Lines.Contains(line) && !BookmarkFilter.VisibleLines.Contains(line)) return;
+        Bookmarks.Toggle(line);
+    }
 
     private BookmarkFilterViewModel? _bookmarkFilter;
 

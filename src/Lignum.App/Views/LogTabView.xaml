@@ -62,7 +62,7 @@
             <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}" />
             <Separator />
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
-            <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
+            <MenuItem Header="Edit _description…" Click="OnEditNoteClick" />
             <MenuItem Header="Bookmark co_lor">
                 <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
@@ -107,7 +107,7 @@
             <Separator />
             <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+F2" />
-            <MenuItem Header="Edit bookmark _note…" Click="OnEditNoteClick" />
+            <MenuItem Header="Edit _description…" Click="OnEditNoteClick" />
             <MenuItem Header="Bookmark co_lor">
                 <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
@@ -140,8 +140,9 @@
             <views:DetailPaneLayout.Main>
                 <DockPanel>
                 <!-- The bookmarks pane (ticket 06): every bookmark and note in this file; a click jumps to it. Drag its left
-                     edge to resize it. Smaller text than the rest of the window, so more bookmarks fit. -->
-                <Border x:Name="BookmarksPane" DockPanel.Dock="Right" Width="260" MinWidth="160" BorderThickness="1,0,0,0"
+                     edge to resize it (saved, the same for every tab). Smaller text than the rest of the window, so more bookmarks fit. -->
+                <Border x:Name="BookmarksPane" DockPanel.Dock="Right" MinWidth="160"
+                        Width="{Binding DataContext.BookmarksPaneWidth, RelativeSource={RelativeSource AncestorType=Window}, Mode=TwoWay, FallbackValue=260}" BorderThickness="1,0,0,0"
                         TextElement.FontSize="12"
                         Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
                         Visibility="{Binding IsBookmarksPaneOpen, Converter={StaticResource BoolToVisibility}}">

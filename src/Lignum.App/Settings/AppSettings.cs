@@ -40,6 +40,11 @@ public sealed class AppSettings
 
     public DetailPaneSettings DetailPane { get; set; } = new();
 
+    public const double DefaultBookmarksPaneWidth = 260;
+
+    /// <summary>The bookmarks pane's width (ticket 23), the same for every tab.</summary>
+    public double BookmarksPaneWidth { get; set; } = DefaultBookmarksPaneWidth;
+
     /// <summary>Full paths, most recent first (File &gt; Open recent). Capped by MainViewModel.</summary>
     public List<string> RecentFiles { get; set; } = [];
 
