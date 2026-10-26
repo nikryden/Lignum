@@ -6,7 +6,7 @@ using Lignum.App.Viewer;
 
 namespace Lignum.App.ViewModels;
 
-// Bookmarks (ticket 17): Ctrl+F2 toggles the caret line, F2 / Shift+F2 jump to the next / previous one.
+// Bookmarks (ticket 17): Ctrl+F2 toggles the caret line, F2 / Shift+F2 jump to the next / previous shown one.
 // They belong to the file (bookmarks/<hash of the path>.json), so they survive a reload and a restart.
 public sealed partial class LogTabViewModel
 {
@@ -27,7 +27,10 @@ public sealed partial class LogTabViewModel
                     : SettingsStore?.Open<BookmarksFile>(BookmarksFile.RelativePathFor(Path)), Path);
             _bookmarks.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(BookmarksViewModel.Lines)) ClearBookmarksCommand.NotifyCanExecuteChanged();
+                if (e.PropertyName != nameof(BookmarksViewModel.Lines)) return;
+                ClearBookmarksCommand.NotifyCanExecuteChanged();
+                RemoveBookmarksWithoutNotesCommand.NotifyCanExecuteChanged();
+                RemoveBookmarksOfColorCommand.NotifyCanExecuteChanged();
             };
             return _bookmarks;
         }
@@ -46,6 +49,21 @@ public sealed partial class LogTabViewModel
     }
 
     private bool HasBookmarks() => !Bookmarks.Lines.IsEmpty;
+
+    /// <summary>"Remove bookmarks without notes" (ticket 24). Nothing with a note goes, so it never asks.</summary>
+    [RelayCommand(CanExecute = nameof(HasBookmarks))]
+    private void RemoveBookmarksWithoutNotes() =>
+        Bookmarks.Remove(Bookmarks.Lines.Where(l => !Bookmarks.Notes.ContainsKey(l)));
+
+    /// <summary>"Remove bookmarks of color" (ticket 24): asks first when any of them has a note.</summary>
+    [RelayCommand(CanExecute = nameof(HasBookmarks))]
+    private void RemoveBookmarksOfColor(BookmarkColor color)
+    {
+        var lines = Bookmarks.Lines.Where(l => Bookmarks.ColorFor(l) == color).ToList();
+        var notes = lines.Count(Bookmarks.Notes.ContainsKey);
+        if (notes > 0 && _services.ConfirmClearBookmarks is { } confirm && !confirm(notes)) return;
+        Bookmarks.Remove(lines);
+    }
 
     /// <summary>
     /// Ctrl+F2 / "Toggle bookmark": the caret line of <paramref name="selection"/> (the results pane passes its
@@ -96,11 +114,13 @@ public sealed partial class LogTabViewModel
 
     /// <summary>F2: the next bookmark after the caret, wrapping to the first.</summary>
     [RelayCommand]
-    private void NextBookmark() => JumpToBookmark(Bookmarks.Next(Navigation.Caret.Line, LineCount));
+    private void NextBookmark() =>
+        JumpToBookmark(Bookmarks.Next(Navigation.Caret.Line, LineCount, BookmarkFilter.VisibleLines));
 
     /// <summary>Shift+F2: the previous bookmark before the caret, wrapping to the last.</summary>
     [RelayCommand]
-    private void PreviousBookmark() => JumpToBookmark(Bookmarks.Previous(Navigation.Caret.Line, LineCount));
+    private void PreviousBookmark() =>
+        JumpToBookmark(Bookmarks.Previous(Navigation.Caret.Line, LineCount, BookmarkFilter.VisibleLines));
 
     private void JumpToBookmark(long? line)
     {

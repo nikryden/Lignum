@@ -51,6 +51,21 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
     public ImmutableHashSet<BookmarkColor> ShownColors =>
         [.. ColorToggles.Where(t => t.IsShown).Select(t => t.Color)];
 
+    /// <summary>
+    /// The bookmarked lines of the shown colors, ascending: what the margin marks and F2 / Shift+F2 visit (ticket 24).
+    /// Only the color filter applies here, not "notes only" or the search.
+    /// </summary>
+    public ImmutableSortedSet<long> VisibleLines
+    {
+        get
+        {
+            var shown = ShownColors;
+            return shown.Count == ColorToggles.Count
+                ? _bookmarks.Lines // the same set object, so the margin does not repaint for nothing
+                : [.. _bookmarks.Lines.Where(l => shown.Contains(_bookmarks.ColorFor(l)))];
+        }
+    }
+
     /// <summary>The bookmarks the pane lists, filtered and sorted.</summary>
     public IReadOnlyList<BookmarkItem> Items
     {
@@ -119,6 +134,7 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
     {
         if (e.PropertyName != nameof(BookmarksViewModel.Items)) return;
         if (_selectedLine is { } line && !_bookmarks.Lines.Contains(line)) _selectedLine = null; // removed
+        OnPropertyChanged(nameof(VisibleLines));
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(Header));
         OnSelectionChanged();
@@ -127,6 +143,7 @@ public sealed partial class BookmarkFilterViewModel : ObservableObject
     private void OnFilterChanged()
     {
         OnPropertyChanged(nameof(ShownColors));
+        OnPropertyChanged(nameof(VisibleLines));
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(Header));
         OnSelectionChanged();

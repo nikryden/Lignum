@@ -423,4 +423,73 @@ public sealed class BookmarkTests : IDisposable
 
         Assert.Empty(reopened.Bookmarks.Lines);
     }
+
+    // Ticket 24: bulk removal by note and color, and showing only some colors in the margin.
+
+    [Fact]
+    public async Task Remove_without_notes_keeps_only_bookmarks_with_a_note_and_saves_it()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        ToggleAt(tab, 2);
+        tab.Bookmarks.SetNote(5, "keep");
+        tab.Bookmarks.SetColor(8, BookmarkColor.Red);
+
+        tab.RemoveBookmarksWithoutNotesCommand.Execute(null);
+
+        Assert.Equal([5L], tab.Bookmarks.Lines);
+        Assert.Empty(tab.Bookmarks.Colors);
+        Assert.Equal([5L], (await Open(Start(), a)).Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Remove_of_color_removes_only_that_color_and_asks_when_one_has_a_note()
+    {
+        var vm = Start();
+        var answer = false;
+        int? asked = null;
+        vm.ConfirmClearBookmarks = notes => { asked = notes; return answer; };
+        var tab = await Open(vm, WriteLog("a.log"));
+        ToggleAt(tab, 1);
+        tab.Bookmarks.SetColor(3, BookmarkColor.Red);
+        tab.Bookmarks.SetColor(4, BookmarkColor.Red);
+        tab.Bookmarks.SetNote(4, "why");
+        tab.Bookmarks.SetColor(6, BookmarkColor.Green);
+
+        tab.RemoveBookmarksOfColorCommand.Execute(BookmarkColor.Red);
+        Assert.Equal(1, asked);
+        Assert.Equal([1L, 3, 4, 6], tab.Bookmarks.Lines); // cancelled
+
+        answer = true;
+        tab.RemoveBookmarksOfColorCommand.Execute(BookmarkColor.Red);
+        Assert.Equal([1L, 6], tab.Bookmarks.Lines);
+        Assert.Null(tab.Bookmarks.NoteFor(4));
+
+        asked = null;
+        tab.RemoveBookmarksOfColorCommand.Execute(BookmarkColor.Blue);
+        Assert.Null(asked); // no notes, no question
+        Assert.Equal([6L], tab.Bookmarks.Lines);
+    }
+
+    [Fact]
+    public async Task Showing_only_some_colors_hides_the_other_markers_and_F2_skips_them()
+    {
+        var tab = await Open(Start(), WriteLog("a.log"));
+        ToggleAt(tab, 2);
+        tab.Bookmarks.SetColor(5, BookmarkColor.Red);
+        ToggleAt(tab, 9);
+        Assert.Same(tab.Bookmarks.Lines, tab.BookmarkFilter.VisibleLines);
+
+        tab.BookmarkFilter.ColorToggles.Single(t => t.Color == BookmarkColor.Blue).IsShown = false;
+
+        Assert.Equal([5L], tab.BookmarkFilter.VisibleLines);
+        Assert.Equal([2L, 5, 9], tab.Bookmarks.Lines); // hidden, not removed
+        tab.Navigation.Caret = new FilePosition(0, 0);
+        tab.NextBookmarkCommand.Execute(null);
+        Assert.Equal(5, tab.Navigation.Caret.Line);
+        tab.NextBookmarkCommand.Execute(null);
+        Assert.Equal(5, tab.Navigation.Caret.Line); // wraps to itself
+        tab.PreviousBookmarkCommand.Execute(null);
+        Assert.Equal(5, tab.Navigation.Caret.Line);
+    }
 }

@@ -35,6 +35,19 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        <!-- Bulk bookmark actions (ticket 24); the items are the tab's BookmarkFilter.ColorToggles. -->
+        <Style x:Key="RemoveColorItem" TargetType="MenuItem">
+            <Setter Property="Header" Value="{Binding Color}" />
+            <Setter Property="Command" Value="{Binding DataContext.RemoveBookmarksOfColorCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}" />
+            <Setter Property="CommandParameter" Value="{Binding Color}" />
+        </Style>
+        <!-- Hides the other colors' margin markers (not lines); shared with the pane's color filter. -->
+        <Style x:Key="ShowColorItem" TargetType="MenuItem">
+            <Setter Property="Header" Value="{Binding Color}" />
+            <Setter Property="IsCheckable" Value="True" />
+            <Setter Property="IsChecked" Value="{Binding IsShown}" />
+            <Setter Property="StaysOpenOnClick" Value="True" />
+        </Style>
         <!-- Right-click menus (ticket 15). The menu's DataContext is the LogView's (this tab). The text commands take
              the view's selection as parameter (null = the main view's); see LogTabViewModel.ContextMenu.cs.
              "Toggle bookmark" (ticket 17), the note and the color act on the caret line of the view the menu opened on. -->
@@ -68,6 +81,11 @@
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="Clear _all bookmarks" Command="{Binding ClearBookmarksCommand}" />
+            <MenuItem Header="Remove bookmarks _without notes" Command="{Binding RemoveBookmarksWithoutNotesCommand}" />
+            <MenuItem Header="Re_move bookmarks of color" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
+                      ItemContainerStyle="{StaticResource RemoveColorItem}" />
+            <MenuItem Header="Show onl_y colors" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
+                      ItemContainerStyle="{StaticResource ShowColorItem}" />
             <MenuItem Header="Highlight _line…" Click="OnHighlightLineClick" />
             <MenuItem Header="Remove highligh_t" Click="OnRemoveHighlightClick" />
             <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
@@ -221,7 +239,7 @@
                                   VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Auto">
                         <viewer:LogView x:Name="LogView" Source="{Binding ViewLines}" Caret="{Binding Navigation.Caret}"
                                         Selection="{Binding Selection}"
-                                        Bookmarks="{Binding Bookmarks.Lines}"
+                                        Bookmarks="{Binding BookmarkFilter.VisibleLines}"
                                         BookmarkNotes="{Binding Bookmarks.Notes}"
                                         BookmarkColors="{Binding Bookmarks.Colors}"
                                         LineHighlights="{Binding Bookmarks.Highlights}"
@@ -262,7 +280,7 @@
                             <viewer:LogView x:Name="ResultsView" Source="{Binding Search.Results}"
                                             Highlight="{Binding Search.Highlight}"
                                             Selection="{Binding Search.ResultsSelection}"
-                                            Bookmarks="{Binding Bookmarks.Lines}"
+                                            Bookmarks="{Binding BookmarkFilter.VisibleLines}"
                                             BookmarkNotes="{Binding Bookmarks.Notes}"
                                             BookmarkColors="{Binding Bookmarks.Colors}"
                                             LineHighlights="{Binding Bookmarks.Highlights}"

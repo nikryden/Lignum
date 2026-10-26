@@ -20,8 +20,8 @@ public partial class MainWindow : Window
         _viewModel.Assistant.Approver = new DialogPermissionApprover();
         _viewModel.Assistant.PermissionsRequested += (_, _) => OnAiPermissionsClick(this, new RoutedEventArgs());
         _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
-            $"{notes:N0} of the bookmarks have notes. Remove every bookmark, with its note and color?",
-            "Clear all bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+            $"{notes:N0} of the bookmarks to remove have notes. Remove them, with their notes and colors?",
+            "Remove bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
