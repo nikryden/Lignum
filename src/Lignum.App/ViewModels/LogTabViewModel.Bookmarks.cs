@@ -59,6 +59,11 @@ public sealed partial class LogTabViewModel
     [RelayCommand]
     private void ToggleBookmarkAt(long line) => Bookmarks.Toggle(line);
 
+    private BookmarkFilterViewModel? _bookmarkFilter;
+
+    /// <summary>What the bookmarks pane lists (ticket 22): sort, color, notes-only and note search. Not saved.</summary>
+    public BookmarkFilterViewModel BookmarkFilter => _bookmarkFilter ??= new BookmarkFilterViewModel(Bookmarks);
+
     /// <summary>Whether the bookmarks pane (every bookmark and note in this file) is shown.</summary>
     [ObservableProperty]
     private bool _isBookmarksPaneOpen;

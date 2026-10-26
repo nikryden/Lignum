@@ -129,11 +129,49 @@
                         <DockPanel DockPanel.Dock="Top" Margin="8,6">
                             <Button DockPanel.Dock="Right" Content="✕" Padding="6,0" ToolTip="Close the bookmarks pane"
                                     Command="{Binding ToggleBookmarksPaneCommand}" />
-                            <TextBlock FontWeight="SemiBold" Text="Bookmarks" VerticalAlignment="Center" />
+                            <TextBlock FontWeight="SemiBold" Text="{Binding BookmarkFilter.Header}" VerticalAlignment="Center" />
                         </DockPanel>
                         <TextBlock DockPanel.Dock="Top" Margin="8,0,8,6" Opacity="0.7" TextWrapping="Wrap"
                                    Text="Ctrl+F2 or double-click the margin to add one; right-click for a note or a color." />
-                        <ListBox x:Name="BookmarkList" ItemsSource="{Binding Bookmarks.Items}" BorderThickness="0"
+                        <!-- Sort and filter (ticket 22): view state only, never saved. -->
+                        <Grid DockPanel.Dock="Top" Margin="8,0,8,4">
+                            <TextBox x:Name="BookmarkSearchBox" ToolTip="Search the notes; * matches any text (disk*full)"
+                                     Text="{Binding BookmarkFilter.SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Margin="5,0" VerticalAlignment="Center" IsHitTestVisible="False" Opacity="0.5"
+                                       Text="Search notes (* = any)">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=BookmarkSearchBox}" Value="">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <WrapPanel DockPanel.Dock="Top" Margin="8,0,8,6">
+                            <ItemsControl ItemsSource="{Binding BookmarkFilter.ColorToggles}" VerticalAlignment="Center"
+                                          Margin="0,0,8,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox IsChecked="{Binding IsShown}" Margin="0,0,4,0" VerticalContentAlignment="Center"
+                                                  ToolTip="{Binding Color, StringFormat=Show {0} bookmarks}">
+                                            <Ellipse Width="10" Height="10" Style="{StaticResource BookmarkColorDot}" />
+                                        </CheckBox>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <CheckBox Content="Notes only" IsChecked="{Binding BookmarkFilter.NotesOnly}" Margin="0,0,8,0"
+                                      ToolTip="Only bookmarks with a note" />
+                            <CheckBox Content="By color" IsChecked="{Binding BookmarkFilter.SortByColor}"
+                                      ToolTip="Sort by color, then line (otherwise by line)" />
+                        </WrapPanel>
+                        <ListBox x:Name="BookmarkList" ItemsSource="{Binding BookmarkFilter.Items}" BorderThickness="0"
                                  Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  MouseLeftButtonUp="OnBookmarkListClick" KeyDown="OnBookmarkListKeyDown">
