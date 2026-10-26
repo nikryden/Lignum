@@ -73,7 +73,7 @@ public sealed class NoteLinkTests : IDisposable
     private static NoteLink Link(string target) => NoteLinks.Find(target).Single();
 
     [Fact]
-    public async Task A_file_link_opens_in_a_tab_and_show_in_folder_selects_it_in_Explorer()
+    public async Task A_file_link_selects_the_file_in_Explorer_and_open_in_tab_opens_it_in_Lignum()
     {
         var started = new List<ProcessStartInfo>();
         var vm = Start(started);
@@ -81,12 +81,13 @@ public sealed class NoteLinkTests : IDisposable
         File.WriteAllLines(log, ["a", "b"]);
 
         await vm.OpenNoteLinkAsync(Link(log.Replace('\\', '/'))); // forward slashes work too
-        Assert.Equal("linked.log", vm.SelectedTab!.FileName);
-        Assert.Empty(started);
-
-        await vm.OpenNoteLinkAsync(Link(log), inFolder: true);
         Assert.Equal("explorer.exe", Assert.Single(started).FileName);
-        Assert.Equal($"/select,\"{log}\"", started[0].Arguments);
+        Assert.Equal($"/select,\"{log}\"", started[0].Arguments); // backslashes: Explorer needs them
+        Assert.Empty(vm.Tabs);
+
+        await vm.OpenNoteLinkAsync(Link(log), inTab: true);
+        Assert.Equal("linked.log", vm.SelectedTab!.FileName);
+        Assert.Single(started);
     }
 
     [Fact]
@@ -97,7 +98,8 @@ public sealed class NoteLinkTests : IDisposable
 
         await vm.OpenNoteLinkAsync(Link(_dir));
 
-        Assert.Equal(_dir, Assert.Single(started).FileName);
+        Assert.Equal("explorer.exe", Assert.Single(started).FileName);
+        Assert.Equal($"\"{_dir}\"", started[0].Arguments);
         Assert.Empty(vm.Tabs);
     }
 

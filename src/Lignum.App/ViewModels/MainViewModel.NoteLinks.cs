@@ -3,12 +3,13 @@ using System.Diagnostics;
 
 namespace Lignum.App.ViewModels;
 
-// Ticket 23: Ctrl+click a link in a bookmark note. A web address opens in the default browser, a file in a tab, a
-// folder in Explorer. A path is a link when it looks like one, so a missing target is reported only when clicked.
+// Ticket 23: Ctrl+click a link in a bookmark note. A web address opens in the default browser; a file shows in Explorer
+// with the file selected, a folder opens in Explorer. "Open in tab" opens a file in Lignum instead. A path is a link
+// when it looks like one, so a missing target is reported only when clicked.
 public sealed partial class MainViewModel
 {
-    /// <summary>Opens <paramref name="link"/>; with <paramref name="inFolder"/>, shows it in Explorer instead.</summary>
-    internal async Task OpenNoteLinkAsync(NoteLink link, bool inFolder = false)
+    /// <summary>Opens <paramref name="link"/>; with <paramref name="inTab"/>, a file opens in a Lignum tab instead of Explorer.</summary>
+    internal async Task OpenNoteLinkAsync(NoteLink link, bool inTab = false)
     {
         if (link.Kind == NoteLinkKind.Web)
         {
@@ -35,12 +36,12 @@ public sealed partial class MainViewModel
             return;
         }
 
-        if (inFolder)
-            StartLinkProcess(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }, link.Target);
-        else if (isFolder)
-            StartLinkProcess(new ProcessStartInfo(path) { UseShellExecute = true }, link.Target);
-        else
+        if (isFolder)
+            StartLinkProcess(new ProcessStartInfo("explorer.exe", $"\"{path}\"") { UseShellExecute = true }, link.Target);
+        else if (inTab)
             await OpenFileAsync(path);
+        else
+            StartLinkProcess(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }, link.Target);
     }
 
     private void StartLinkProcess(ProcessStartInfo info, string target)

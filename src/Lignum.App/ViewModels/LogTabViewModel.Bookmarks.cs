@@ -105,14 +105,14 @@ public sealed partial class LogTabViewModel
         if (item is not null) Navigation.GoToLine(item.Line);
     }
 
-    /// <summary>Ctrl+click on a link in a bookmark note (ticket 23): a browser, a tab or Explorer.</summary>
+    /// <summary>Ctrl+click on a link in a bookmark note (ticket 23): the browser, or Explorer (a file selected in its folder).</summary>
     [RelayCommand]
     private Task OpenNoteLink(NoteLink? link) =>
         link is not null && _services.OpenNoteLink is { } open ? open(link, false) : Task.CompletedTask;
 
-    /// <summary>"Show in folder" on a path in a bookmark note: Explorer with the file or folder selected.</summary>
+    /// <summary>"Open in tab" on a file path in a bookmark note.</summary>
     [RelayCommand]
-    private Task ShowNoteLinkInFolder(NoteLink? link) =>
+    private Task OpenNoteLinkInTab(NoteLink? link) =>
         link is { Kind: NoteLinkKind.Path } && _services.OpenNoteLink is { } open ? open(link, true) : Task.CompletedTask;
 
     /// <summary>"Copy description" in the bookmarks pane.</summary>

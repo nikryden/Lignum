@@ -8,8 +8,8 @@ using Lignum.App.ViewModels;
 namespace Lignum.App.Views;
 
 // The bookmarks pane's right-click menu, links and resizing (ticket 23). A description is edited in the same dialog
-// as "Edit description…" in the log view. Ctrl+click on a link in a row opens it: a web address in the browser, a file
-// in a tab, a folder in Explorer; the right-click menu also has "Show in folder" for paths.
+// as "Edit description…" in the log view. Ctrl+click on a link in a row opens it: a web address in the browser, a path
+// in Explorer (a file selected in its folder); the right-click menu also has "Open in tab" for paths.
 public partial class LogTabView
 {
     /// <summary>A link in a row: Ctrl+click opens it; a plain click only selects the row.</summary>
@@ -20,7 +20,7 @@ public partial class LogTabView
         e.Handled = true;
     }
 
-    /// <summary>Adds an "Open" (and for a path "Show in folder") item per link in the selected bookmark's description.</summary>
+    /// <summary>Adds an "Open" (and for a path "Open in tab") item per link in the selected bookmark's description.</summary>
     private void OnBookmarkListMenuOpened(object sender, RoutedEventArgs e)
     {
         if (sender is not ContextMenu menu || DataContext is not LogTabViewModel tab) return;
@@ -31,11 +31,12 @@ public partial class LogTabView
         foreach (var link in links)
         {
             // Headers are plain text, so an underscore in a path is not an access key.
-            menu.Items.Add(new MenuItem { Header = new TextBlock { Text = $"Open {link.Target}" },
+            var open = link.Kind == NoteLinkKind.Web ? $"Open {link.Target}" : $"Show {link.Target} in Explorer";
+            menu.Items.Add(new MenuItem { Header = new TextBlock { Text = open },
                                           Command = tab.OpenNoteLinkCommand, CommandParameter = link });
             if (link.Kind == NoteLinkKind.Path)
-                menu.Items.Add(new MenuItem { Header = new TextBlock { Text = $"Show {link.Target} in folder" },
-                                              Command = tab.ShowNoteLinkInFolderCommand, CommandParameter = link });
+                menu.Items.Add(new MenuItem { Header = new TextBlock { Text = $"Open {link.Target} in a tab" },
+                                              Command = tab.OpenNoteLinkInTabCommand, CommandParameter = link });
         }
     }
 

@@ -31,7 +31,7 @@ public static class NoteText
             block.Inlines.Add(new Hyperlink(new Run(note.Substring(link.Start, link.Length)))
             {
                 Tag = link,
-                ToolTip = $"Ctrl+click to open {link.Target}",
+                ToolTip = link.Kind == NoteLinkKind.Web ? $"Ctrl+click to open {link.Target}" : $"Ctrl+click to show {link.Target} in Explorer",
             });
             at = link.Start + link.Length;
         }
