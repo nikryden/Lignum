@@ -6,11 +6,16 @@
              Background="{DynamicResource PaneBackgroundBrush}">
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
-        <Style x:Key="PaneButton" TargetType="Button">
+        <!-- BasedOn keeps the app's Fluent button look, like the other panes' buttons. -->
+        <Style x:Key="PaneButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Padding" Value="6,0" />
             <Setter Property="Margin" Value="4,0,0,0" />
-            <Setter Property="MinHeight" Value="0" />
             <Setter Property="Focusable" Value="False" />
+        </Style>
+        <!-- Icon buttons, as in the AI access pane. -->
+        <Style x:Key="PaneIconButton" TargetType="Button" BasedOn="{StaticResource PaneButton}">
+            <Setter Property="Padding" Value="6,2" />
+            <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets" />
         </Style>
     </UserControl.Resources>
     <Border BorderBrush="{DynamicResource PaneBorderBrush}" BorderThickness="1">
@@ -21,13 +26,13 @@
                     <CheckBox Content="Hidden lines" VerticalAlignment="Center" Margin="4,0" Focusable="False"
                               ToolTip="When several lines are selected, also show the lines the filter hides between them"
                               IsChecked="{Binding DataContext.DetailPane.IncludeHiddenLines, Mode=TwoWay, RelativeSource={RelativeSource AncestorType=Window}}" />
-                    <Button Content="{Binding CopyLabel}" ToolTip="Copy what the pane shows, in full" Click="OnCopyLineClick"
-                            Style="{StaticResource PaneButton}" />
+                    <Button Content="&#xE8C8;" ToolTip="{Binding CopyLabel}" Click="OnCopyLineClick"
+                            Style="{StaticResource PaneIconButton}" />
                     <!-- Layout commands are app-wide: the window's MainViewModel.DetailPane. -->
-                    <Button Content="Dock bottom" ToolTip="Dock the detail pane at the bottom"
+                    <Button Content="&#xE90E;" ToolTip="Dock at the bottom"
                             Command="{Binding DataContext.DetailPane.DockBottomCommand, RelativeSource={RelativeSource AncestorType=Window}}">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PaneButton}">
+                            <Style TargetType="Button" BasedOn="{StaticResource PaneIconButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.DetailPane.Dock, RelativeSource={RelativeSource AncestorType=Window}}"
                                                  Value="{x:Static settings:DetailPaneDock.Bottom}">
@@ -37,10 +42,10 @@
                             </Style>
                         </Button.Style>
                     </Button>
-                    <Button Content="Dock right" ToolTip="Dock the detail pane on the right"
+                    <Button Content="&#xE90D;" ToolTip="Dock on the right"
                             Command="{Binding DataContext.DetailPane.DockRightCommand, RelativeSource={RelativeSource AncestorType=Window}}">
                         <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PaneButton}">
+                            <Style TargetType="Button" BasedOn="{StaticResource PaneIconButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.DetailPane.Dock, RelativeSource={RelativeSource AncestorType=Window}}"
                                                  Value="{x:Static settings:DetailPaneDock.Right}">
