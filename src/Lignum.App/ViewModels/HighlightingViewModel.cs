@@ -198,38 +198,46 @@ public sealed partial class HighlightingViewModel : ObservableObject
 
     private void Rebuild() => Highlighter = LineHighlighter.Build(_activePreset!.Rules.Select(r => r.Data), _theme);
 
-    /// <summary>ERROR (and FATAL), WARN and INFO, in the common long and short spellings, for both themes.</summary>
+    /// <summary>
+    /// The first-run preset: DEBUG, INFO, WARN, ERROR (and FATAL) and TRACE lines, in the common long and short
+    /// spellings, any case, with colors for both themes. "Factory defaults" in the rules dialog brings it back.
+    /// </summary>
     public static HighlightPresetData CreateDefaultPreset() => new()
     {
         Name = DefaultPresetName,
         Rules =
         [
-            new HighlightRuleData
-            {
-                Pattern = @"\b(ERROR|ERR|FATAL|FTL|CRITICAL|CRIT)\b",
-                IsRegex = true,
-                MatchCase = true,
-                Light = new HighlightColors { Foreground = "#A80000", Background = "#FDE7E9" },
-                Dark = new HighlightColors { Foreground = "#FF9A9A", Background = "#4B1D1D" },
-            },
-            new HighlightRuleData
-            {
-                Pattern = @"\b(WARN|WARNING|WRN)\b",
-                IsRegex = true,
-                MatchCase = true,
-                Light = new HighlightColors { Foreground = "#8A4B00", Background = "#FFF1DC" },
-                Dark = new HighlightColors { Foreground = "#FFC870", Background = "#3D2E12" },
-            },
-            new HighlightRuleData
-            {
-                Pattern = @"\b(INFO|INF)\b",
-                IsRegex = true,
-                MatchCase = true,
-                Light = new HighlightColors { Foreground = "#0B5394" },
-                Dark = new HighlightColors { Foreground = "#8CC4FF" },
-            },
+            Rule(@"\b(DEBG|DEBUG|DBG)\b", ("#0C4A6E", "#C8F0C8"), ("#8CC4FF", "#404040")),
+            Rule(@"\b(INFO|INFORMATION|INF)\b", ("#0C4A6E", "#E6F0FA"), ("#38BDF8", "#1E293B")),
+            Rule(@"\b(WARN|WARNING|WRN)\b", ("#8A4B00", "#FFF1DC"), ("#FFC870", "#3D2E12")),
+            Rule(@"\b(ERROR|ERR|FATAL|FTL|CRITICAL|CRIT)\b", ("#A80000", "#FDE7E9"), ("#FF9A9A", "#4B1D1D")),
+            Rule(@"\b(TRACE|TRC)\b", ("#6A6A6A", "#FDE7E9"), ("#A0A0A0", "#1A4848")),
         ],
     };
+
+    private static HighlightRuleData Rule(string regex, (string Text, string Back) light, (string Text, string Back) dark) => new()
+    {
+        Pattern = regex,
+        IsRegex = true,
+        Light = new HighlightColors { Foreground = light.Text, Background = light.Back },
+        Dark = new HighlightColors { Foreground = dark.Text, Background = dark.Back },
+    };
+
+    /// <summary>
+    /// Goes back to the first-run state: only the <see cref="CreateDefaultPreset"/> preset, active. Every other
+    /// preset and every rule change is lost.
+    /// </summary>
+    public void ResetToFactoryDefaults()
+    {
+        var preset = new HighlightPresetViewModel(CreateDefaultPreset(), OnRulesChanged);
+        Presets.Clear();
+        Presets.Add(preset);
+        _activePreset = preset;
+        OnPropertyChanged(nameof(ActivePreset));
+        OnPropertyChanged(nameof(Rules));
+        DeletePresetCommand.NotifyCanExecuteChanged();
+        Save();
+    }
 }
 
 /// <summary>A named rule set. Rule edits, additions, removals and moves are reported to the owner.</summary>

@@ -31,6 +31,18 @@ public partial class HighlightRulesDialog : Window
             ? null
             : "Type a name that no other preset uses.");
 
+    private void OnFactoryDefaultsClick(object sender, RoutedEventArgs e)
+    {
+        var others = _highlighting.Presets.Count - 1;
+        var lost = others > 0 ? $" and deletes the other {others:N0} preset{(others == 1 ? "" : "s")}" : "";
+        if (MessageBox.Show(this, $"This brings back the rules of the first start{lost}. Continue?",
+                "Factory defaults", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
+        RulesGrid.CancelEdit(System.Windows.Controls.DataGridEditingUnit.Row);
+        _highlighting.ResetToFactoryDefaults();
+        PresetNameBox.Text = _highlighting.ActivePreset?.Name ?? "";
+        ShowPresetError(null);
+    }
+
     private void ShowPresetError(string? message)
     {
         PresetError.Text = message ?? "";
