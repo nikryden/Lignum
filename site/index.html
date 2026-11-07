@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lignum — Log viewer for huge files</title>
+  <meta name="description" content="Lignum is a fast, read-only Windows log viewer that opens, searches and filters log files of 2 GB and more.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Apply the saved theme before the page paints, to avoid a flash.
+    try { const t = localStorage.getItem("lignum-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <a class="brand" href="#top">
+        <img src="favicon.svg" alt="" width="28" height="28">
+        <span>Lignum</span>
+      </a>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#ai">AI access</a>
+        <a href="#shortcuts">Shortcuts</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/nikryden/Lignum">GitHub</a>
+      </nav>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Switch between light and dark theme">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36A5.5 5.5 0 0 1 13.36 3.1 9.2 9.2 0 0 0 12 3Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-text">
+          <p class="eyebrow">Free and open source · Windows</p>
+          <h1>Read the log.<br>All 2&nbsp;GB of it.</h1>
+          <p class="lede">
+            Lignum is a read-only log viewer that opens huge files instantly, searches them in seconds,
+            and never touches or locks the file, even while it is being written.
+          </p>
+          <div class="cta">
+            <a class="btn primary" id="downloadMsi" href="https://github.com/nikryden/Lignum/releases/latest">
+              Download installer (.msi)
+            </a>
+            <a class="btn" id="downloadExe" href="https://github.com/nikryden/Lignum/releases/latest">
+              Portable .exe
+            </a>
+          </div>
+          <p class="fine" id="releaseInfo">Windows 10 and 11, x64. No .NET installation needed.</p>
+        </div>
+
+        <figure class="window" aria-label="Lignum showing a log with highlighted lines and search results">
+          <div class="window-bar">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="tab active">server-2026-11-07.log</span>
+            <span class="tab">Program.cs</span>
+          </div>
+          <div class="log">
+            <div class="ln"><i>1 048 571</i><span class="lv-info">09:14:02.117 INFO  Request GET /api/orders 200 in 41 ms</span></div>
+            <div class="ln"><i>1 048 572</i><span class="lv-debug">09:14:02.118 DEBUG Cache hit orders:customer:8812</span></div>
+            <div class="ln"><i>1 048 573</i><span class="lv-warn">09:14:02.305 WARN  Slow query took 1 902 ms (threshold 1 000)</span></div>
+            <div class="ln mark"><i>1 048 574</i><span class="lv-error">09:14:02.311 ERROR Payment <b class="hit">timeout</b> for order 55120</span></div>
+            <div class="ln"><i>1 048 575</i><span class="lv-trace">09:14:02.312 TRACE   at Billing.Gateway.Charge()</span></div>
+            <div class="ln"><i>1 048 576</i><span class="lv-info">09:14:02.420 INFO  Retrying payment for order 55120</span></div>
+            <div class="ln"><i>1 048 577</i><span class="lv-error">09:14:03.002 ERROR Payment <b class="hit">timeout</b> for order 55120</span></div>
+            <div class="ln"><i>1 048 578</i><span class="lv-info">09:14:03.010 INFO  Order 55120 moved to manual review</span></div>
+          </div>
+          <div class="results">
+            <span class="results-title">Find all: <b>timeout</b></span>
+            <span class="results-count">2 418 matches · 28 431 907 lines · 2.1 GB</span>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="wrap stats-grid">
+        <div><strong>&lt; 1 s</strong><span>to the first screen</span></div>
+        <div><strong>~5–10 s</strong><span>to index 2 GB</span></div>
+        <div><strong>0 bytes</strong><span>ever written to your log</span></div>
+        <div><strong>45</strong><span>built-in syntax schemes</span></div>
+      </div>
+    </section>
+
+    <section id="features" class="section">
+      <div class="wrap">
+        <h2>Built for the logs other tools give up on</h2>
+        <p class="section-lede">Everything goes through a line index and positional reads, so the file is never loaded into memory.</p>
+        <div class="features">
+          <article class="card">
+            <h3>Huge files, instantly</h3>
+            <p>The first screen shows at once while the index builds in the background. The scrollbar grows as it goes.</p>
+          </article>
+          <article class="card">
+            <h3>Search that keeps up</h3>
+            <p>Plain text or regex, in parallel, with progress and cancel. Search one file, every open tab, or a whole folder.</p>
+          </article>
+          <article class="card">
+            <h3>Filters that compose</h3>
+            <p>Include and exclude rules, hide non-matching lines, and search inside the filter. Results stream in while indexing runs.</p>
+          </article>
+          <article class="card">
+            <h3>Highlight rules</h3>
+            <p>Color whole lines by level or by any regex, with separate colors for light and dark themes, and presets.</p>
+          </article>
+          <article class="card">
+            <h3>Syntax coloring</h3>
+            <p>Open a <code>.cs</code>, <code>.json</code>, <code>.py</code> or <code>.yaml</code> file and it is colored like in your editor. Edit, import and export schemes.</p>
+          </article>
+          <article class="card">
+            <h3>Bookmarks with notes</h3>
+            <p>Five colors, notes with links, and a bookmarks pane. Export the log with your notes as a <code>.lm</code> package to share.</p>
+          </article>
+          <article class="card">
+            <h3>Safe for live logs</h3>
+            <p>Opens files with full sharing, never locks or writes them, and shows a reload banner when the file changes.</p>
+          </article>
+          <article class="card">
+            <h3>Picks up where you left</h3>
+            <p>Tabs, scroll positions and filters come back on the next start. Open a whole folder with Ctrl+Shift+O.</p>
+          </article>
+          <article class="card">
+            <h3>Comfortable to read</h3>
+            <p>Detail pane, light and dark themes, zoom, font and tab width, and automatic encoding detection with an override.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="ai" class="section alt">
+      <div class="wrap split">
+        <div>
+          <h2>Bring your own AI</h2>
+          <p>
+            Lignum is an MCP server. Turn on AI access and GitHub Copilot, Claude, Cursor, Codex and other tools
+            can search your open logs, read lines, and add filters, highlight rules and bookmarks for you.
+          </p>
+          <ul class="checks">
+            <li>Off by default. Nothing is shared until you turn it on.</li>
+            <li>The AI runs in your own tool. Lignum needs no API key.</li>
+            <li>Every call is listed, and permissions decide what the AI may do.</li>
+            <li>No AI tool can ever change a log file.</li>
+          </ul>
+        </div>
+        <pre class="code"><code><span class="c"># Claude Code</span>
+claude mcp add lignum -- "C:\Tools\Lignum.exe" --mcp
+
+<span class="c"># Then ask:</span>
+<span class="s">"Which errors happen most in the log open
+ in Lignum? Add a filter for them."</span></code></pre>
+      </div>
+    </section>
+
+    <section id="shortcuts" class="section">
+      <div class="wrap">
+        <h2>Keyboard first</h2>
+        <div class="keys">
+          <div><span><kbd>Ctrl</kbd><kbd>O</kbd></span>Open file</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>O</kbd></span>Open folder</div>
+          <div><span><kbd>Ctrl</kbd><kbd>F</kbd></span>Find</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>F</kbd></span>Find in all tabs</div>
+          <div><span><kbd>F3</kbd></span>Next match</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>C</kbd></span>Copy selection to search</div>
+          <div><span><kbd>Ctrl</kbd><kbd>G</kbd></span>Go to line</div>
+          <div><span><kbd>Ctrl</kbd><kbd>F2</kbd></span>Toggle bookmark</div>
+          <div><span><kbd>F2</kbd></span>Next bookmark</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></span>Open in editor</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>A</kbd></span>AI access</div>
+          <div><span><kbd>Ctrl</kbd><kbd>Wheel</kbd></span>Zoom</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="section alt">
+      <div class="wrap narrow">
+        <h2>Questions</h2>
+        <details>
+          <summary>How big a file can Lignum open?</summary>
+          <p>It is designed and benchmarked for files of 2 GB and more. Lignum keeps only a list of line offsets and the lines on screen in memory, so the limit is your disk, not your RAM.</p>
+        </details>
+        <details>
+          <summary>Can I read a log that a service is still writing?</summary>
+          <p>Yes. Lignum opens files with full read, write and delete sharing, so it never blocks the writer or log rotation. When the file changes, a banner offers to reload it.</p>
+        </details>
+        <details>
+          <summary>Which encodings are supported?</summary>
+          <p>UTF-8 with or without BOM, UTF-16 LE and BE, and Windows-1252. The encoding is detected automatically, and you can override it from the status bar.</p>
+        </details>
+        <details>
+          <summary>Installer or portable?</summary>
+          <p>The MSI adds Lignum to the Start menu and can open <code>.log</code> and <code>.lm</code> files with a double-click. The portable <code>Lignum.exe</code> is a single self-contained file you can run from anywhere.</p>
+        </details>
+        <details>
+          <summary>Where are my settings stored?</summary>
+          <p>As JSON files in <code>%APPDATA%\Lignum</code>. Lignum does not use the registry for settings.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <span>Lignum · MIT License · © 2026 Niklas Rydén</span>
+      <span><a href="https://github.com/nikryden/Lignum">Source</a> · <a href="https://github.com/nikryden/Lignum/releases">Releases</a> · <a href="https://github.com/nikryden/Lignum/blob/main/docs/ai-access.md">AI access guide</a></span>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
