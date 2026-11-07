@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Lignum.App.Settings;
 using Lignum.App.Views;
 using Lignum.Core;
+using Lignum.Core.Searching;
 
 namespace Lignum.App.ViewModels;
 
@@ -164,6 +165,69 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var indexing = new List<Task>();
         foreach (var path in paths) indexing.Add(await OpenFileCoreAsync(path)); // one by one, so the tabs keep their order
+        await Task.WhenAll(indexing);
+    }
+
+    /// <summary>Opening a folder with more text files than this asks <see cref="ConfirmOpenFiles"/> first.</summary>
+    public const int ConfirmOpenFilesAbove = 20;
+
+    /// <summary>Opening a folder of many files asks this, given how many would open; null: open without asking.</summary>
+    public Func<int, bool>? ConfirmOpenFiles { get; set; }
+
+    /// <summary>
+    /// Opens the text files directly in <paramref name="folder"/> (not its subfolders) as <see cref="OpenFilesAsync"/>
+    /// does; binary and unreadable files are skipped and <see cref="ErrorMessage"/> says how many. The folder is
+    /// listed on a background thread. Completes when all of them have finished indexing.
+    /// </summary>
+    public async Task OpenFolderAsync(string folder)
+    {
+        var indexing = new List<Task>();
+        await OpenFolderCoreAsync(folder, indexing);
+        await Task.WhenAll(indexing);
+    }
+
+    /// <summary>Opens <paramref name="folder"/> as <see cref="OpenFolderAsync"/> does; completes once its tabs are there, adding their indexing to <paramref name="indexing"/>.</summary>
+    private async Task OpenFolderCoreAsync(string folder, List<Task> indexing)
+    {
+        List<string> files;
+        int binary, unreadable;
+        try
+        {
+            (files, binary, unreadable) = await Task.Run(() => FileFinder.FindTextFiles(folder));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            ErrorMessage = $"Could not open the folder {folder}: {ex.Message}";
+            return;
+        }
+
+        var skipped = string.Join(", ", new[] { (binary, "binary"), (unreadable, "unreadable") }
+            .Where(s => s.Item1 > 0).Select(s => $"{s.Item1:N0} {s.Item2}"));
+        if (files.Count == 0)
+        {
+            ErrorMessage = $"No text files in {folder}" + (skipped.Length > 0 ? $" (skipped {skipped})." : ".");
+            return;
+        }
+        if (files.Count > ConfirmOpenFilesAbove && ConfirmOpenFiles is { } confirm && !confirm(files.Count)) return;
+
+        foreach (var file in files) indexing.Add(await OpenFileCoreAsync(file)); // one by one, so the tabs keep their order
+        if (skipped.Length > 0 && ErrorMessage is null)
+            ErrorMessage = $"Opened {files.Count:N0} files from {folder}; skipped {skipped}.";
+    }
+
+    /// <summary>
+    /// Opens what was dropped on the window, in order: files as <see cref="OpenFileAsync"/> does, folders as
+    /// <see cref="OpenFolderAsync"/> does. Completes when all of them have finished indexing.
+    /// </summary>
+    public async Task OpenDroppedAsync(IReadOnlyList<string> paths)
+    {
+        var folders = await Task.Run(() => paths.Where(Directory.Exists).ToHashSet(StringComparer.OrdinalIgnoreCase));
+        var indexing = new List<Task>();
+        foreach (var path in paths)
+        {
+            if (folders.Contains(path)) await OpenFolderCoreAsync(path, indexing);
+            else indexing.Add(await OpenFileCoreAsync(path));
+        }
         await Task.WhenAll(indexing);
     }
 

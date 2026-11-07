@@ -24,6 +24,7 @@ public sealed class TabsTests : IDisposable
     private string WriteLog(string name, string content)
     {
         var path = Path.Combine(_dir, name);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
         return path;
     }
@@ -103,6 +104,64 @@ public sealed class TabsTests : IDisposable
         Assert.Equal(["a.log", "b.log"], vm.Tabs.Select(t => t.FileName));
         Assert.All(vm.Tabs, t => Assert.False(t.IsIndexing));
         Assert.Equal(2, vm.Tabs[1].LineCount);
+    }
+
+    [Fact]
+    public async Task Opening_a_folder_opens_its_text_files_and_skips_binary_files_and_subfolders()
+    {
+        using var vm = Create();
+        WriteLog(Path.Combine("logs", "b.log"), "1\n2\n");
+        WriteLog(Path.Combine("logs", "a.txt"), "1\n");
+        WriteLog(Path.Combine("logs", "empty.log"), "");
+        File.WriteAllBytes(Path.Combine(_dir, "logs", "app.exe"), [0x4D, 0x5A, 0x00, 0x01]);
+        WriteLog(Path.Combine("logs", "sub", "c.log"), "1\n");
+
+        await vm.OpenFolderAsync(Path.Combine(_dir, "logs"));
+
+        Assert.Equal(["a.txt", "b.log", "empty.log"], vm.Tabs.Select(t => t.FileName));
+        Assert.All(vm.Tabs, t => Assert.False(t.IsIndexing));
+        Assert.Contains("skipped 1 binary", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Opening_a_folder_of_many_files_asks_first_and_opens_nothing_when_declined()
+    {
+        using var vm = Create();
+        for (var i = 0; i <= MainViewModel.ConfirmOpenFilesAbove; i++) WriteLog(Path.Combine("logs", $"{i:D2}.log"), "1\n");
+        int? asked = null;
+        vm.ConfirmOpenFiles = count => { asked = count; return false; };
+
+        await vm.OpenFolderAsync(Path.Combine(_dir, "logs"));
+
+        Assert.Equal(MainViewModel.ConfirmOpenFilesAbove + 1, asked);
+        Assert.Empty(vm.Tabs);
+    }
+
+    [Fact]
+    public async Task Opening_a_folder_without_text_files_says_so()
+    {
+        using var vm = Create();
+        Directory.CreateDirectory(Path.Combine(_dir, "logs"));
+        File.WriteAllBytes(Path.Combine(_dir, "logs", "app.exe"), [0x4D, 0x5A, 0x00, 0x01]);
+
+        await vm.OpenFolderAsync(Path.Combine(_dir, "logs"));
+
+        Assert.Empty(vm.Tabs);
+        Assert.StartsWith("No text files in", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Dropping_files_and_folders_opens_them_in_order()
+    {
+        using var vm = Create();
+        var a = WriteLog("a.log", "1\n");
+        WriteLog(Path.Combine("logs", "b.log"), "1\n");
+        WriteLog(Path.Combine("logs", "c.log"), "1\n");
+        var d = WriteLog("d.log", "1\n");
+
+        await vm.OpenDroppedAsync([a, Path.Combine(_dir, "logs"), d]);
+
+        Assert.Equal(["a.log", "b.log", "c.log", "d.log"], vm.Tabs.Select(t => t.FileName));
     }
 
     [Fact]

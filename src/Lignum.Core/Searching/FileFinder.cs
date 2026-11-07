@@ -43,6 +43,34 @@ public static class FileFinder
     }
 
     /// <summary>
+    /// The text files directly in <paramref name="folder"/> (not its subfolders), sorted by path, for opening a
+    /// folder. Binary files (<see cref="LooksBinary"/>) are left out and counted, as are files that cannot be read.
+    /// Throws when the folder itself cannot be listed.
+    /// </summary>
+    public static (List<string> Files, int Binary, int Unreadable) FindTextFiles(string folder,
+                                                                                 CancellationToken cancellationToken = default)
+    {
+        var (all, _) = Find(folder, includeSubfolders: false, patterns: "", cancellationToken);
+        var files = new List<string>(all.Count);
+        int binary = 0, unreadable = 0;
+        foreach (var file in all)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                if (LooksBinary(file)) binary++;
+                else files.Add(file);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                unreadable++;
+            }
+        }
+
+        return (files, binary, unreadable);
+    }
+
+    /// <summary>
     /// True when the start of the file has a null byte (and no UTF-16 byte order mark): an executable, image or
     /// archive rather than a log. Reads at most <see cref="BinarySampleSize"/> bytes, without locking the file.
     /// UTF-16 text without a byte order mark also counts as binary.

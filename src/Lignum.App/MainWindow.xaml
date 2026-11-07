@@ -33,6 +33,7 @@
         <KeyBinding Gesture="Ctrl+NumPad0" Command="{Binding Appearance.ResetZoomCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
         <!-- Navigation (ticket 05). LogTabView repeats Ctrl+Home/End on the LogView because its ScrollViewer would eat them. -->
         <KeyBinding Gesture="Ctrl+G" Command="{x:Static local:MainWindow.GoToLineCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+O" Command="{x:Static local:MainWindow.OpenFolderCommand}" />
         <KeyBinding Gesture="Ctrl+Home" Command="{Binding SelectedTab.Navigation.GoToStartCommand}" />
         <KeyBinding Gesture="Ctrl+End" Command="{Binding SelectedTab.Navigation.GoToEndCommand}" />
         <!-- Bookmarks (ticket 17). -->
@@ -44,11 +45,13 @@
         <!-- ApplicationCommands.Open carries the Ctrl+O gesture. -->
         <CommandBinding Command="ApplicationCommands.Open" Executed="OnOpenExecuted" />
         <CommandBinding Command="{x:Static local:MainWindow.GoToLineCommand}" Executed="OnGoToLineExecuted" />
+        <CommandBinding Command="{x:Static local:MainWindow.OpenFolderCommand}" Executed="OnOpenFolderExecuted" />
     </Window.CommandBindings>
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_Open…" Command="ApplicationCommands.Open" InputGestureText="Ctrl+O" />
+                <MenuItem Header="Open _folder…" Command="{x:Static local:MainWindow.OpenFolderCommand}" InputGestureText="Ctrl+Shift+O" />
                 <MenuItem Header="Open _recent" ItemsSource="{Binding RecentFiles}"
                           IsEnabled="{Binding HasRecentFiles}">
                     <MenuItem.ItemContainerStyle>
