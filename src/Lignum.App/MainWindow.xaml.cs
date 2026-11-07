@@ -43,6 +43,14 @@ public partial class MainWindow : Window
         if (Highlighting is not null) new HighlightRulesDialog(Highlighting) { Owner = this }.ShowDialog();
     }
 
+    /// <summary>Syntax coloring by file type (ticket 25); viewers bind <c>Syntax.Highlighters</c>.</summary>
+    public SyntaxViewModel? Syntax { get; init; }
+
+    private void OnSyntaxSchemesClick(object sender, RoutedEventArgs e)
+    {
+        if (Syntax is not null) new SyntaxSchemesDialog(Syntax) { Owner = this }.ShowDialog();
+    }
+
     private void OnAiPermissionsClick(object sender, RoutedEventArgs e) =>
         new AiPermissionsDialog(_viewModel.Assistant.Permissions) { Owner = this }.ShowDialog();
 

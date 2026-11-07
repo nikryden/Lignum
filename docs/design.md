@@ -78,7 +78,10 @@ Windows desktop log viewer for developers and support staff. Its core purpose is
 ### Highlighting
 - User-defined color rules color the **whole line** (foreground and/or background). When rules overlap, the first in the list wins.
 - Search matches are drawn on top as a separate highlight of the matched text.
-- The default preset covers ERROR, WARN and INFO. Presets can be saved.
+- The default preset covers DEBUG, INFO, WARN, ERROR and TRACE. Presets can be saved, and "Factory defaults" brings back the first-run preset.
+- **Syntax coloring by file type** (ticket 25): source and data files (`.cs`, `.json`, `.xml`, `.py`…) are colored token by token with a *syntax scheme* chosen by extension or file name. A scheme is ordered regex *token rules*, each with a light and a dark color, bold and italic. About 45 schemes are built in (`Lignum.Core/Syntax/BuiltInSyntaxSchemes.cs`). View > Syntax schemes… edits, adds, imports and exports them (`syntax-schemes.json`).
+  - `.txt`, `.log` and `.lm` never use a scheme, and neither do types without one: they keep the whole-line rules. A file with a scheme does not use the whole-line rules. Search matches, the selection, bookmarks and hand-set line colors still draw on top (a hand-set text color colors the whole line).
+  - **Each line is tokenized on its own** (the viewer reads only visible lines, so no lexer state is carried from the start of the file). At each position the earliest match wins, and ties go to the first rule. Block comments and multi-line strings are therefore colored only on the lines with their markers, plus C-style ` * ` doc lines. Regexes have a match timeout, and a rule that times out is skipped for that line.
 - **Dark and light themes**, following Windows by default. The user's choice is remembered.
 
 ### Context menu (selection)
@@ -112,6 +115,7 @@ Windows desktop log viewer for developers and support staff. Its core purpose is
 JSON files under `%APPDATA%\Lignum\`, with no registry use:
 - `settings.json`: theme, font, zoom, pane layout, recent files, session, and search/filter history.
 - `highlight-presets.json`
+- `syntax-schemes.json` (ticket 25)
 - `bookmarks/<hash of file path>.json`: designed so that a note field can be added later.
 
 ## Automated builds

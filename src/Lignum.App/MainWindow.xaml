@@ -142,6 +142,7 @@
                 </MenuItem>
                 <MenuItem Header="_Font…" Click="OnFontClick" />
                 <MenuItem Header="_Highlight rules…" Click="OnHighlightRulesClick" />
+                <MenuItem Header="_Syntax schemes…" Click="OnSyntaxSchemesClick" />
                 <MenuItem Header="_External editor…" Click="OnExternalEditorClick" />
                 <MenuItem Header="AI _permissions…" Click="OnAiPermissionsClick" />
                 <MenuItem Header="Tab _width">

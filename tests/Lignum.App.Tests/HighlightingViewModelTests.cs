@@ -24,7 +24,7 @@ public sealed class HighlightingViewModelTests : IDisposable
         });
 
     [Fact]
-    public void On_first_run_the_default_preset_colors_error_warn_and_info_lines()
+    public void On_first_run_the_default_preset_colors_debug_info_warn_error_and_trace_lines()
     {
         var vm = Create();
 
@@ -37,7 +37,9 @@ public sealed class HighlightingViewModelTests : IDisposable
         Assert.NotNull(info);
         Assert.NotEqual(error.Foreground!.Color, warn.Foreground!.Color);
         Assert.NotEqual(warn.Foreground.Color, info.Foreground!.Color);
-        Assert.Null(vm.Highlighter.Resolve("2026-10-16 12:00:01 DEBUG nothing to see"));
+        Assert.NotNull(vm.Highlighter.Resolve("2026-10-16 12:00:01 DEBUG details"));
+        Assert.NotNull(vm.Highlighter.Resolve("2026-10-16 12:00:01 trace details")); // any case
+        Assert.Null(vm.Highlighter.Resolve("2026-10-16 12:00:01 a line without a level"));
     }
 
     [Fact]
@@ -160,7 +162,7 @@ public sealed class HighlightingViewModelTests : IDisposable
 
         var restarted = Create();
 
-        Assert.Equal(4, restarted.Rules.Count);
+        Assert.Equal(DefaultRuleCount + 1, restarted.Rules.Count);
         Assert.Equal("needle", restarted.Rules[1].Pattern);
         Assert.Equal("#112233", restarted.Rules[1].LightForeground);
     }
@@ -172,7 +174,7 @@ public sealed class HighlightingViewModelTests : IDisposable
 
         var mine = vm.CreatePreset("Payments")!;
         Assert.Same(mine, vm.ActivePreset);
-        Assert.Equal(3, vm.Rules.Count); // a copy of the rules that were active
+        Assert.Equal(DefaultRuleCount, vm.Rules.Count); // a copy of the rules that were active
         vm.Rules.Clear();
         vm.AddRule("card declined");
         Assert.Null(vm.Highlighter.Resolve("ERROR boom"));
@@ -211,6 +213,31 @@ public sealed class HighlightingViewModelTests : IDisposable
         Assert.Equal(HighlightingViewModel.DefaultPresetName, vm.ActivePreset!.Name);
         Assert.NotNull(vm.Highlighter.Resolve("ERROR boom"));
     }
+
+    [Fact]
+    public void Factory_defaults_bring_back_the_first_run_preset_and_delete_the_others()
+    {
+        var vm = Create();
+        vm.Rules.Clear();
+        vm.AddRule("needle");
+        vm.CreatePreset("Payments");
+        Assert.Null(vm.Highlighter.Resolve("ERROR boom"));
+
+        vm.ResetToFactoryDefaults();
+
+        Assert.Equal([HighlightingViewModel.DefaultPresetName], vm.Presets.Select(p => p.Name));
+        Assert.Same(vm.Presets[0], vm.ActivePreset);
+        Assert.Equal(HighlightingViewModel.CreateDefaultPreset().Rules.Select(r => r.Pattern), vm.Rules.Select(r => r.Pattern));
+        Assert.NotNull(vm.Highlighter.Resolve("ERROR boom"));
+        Assert.Null(vm.Highlighter.Resolve("needle"));
+        Assert.False(vm.DeletePresetCommand.CanExecute(null));
+
+        var restarted = Create();
+        Assert.Equal([HighlightingViewModel.DefaultPresetName], restarted.Presets.Select(p => p.Name));
+        Assert.Equal(DefaultRuleCount, restarted.Rules.Count);
+    }
+
+    private static readonly int DefaultRuleCount = HighlightingViewModel.CreateDefaultPreset().Rules.Count;
 
     private static Color Background(HighlightRuleViewModel rule) =>
         (Color)ColorConverter.ConvertFromString(rule.LightBackground!);
