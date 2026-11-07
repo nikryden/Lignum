@@ -191,6 +191,7 @@ public sealed partial class LogView : FrameworkElement
         // Draw only the characters that can be visible. Rows are already cut at LineSource.DisplayLimit (ticket 07).
         var maxChars = (int)Math.Ceiling(Math.Max(0, width - textLeft) / _charWidth) + 1;
         var pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var syntax = Syntax; // ticket 25: null when the whole-line rules apply
 
         for (var i = 0; i < wanted; i++)
         {
@@ -201,7 +202,7 @@ public sealed partial class LogView : FrameworkElement
                 LineNumberForeground, pixelsPerDip);
             dc.DrawText(number, new Point(marginWidth - MarginPadding - number.WidthIncludingTrailingWhitespace, y));
             DrawBookmarkMarker(dc, row, y);
-            var style = LineStyleFor(first + i, row);
+            var style = LineStyleFor(first + i, row, syntax is not null);
             DrawLineBackground(dc, style, y, textLeft); // under the search decorations
             DrawRowDecorations(dc, row, y, textLeft, firstColumn, maxChars);
 
@@ -216,7 +217,10 @@ public sealed partial class LogView : FrameworkElement
             var expanded = TabExpansion.Expand(row.Text, TabWidth, (int)Math.Min((long)firstColumn + maxChars, int.MaxValue));
             if (expanded.Length <= firstColumn) continue;
             var text = firstColumn == 0 ? expanded : expanded[firstColumn..];
-            dc.DrawText(Format(text, style?.Foreground ?? Foreground, pixelsPerDip), new Point(textLeft, y));
+            var formatted = Format(text, style?.Foreground ?? Foreground, pixelsPerDip);
+            // A hand-set text color colors the whole line, over the syntax colors.
+            if (syntax is not null && style?.Foreground is null) ApplySyntax(formatted, text, syntax, first + i, row, firstColumn);
+            dc.DrawText(formatted, new Point(textLeft, y));
         }
 
         DrawCaret(dc, first, wanted, textLeft);

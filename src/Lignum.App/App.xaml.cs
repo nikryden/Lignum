@@ -68,14 +68,20 @@ public partial class App : Application
         {
             Theme = appearance.EffectiveTheme,
         };
+        // Syntax coloring by file type (ticket 25), also recolored on theme changes.
+        var syntax = new SyntaxViewModel(_settingsStore.Open<SyntaxSchemesFile>(SyntaxSchemesFile.FileName))
+        {
+            Theme = appearance.EffectiveTheme,
+        };
         appearance.PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName == nameof(AppearanceViewModel.EffectiveTheme))
-                highlighting.Theme = appearance.EffectiveTheme;
+            if (args.PropertyName != nameof(AppearanceViewModel.EffectiveTheme)) return;
+            highlighting.Theme = appearance.EffectiveTheme;
+            syntax.Theme = appearance.EffectiveTheme;
         };
 
         var viewModel = new MainViewModel(_settings) { Highlighting = highlighting, DiagnosticsLog = _log.Logger };
-        MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting };
+        MainWindow = new MainWindow(viewModel, appearance) { Highlighting = highlighting, Syntax = syntax };
         MainWindow.Show();
         var settingsDirectory = commandLine.SettingsDirectory ?? SettingsStore.DefaultDirectory;
         viewModel.Assistant.McpArguments = commandLine.SettingsDirectory is { } custom

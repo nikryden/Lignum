@@ -43,9 +43,9 @@ public sealed partial class LogView
     }
 
     /// <summary>The style of a loaded row: its hand-set colors over its rule style, or null.</summary>
-    private LineStyle? LineStyleFor(long row, DisplayRow displayRow)
+    private LineStyle? LineStyleFor(long row, DisplayRow displayRow, bool syntaxColored)
     {
-        var ruleStyle = RuleStyleFor(row, displayRow);
+        var ruleStyle = syntaxColored ? null : RuleStyleFor(row, displayRow); // ticket 25: a scheme replaces the rules
         if (LineHighlights is not { Count: > 0 } highlights
             || !highlights.TryGetValue(displayRow.LineNumber, out var own)) return ruleStyle;
         return new LineStyle(HighlightBrush(own.Foreground) ?? ruleStyle?.Foreground,

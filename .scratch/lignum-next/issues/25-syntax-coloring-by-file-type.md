@@ -4,7 +4,7 @@
 
 **Blocked by:** none
 
-**Status:** needs-triage
+**Status:** ready-for-human (built and unit-tested; check it in the app)
 
 ## Behaviour
 
@@ -42,14 +42,20 @@ Each one covers comments, strings, numbers, keywords and types, plus what is spe
 
 ## Where the code goes
 
-- `Lignum.Core/Syntax`: the scheme model, the extension lookup (with the `.txt/.log/.lm` exclusion) and the line tokenizer. Colors stay as strings, with no WPF. Unit tests go here.
-- `Lignum.App`: the settings file, the built-in schemes, the LogView drawing (`FormattedText.SetForegroundBrush`/`SetFontWeight` per token), the schemes window, and view-model tests.
-- Update `docs/design.md` (Highlighting) and `GLOSSARY.md` (syntax scheme, token rule).
+- `Lignum.Core/Syntax`: the scheme model, the extension lookup (with the `.txt/.log/.lm` exclusion), the line tokenizer and the built-in schemes. Colors stay as strings, with no WPF. Unit tests go here.
+- `Lignum.App`: the settings file, the LogView drawing (`FormattedText.SetForegroundBrush`/`SetFontWeight` per token), the schemes window, and view-model tests.
+- Update `docs/design.md` (Highlighting).
 
 ## Done when
 
-- [ ] Opening `.cs`, `.json`, `.xml`, `.py` and `.ps1` files colors them, and `.log`, `.txt` and `.lm` files look exactly as before
-- [ ] Unknown extensions fall back to the whole-line rules
-- [ ] The schemes page adds, edits, deletes, imports, exports and restores factory defaults, and every change is saved
-- [ ] A bad or slow regex never blocks the UI or crashes
-- [ ] Core tokenizer tests (earliest match wins, ties go by order, timeout, cut-off) and view-model tests (lookup, exclusions, import/export round-trip, factory reset)
+- [x] Opening `.cs`, `.json`, `.xml`, `.py` and `.ps1` files colors them, and `.log`, `.txt` and `.lm` files look exactly as before
+- [x] Unknown extensions fall back to the whole-line rules
+- [x] The schemes page adds, edits, deletes, imports, exports and restores factory defaults, and every change is saved
+- [x] A bad or slow regex never blocks the UI or crashes
+- [x] Core tokenizer tests (earliest match wins, ties go by order, timeout, cut-off) and view-model tests (lookup, exclusions, import/export round-trip, factory reset)
+
+## Comments
+
+- Built-in schemes live in Core (plain data, testable there) instead of App. There are 45 of them, including the extras Scala, Groovy/Gradle, Dart, Perl, Lua, R, Haskell, Elixir, Protobuf, GraphQL, HCL/Terraform, CMake, Assembly and Nginx. HTML also covers Vue, Svelte, Razor and similar templates.
+- A PascalCase word is colored as a type only where it is used like one (before `<`, `?`, `[]`, `.member` or a declared name), so property names stay plain.
+- The first and the last "Done when" items are covered by tests. They are not yet checked by hand in the running app.
