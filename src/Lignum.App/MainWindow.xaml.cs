@@ -22,6 +22,9 @@ public partial class MainWindow : Window
         _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
             $"{notes:N0} of the bookmarks to remove have notes. Remove them, with their notes and colors?",
             "Remove bookmarks", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
+        _viewModel.ConfirmOpenFiles = count => MessageBox.Show(this,
+            $"The folder has {count:N0} text files. Open them all, each in a tab?",
+            "Open folder", MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK;
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
@@ -65,14 +68,25 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Open log file",
+            Title = "Open log files",
             Filter = "Log files (*.log;*.txt)|*.log;*.txt|Lignum packages with notes (*.lm)|*.lm|All files (*.*)|*.*",
             FilterIndex = 3,
             CheckFileExists = true,
+            Multiselect = true,
         };
         if (dialog.ShowDialog(this) == true)
         {
-            _ = _viewModel.OpenFileAsync(dialog.FileName);
+            _ = _viewModel.OpenFilesAsync(dialog.FileNames);
+        }
+    }
+
+    /// <summary>Opens the text files directly in a folder, each in a tab (binary files are skipped).</summary>
+    private void OnOpenFolderExecuted(object sender, ExecutedRoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = "Open all text files in a folder" };
+        if (dialog.ShowDialog(this) == true)
+        {
+            _ = _viewModel.OpenFolderAsync(dialog.FolderName);
         }
     }
 
@@ -83,12 +97,12 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>Dropping one or more files opens each in a tab (or switches to it if already open).</summary>
+    /// <summary>Dropping files opens each in a tab (or switches to it if already open); a folder opens its text files.</summary>
     private void OnDrop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is not string[] paths || paths.Length == 0) return;
         e.Handled = true;
-        _ = _viewModel.OpenFilesAsync(paths);
+        _ = _viewModel.OpenDroppedAsync(paths);
         Activate();
     }
 
