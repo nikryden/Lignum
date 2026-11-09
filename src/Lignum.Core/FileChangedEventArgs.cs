@@ -5,7 +5,7 @@ public enum FileChangeKind
 {
     /// <summary>
     /// The file is longer than before. What is already indexed is still valid; the new bytes are
-    /// not indexed (tail mode will index them).
+    /// not indexed until <see cref="LogDocument.IndexAppendedAsync"/> is called.
     /// </summary>
     Grown,
 

@@ -25,6 +25,8 @@ public sealed partial class LogDocument : IDisposable
     private readonly CancellationTokenSource _cancel = new();
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private long _bytesIndexed;
+    private long _totalBytes;
+    private bool _atLineStart = true; // whether the byte at BytesIndexed starts a line (indexer thread only)
     private int _state = (int)IndexingState.NotStarted;
     private int _disposed;
 
@@ -33,7 +35,7 @@ public sealed partial class LogDocument : IDisposable
         Path = path;
         _requestedEncoding = encoding;
         _handle = handle;
-        TotalBytes = length;
+        _totalBytes = length;
     }
 
     /// <summary>
@@ -82,8 +84,11 @@ public sealed partial class LogDocument : IDisposable
     /// <summary>The file name without its folder, for display.</summary>
     public string FileName => System.IO.Path.GetFileName(Path);
 
-    /// <summary>File length when it was opened; indexing runs up to this length.</summary>
-    public long TotalBytes { get; }
+    /// <summary>
+    /// The file length indexing runs up to: its length when opened, raised by <see cref="IndexAppendedAsync"/>
+    /// after the file grows. Thread-safe.
+    /// </summary>
+    public long TotalBytes => Interlocked.Read(ref _totalBytes);
 
     /// <summary>Bytes indexed so far. Thread-safe.</summary>
     public long BytesIndexed => Interlocked.Read(ref _bytesIndexed);
@@ -144,7 +149,7 @@ public sealed partial class LogDocument : IDisposable
         }
 
         // Never block the caller on file I/O: the handle is released once the indexer has stopped.
-        IndexingCompletion.ContinueWith(_ =>
+        Task.WhenAll(IndexingCompletion, GrowthIdle()).ContinueWith(_ =>
         {
             _handle.Dispose();
             _cancel.Dispose();
@@ -156,26 +161,10 @@ public sealed partial class LogDocument : IDisposable
         var token = _cancel.Token;
         try
         {
-            var buffer = new byte[ReadBufferSize];
             var codec = DetectEncoding();
-            var offset = (long)codec.PreambleLength; // the byte order mark is not part of line 0
-            var atLineStart = true;
-            while (offset < TotalBytes)
-            {
-                token.ThrowIfCancellationRequested();
-                var toRead = (int)Math.Min(buffer.Length, TotalBytes - offset);
-                var read = RandomAccess.Read(_handle, buffer.AsSpan(0, toRead), offset);
-                if (read == 0) break; // file shrank under us; change detection deals with that later
-
-                // Keep blocks on whole code units (UTF-16), except a stray last byte at the end of the file.
-                var usable = read - read % codec.UnitSize;
-                if (usable == 0) usable = read;
-                atLineStart = IndexBlock(codec, buffer.AsSpan(0, usable), offset, atLineStart);
-                offset += usable;
-                Interlocked.Exchange(ref _bytesIndexed, offset);
-                LinesAdded?.Invoke(this, new LinesAddedEventArgs(_index.Count, offset, TotalBytes));
-            }
-
+            // The byte order mark is not part of line 0.
+            _atLineStart = IndexRange(codec, codec.PreambleLength, TotalBytes, true, token);
+            SampleTail(); // so growth can be checked to be a real append (LogDocument.Growth)
             Finish(IndexingState.Completed);
         }
         catch (OperationCanceledException)
@@ -191,6 +180,33 @@ public sealed partial class LogDocument : IDisposable
             IndexingError = ex;
             Finish(IndexingState.Failed);
         }
+    }
+
+    /// <summary>
+    /// Indexes <c>[from, to)</c> in blocks, publishing <see cref="BytesIndexed"/> and raising
+    /// <see cref="LinesAdded"/> after each one. Returns whether the next byte starts a line. Indexer thread only.
+    /// </summary>
+    private bool IndexRange(TextCodec codec, long from, long to, bool atLineStart, CancellationToken token)
+    {
+        var buffer = new byte[(int)Math.Clamp(to - from, 1, ReadBufferSize)];
+        var offset = from;
+        while (offset < to)
+        {
+            token.ThrowIfCancellationRequested();
+            var toRead = (int)Math.Min(buffer.Length, to - offset);
+            var read = RandomAccess.Read(_handle, buffer.AsSpan(0, toRead), offset);
+            if (read == 0) break; // file shrank under us; change detection deals with that later
+
+            // Keep blocks on whole code units (UTF-16), except a stray last byte at the end of the file.
+            var usable = read - read % codec.UnitSize;
+            if (usable == 0) usable = read;
+            atLineStart = IndexBlock(codec, buffer.AsSpan(0, usable), offset, atLineStart);
+            offset += usable;
+            Interlocked.Exchange(ref _bytesIndexed, offset);
+            LinesAdded?.Invoke(this, new LinesAddedEventArgs(_index.Count, offset, to));
+        }
+
+        return atLineStart;
     }
 
     /// <summary>Records the line starts in one block. Returns whether the next byte starts a line.</summary>
