@@ -241,6 +241,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         StopSearch();
         var result = document.StartQuery(query);
         _result = result;
+        IsOutdated = false;
         _showingFilter = isFilter;
         Results = new LineSource(new ResultLines(result), new DocumentLineReader(document));
         ResultsSelection.MoveCaret(default, extend: false);
@@ -263,6 +264,7 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         StopSearch();
         _showingFilter = false;
         Results = null;
+        IsOutdated = false;
         Highlight = null;
         ResultsHeader = "";
         MatchCount = 0;

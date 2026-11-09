@@ -296,6 +296,12 @@
                         <DockPanel DockPanel.Dock="Top" Margin="8,2">
                             <Button DockPanel.Dock="Right" Content="✕" ToolTip="Collapse the results pane" Padding="6,0"
                                     Command="{Binding Search.ToggleResultsPaneCommand}" />
+                            <!-- Ticket 27: results are not extended when the file grows. -->
+                            <Button DockPanel.Dock="Right" Content="Outdated: run _again" Padding="6,0" Margin="0,0,6,0"
+                                    ToolTip="The file has grown since these results were found"
+                                    Foreground="{DynamicResource TabNeedsUpdateBrush}"
+                                    Command="{Binding Search.RunAgainCommand}"
+                                    Visibility="{Binding Search.IsOutdated, Converter={StaticResource BoolToVisibility}}" />
                             <TextBlock VerticalAlignment="Center">
                                 <Run Text="Results:" FontWeight="SemiBold" />
                                 <Run Text="{Binding Search.ResultsHeader, Mode=OneWay}" />
