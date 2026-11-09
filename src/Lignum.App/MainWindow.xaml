@@ -223,6 +223,11 @@
                                 <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
                                 <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
                                 <Separator />
+                                <!-- Ticket 27: auto update and where the view goes on an update. -->
+                                <MenuItem Header="_Auto update" IsCheckable="True" IsChecked="{Binding AutoUpdate}" />
+                                <MenuItem Header="On update: _jump to last line" IsCheckable="True" IsChecked="{Binding JumpsToEnd}" />
+                                <MenuItem Header="On update: _stay in place" IsCheckable="True" IsChecked="{Binding StaysInPlace}" />
+                                <Separator />
                                 <MenuItem Header="_Close" InputGestureText="Ctrl+W"
                                           Command="{Binding PlacementTarget.Tag.CloseTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                           CommandParameter="{Binding}" />
@@ -231,6 +236,28 @@
                         <StackPanel.Tag>
                             <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=Window}" />
                         </StackPanel.Tag>
+                        <!-- Ticket 27: a small icon at the top of the tab, on every tab that needs one. -->
+                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="9" Margin="0,0,4,0" VerticalAlignment="Top">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Indicator}" Value="NeedsUpdate">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Setter Property="Text" Value="&#xE72C;" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TabNeedsUpdateBrush}" />
+                                            <Setter Property="ToolTip" Value="The file changed on disk: right-click for Auto update, or use Reload" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Indicator}" Value="AutoUpdating">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Setter Property="Text" Value="&#xE895;" />
+                                            <Setter Property="Foreground" Value="{DynamicResource TabAutoUpdateBrush}" />
+                                            <Setter Property="ToolTip" Value="Auto updating when the file changes" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                         <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
                         <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
                                 FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"

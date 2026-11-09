@@ -29,6 +29,9 @@ public static class ThemeKeys
     public const string BannerBorder = "BannerBorderBrush";
     public const string BannerForeground = "BannerForegroundBrush";
 
+    public const string TabNeedsUpdate = "TabNeedsUpdateBrush";
+    public const string TabAutoUpdate = "TabAutoUpdateBrush";
+
     public const string FilterIncludeBackground = "FilterIncludeBackgroundBrush";
     public const string FilterIncludeBorder = "FilterIncludeBorderBrush";
     public const string FilterExcludeBackground = "FilterExcludeBackgroundBrush";

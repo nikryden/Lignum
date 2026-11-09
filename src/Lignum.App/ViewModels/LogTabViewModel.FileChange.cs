@@ -4,32 +4,23 @@ using Lignum.Core;
 
 namespace Lignum.App.ViewModels;
 
-// The "File changed: Reload" banner. Kept apart from the rest of the view model so tail mode (v1.1) can
-// hook the same Grown notifications here without touching document opening.
+// The "File changed: Reload" banner, and the change notifications auto update (AutoUpdate partial) acts on.
 public sealed partial class LogTabViewModel
 {
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ReloadCommand))]
+    [NotifyPropertyChangedFor(nameof(Indicator))]
     private bool _isFileChanged;
 
     [ObservableProperty]
     private string _fileChangeMessage = "";
 
     /// <summary>
-    /// Reopens this tab's path and indexes it again, in the same tab. Available once the file has changed.
-    /// Completes when the new indexing stops.
+    /// Brings the tab up to date once the file has changed: a grown file has only its new bytes indexed, a
+    /// truncated or replaced one is reopened and indexed again in the same tab. Completes when that stops.
     /// </summary>
     [RelayCommand(CanExecute = nameof(IsFileChanged))]
-    private Task Reload() => Reopen();
-
-    /// <summary>
-    /// Opens this tab's path again (with the chosen encoding, if any) and indexes it in the same tab. On
-    /// failure the current document stays and <see cref="ErrorMessage"/> says why.
-    /// </summary>
-    private async Task Reopen()
-    {
-        if (await OpenAgainAsync() is { } document) await Attach(document);
-    }
+    private Task Reload() => Update();
 
     /// <summary>
     /// Opens this tab's path again on a background thread and disposes the current document. Null when the tab
@@ -65,6 +56,7 @@ public sealed partial class LogTabViewModel
     {
         IsFileChanged = false;
         FileChangeMessage = "";
+        _positionAtChange = null;
         document.FileChanged += (_, e) => RunOnUi(() => OnFileChanged(document, e));
     }
 
@@ -72,8 +64,19 @@ public sealed partial class LogTabViewModel
     {
         if (!ReferenceEquals(document, _document)) return; // a late event from a replaced document
 
-        // A truncated/replaced file's index is gone: refresh so the stale lines disappear at once.
-        if (e.InvalidatesIndex) Refresh(document);
+        // A truncated/replaced file's index is gone: refresh so the stale lines disappear at once. Remember
+        // where the view was first: with no lines left, "is the last line in view" would always say yes.
+        if (e.InvalidatesIndex)
+        {
+            _positionAtChange ??= (ScrollLine, IsLastLineInView);
+            Refresh(document);
+        }
+
+        if (AutoUpdate)
+        {
+            _ = Update();
+            return;
+        }
 
         // Growth after an invalidating change must not soften the message.
         if (IsFileChanged && !e.InvalidatesIndex) return;

@@ -20,6 +20,8 @@
 
     <SolidColorBrush x:Key="BannerBackgroundBrush" Color="#FFF4CE" />
     <SolidColorBrush x:Key="BannerBorderBrush" Color="#E0C060" />
+    <SolidColorBrush x:Key="TabNeedsUpdateBrush" Color="#D9822B" />
+    <SolidColorBrush x:Key="TabAutoUpdateBrush" Color="#2E8B3E" />
     <SolidColorBrush x:Key="BannerForegroundBrush" Color="#3A2E00" />
 
     <!-- Filter rule chips (ticket 12): include green, exclude red. -->

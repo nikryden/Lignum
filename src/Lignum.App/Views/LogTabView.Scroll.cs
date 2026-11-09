@@ -25,14 +25,29 @@ public partial class LogTabView
             FirstRowDescriptor.AddValueChanged(LogView, OnFirstRowChanged);
         };
         Unloaded += (_, _) => FirstRowDescriptor.RemoveValueChanged(LogView, OnFirstRowChanged);
-        LogView.SizeChanged += (_, _) => TryRestoreScroll();
+        LogView.SizeChanged += (_, _) =>
+        {
+            _scrollTab?.ReportViewportRows(LogView.ViewportRows);
+            TryRestoreScroll();
+        };
     }
 
     private void AttachScroll(LogTabViewModel? newTab)
     {
-        if (_scrollTab is not null) _scrollTab.PropertyChanged -= OnScrollTabPropertyChanged;
+        if (_scrollTab is not null)
+        {
+            _scrollTab.PropertyChanged -= OnScrollTabPropertyChanged;
+            _scrollTab.ScrollToEndRequested -= OnScrollToEndRequested;
+        }
+
         _scrollTab = newTab;
-        if (newTab is not null) newTab.PropertyChanged += OnScrollTabPropertyChanged;
+        if (newTab is not null)
+        {
+            newTab.PropertyChanged += OnScrollTabPropertyChanged;
+            newTab.ScrollToEndRequested += OnScrollToEndRequested;
+            newTab.ReportViewportRows(LogView.ViewportRows);
+        }
+
         TryRestoreScroll();
     }
 
@@ -44,6 +59,10 @@ public partial class LogTabView
             TryRestoreScroll();
         }
     }
+
+    /// <summary>Auto update, Stay in place: the last line was in view, so keep it there (ticket 27).</summary>
+    private void OnScrollToEndRequested(object? sender, EventArgs e) =>
+        LogView.SetCurrentValue(LogView.FirstRowProperty, long.MaxValue); // coerced to the last full page
 
     private void OnFirstRowChanged(object? sender, EventArgs e)
     {
