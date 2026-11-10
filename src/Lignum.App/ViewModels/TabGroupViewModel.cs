@@ -17,6 +17,12 @@ public sealed partial class TabGroupViewModel : ObservableObject
 
     public ObservableCollection<LogTabViewModel> Tabs { get; } = [];
 
+    /// <summary>A floating window's normal position and size, kept up to date by the window (session restore).</summary>
+    public Settings.WindowBounds? Bounds { get; set; }
+
+    /// <summary>Whether the floating window is maximized (session restore).</summary>
+    public bool IsMaximized { get; set; }
+
     /// <summary>The tab shown in this window; null only when the group is empty.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(Title))]

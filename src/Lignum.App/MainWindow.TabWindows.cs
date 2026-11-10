@@ -39,7 +39,10 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Opens a window for a new floating group, under the mouse, a bit smaller than this window.</summary>
+    /// <summary>
+    /// Opens a window for a new floating group: where it was (session restore), or under the mouse, a bit
+    /// smaller than this window.
+    /// </summary>
     private void OpenTabWindow(TabGroupViewModel group)
     {
         var window = new TabWindow(_viewModel, group, Appearance, RunShortcut)
@@ -47,12 +50,23 @@ public partial class MainWindow
             Highlighting = Highlighting,
             Syntax = Syntax,
             WindowStartupLocation = WindowStartupLocation.Manual,
-            Width = Math.Max(400, RestoreBounds.Width * 0.7),
-            Height = Math.Max(300, RestoreBounds.Height * 0.7),
         };
-        var cursor = CursorInDips();
-        window.Left = cursor.X - 60;
-        window.Top = cursor.Y - 15;
+        if (group.Bounds is { Width: > 0, Height: > 0 } saved)
+        {
+            var bounds = OnScreen(new Rect(saved.Left, saved.Top, saved.Width, saved.Height));
+            (window.Left, window.Top, window.Width, window.Height) = (bounds.Left, bounds.Top, bounds.Width, bounds.Height);
+            if (group.IsMaximized) window.WindowState = WindowState.Maximized;
+            window.ShowActivated = false; // restored with the session: the main window keeps the focus
+        }
+        else
+        {
+            var cursor = CursorInDips();
+            window.Width = Math.Max(400, RestoreBounds.Width * 0.7);
+            window.Height = Math.Max(300, RestoreBounds.Height * 0.7);
+            window.Left = cursor.X - 60;
+            window.Top = cursor.Y - 15;
+        }
+
         // Owned windows close with their owner: give the Find window back to this one first.
         window.Closing += (_, _) =>
         {
@@ -60,6 +74,23 @@ public partial class MainWindow
         };
         _tabWindows.Add(window);
         window.Show();
+    }
+
+    /// <summary>
+    /// <paramref name="bounds"/>, or, when its title bar would be off every screen (a monitor was removed),
+    /// the same size centred on the primary screen's work area.
+    /// </summary>
+    private static Rect OnScreen(Rect bounds)
+    {
+        var screens = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        var titleBar = new Rect(bounds.Left + 40, bounds.Top, Math.Max(1, bounds.Width - 80), 30);
+        if (screens.IntersectsWith(titleBar)) return bounds;
+
+        var work = SystemParameters.WorkArea;
+        var width = Math.Min(bounds.Width, work.Width);
+        var height = Math.Min(bounds.Height, work.Height);
+        return new Rect(work.Left + (work.Width - width) / 2, work.Top + (work.Height - height) / 2, width, height);
     }
 
     /// <summary>The mouse position on the screen, in device-independent units (window coordinates).</summary>

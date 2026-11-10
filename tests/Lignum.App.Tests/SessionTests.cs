@@ -177,4 +177,76 @@ public sealed class SessionTests : IDisposable
 
         Assert.Equal([a, b], restarted.RecentFiles);
     }
+
+    private static string[] Paths(TabGroupViewModel group) => [.. group.Tabs.Select(t => t.Path)];
+
+    [Fact]
+    public async Task Floating_windows_their_tabs_order_shown_tab_and_bounds_are_restored()
+    {
+        var (a, b, c, d) = (WriteLog("a.log"), WriteLog("b.log"), WriteLog("c.log"), WriteLog("d.log"));
+        var vm = Start();
+        await vm.OpenFilesAsync([a, b, c, d]);
+        var floating = vm.MoveToNewGroup(vm.Tabs[1])!;
+        vm.MoveTab(vm.Tabs[2], floating, 0); // c, b
+        floating.Bounds = new WindowBounds { Left = 10, Top = 20, Width = 600, Height = 400 };
+        floating.IsMaximized = true;
+        floating.SelectedTab = floating.Tabs[1]; // b
+        vm.MainGroup.SelectedTab = vm.MainGroup.Tabs[0]; // a
+        vm.Tabs[3].ReportScroll(7);
+        Exit(vm);
+
+        var restarted = Start();
+        await restarted.RestoreSession();
+
+        Assert.Equal([a, d], Paths(restarted.MainGroup));
+        var group = Assert.Single(restarted.FloatingGroups);
+        Assert.Equal([c, b], Paths(group));
+        Assert.Equal(b, group.SelectedTab!.Path);
+        Assert.Equal(a, restarted.MainGroup.SelectedTab!.Path);
+        Assert.Same(restarted.MainGroup, restarted.ActiveGroup);
+        Assert.Equal(a, restarted.SelectedTab!.Path);
+        Assert.Equal((10d, 20d, 600d, 400d), (group.Bounds!.Left, group.Bounds.Top, group.Bounds.Width, group.Bounds.Height));
+        Assert.True(group.IsMaximized);
+        Assert.Equal(7, restarted.Tabs.Single(t => t.Path == d).ScrollLine);
+    }
+
+    [Fact]
+    public async Task A_floating_window_whose_files_are_gone_is_not_reopened()
+    {
+        var (a, b) = (WriteLog("a.log"), WriteLog("b.log"));
+        var vm = Start();
+        await vm.OpenFilesAsync([a, b]);
+        vm.MoveToNewGroup(vm.Tabs[1]);
+        Exit(vm);
+        File.Delete(b);
+
+        var restarted = Start();
+        await restarted.RestoreSession();
+
+        Assert.Empty(restarted.FloatingGroups);
+        Assert.Equal([a], Paths(restarted.MainGroup));
+        Assert.Contains("b.log", restarted.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Tabs_of_an_unknown_window_and_old_settings_without_windows_open_in_the_main_window()
+    {
+        var (a, b) = (WriteLog("a.log"), WriteLog("b.log"));
+        var settings = new SettingsStore(Path.Combine(_dir, "settings"), Logger.None).Open<AppSettings>(AppSettings.FileName);
+        settings.Value.Session = new SessionSettings
+        {
+            Tabs = [new SessionTab { Path = a }, new SessionTab { Path = b, Window = 3 }],
+            SelectedIndex = 1,
+            Windows = null!, // an older settings.json
+        };
+        settings.Save();
+        SettingsStore.Flush();
+
+        var restarted = Start();
+        await restarted.RestoreSession();
+
+        Assert.Empty(restarted.FloatingGroups);
+        Assert.Equal([a, b], Paths(restarted.MainGroup));
+        Assert.Equal(b, restarted.SelectedTab!.Path);
+    }
 }

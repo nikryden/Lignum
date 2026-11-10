@@ -102,7 +102,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// IsNew is false when a tab for the path appeared meanwhile (e.g. dropped twice); that tab is returned.
     /// Null (and <see cref="ErrorMessage"/> set) when it cannot be opened.
     /// </summary>
-    private async Task<(LogTabViewModel Tab, bool IsNew)?> AddTabAsync(string fullPath, string displayPath)
+    private async Task<(LogTabViewModel Tab, bool IsNew)?> AddTabAsync(string fullPath, string displayPath,
+        TabGroupViewModel? group = null)
     {
         OpenedPackage? package = null;
         if (LogPackage.IsPackage(fullPath) && (package = await OpenPackageAsync(fullPath, displayPath)) is null)
@@ -116,7 +117,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             return document is null ? null : (FindTab(fullPath)!, false);
         }
 
-        var tab = AddTab(document, package);
+        var tab = AddTab(document, package, group);
         if (package is { ChecksumMatches: false })
         {
             ErrorMessage = $"Warning: the log in {displayPath} does not match the checksum in the package. "
@@ -145,8 +146,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>Appends a tab for <paramref name="document"/>, not yet indexing (call <see cref="LogTabViewModel.Start"/>).</summary>
-    private LogTabViewModel AddTab(LogDocument document, OpenedPackage? package = null)
+    /// <summary>
+    /// Appends a tab for <paramref name="document"/> to <paramref name="group"/> (null: the active window's),
+    /// not yet indexing (call <see cref="LogTabViewModel.Start"/>).
+    /// </summary>
+    private LogTabViewModel AddTab(LogDocument document, OpenedPackage? package = null, TabGroupViewModel? group = null)
     {
         var tab = new LogTabViewModel(document, _uiContext,
             new TabServices(Copier, Highlighting, History, _settings.Store,
@@ -158,7 +162,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         tab.Search.HighlightOutsideFilter = HighlightMatchesOutsideFilter;
         tab.Detail.IncludeHiddenLines = DetailPane.IncludeHiddenLines;
         Tabs.Add(tab);
-        ActiveGroup.Add(tab);
+        (group ?? ActiveGroup).Add(tab);
         return tab;
     }
 

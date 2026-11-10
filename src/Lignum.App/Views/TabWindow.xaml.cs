@@ -26,6 +26,19 @@ public partial class TabWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         Activated += (_, _) => _viewModel.ActivateGroup(Group);
+        // Session restore: the group remembers where this window is.
+        LocationChanged += (_, _) => RememberBounds();
+        SizeChanged += (_, _) => RememberBounds();
+        StateChanged += (_, _) => RememberBounds();
+    }
+
+    private void RememberBounds()
+    {
+        if (!IsLoaded || WindowState == WindowState.Minimized) return;
+        var normal = WindowState == WindowState.Normal ? new Rect(Left, Top, ActualWidth, ActualHeight) : RestoreBounds;
+        if (normal.IsEmpty) return;
+        Group.Bounds = new Settings.WindowBounds { Left = normal.Left, Top = normal.Top, Width = normal.Width, Height = normal.Height };
+        Group.IsMaximized = WindowState == WindowState.Maximized;
     }
 
     /// <summary>This window's tabs.</summary>

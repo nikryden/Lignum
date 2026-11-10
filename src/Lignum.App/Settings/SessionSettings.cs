@@ -8,10 +8,25 @@ namespace Lignum.App.Settings;
 /// </summary>
 public sealed class SessionSettings
 {
-    /// <summary>The open tabs, in tab-strip order.</summary>
+    /// <summary>The open tabs: the main window's in tab-strip order, then each floating window's.</summary>
     public List<SessionTab> Tabs { get; set; } = [];
 
-    /// <summary>Index into <see cref="Tabs"/> of the tab that was selected; -1 for none.</summary>
+    /// <summary>Index into <see cref="Tabs"/> of the tab shown in the main window; -1 for none.</summary>
+    public int SelectedIndex { get; set; } = -1;
+
+    /// <summary>The floating windows (ticket 28); <see cref="SessionTab.Window"/> 1 is the first. Missing in older files.</summary>
+    public List<SessionWindow> Windows { get; set; } = [];
+}
+
+/// <summary>A floating window of tabs (ticket 28): where it was, and which of its tabs it showed.</summary>
+public sealed class SessionWindow
+{
+    /// <summary>Its normal (not maximized) position and size; null: open it under the mouse.</summary>
+    public WindowBounds? Bounds { get; set; }
+
+    public bool Maximized { get; set; }
+
+    /// <summary>Index into <see cref="SessionSettings.Tabs"/> of the tab it showed; -1 for none.</summary>
     public int SelectedIndex { get; set; } = -1;
 }
 
@@ -19,6 +34,9 @@ public sealed class SessionSettings
 public sealed class SessionTab
 {
     public string Path { get; set; } = "";
+
+    /// <summary>The window it was in (ticket 28): 0 the main window, n the n-th of <see cref="SessionSettings.Windows"/>.</summary>
+    public int Window { get; set; }
 
     /// <summary>The 0-based file line at the top of the viewer.</summary>
     public long FirstLine { get; set; }
