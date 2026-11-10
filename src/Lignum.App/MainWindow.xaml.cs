@@ -17,6 +17,7 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         InitializeFindWindow();
+        InitializeTabWindows();
         _viewModel.Assistant.Approver = new DialogPermissionApprover();
         _viewModel.Assistant.PermissionsRequested += (_, _) => OnAiPermissionsClick(this, new RoutedEventArgs());
         _viewModel.ConfirmClearBookmarks = notes => MessageBox.Show(this,
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
+            CloseTabWindows(); // ticket 28: after saving, so the session still knows their tabs
             _viewModel.Dispose();
         };
     }

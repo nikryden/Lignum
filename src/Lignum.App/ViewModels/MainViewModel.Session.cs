@@ -10,21 +10,34 @@ public sealed partial class MainViewModel
     /// <summary>Writes the open tabs to settings.json (the app calls this on exit, before closing them).</summary>
     public void SaveSession()
     {
+        // Ticket 28: grouped by window, each window's tabs in its strip order.
+        var groups = new List<TabGroupViewModel> { MainGroup };
+        groups.AddRange(FloatingGroups.Where(g => g.Tabs.Count > 0));
+        var placed = groups.SelectMany((group, window) => group.Tabs.Select(tab => (Tab: tab, Window: window))).ToList();
+        var ordered = placed.Select(p => p.Tab).ToList();
+
         _settings.Value.Session = new SessionSettings
         {
-            Tabs = [.. Tabs.Select(tab => new SessionTab
+            Tabs = [.. placed.Select(e => new SessionTab
             {
-                Path = tab.SourcePath,
-                FirstLine = tab.ScrollLine,
-                FilterRules = [.. tab.Search.GetFilterRules()],
-                SearchText = tab.Search.ActiveSearchText,
-                SearchIsRegex = tab.Search.IsRegex,
-                SearchMatchCase = tab.Search.MatchCase,
-                SearchNonBacktracking = tab.Search.UseNonBacktracking,
-                SearchInsideFilter = tab.Search.SearchInsideFilter,
-                HideNonMatchingLines = tab.HideNonMatchingLines,
+                Path = e.Tab.SourcePath,
+                Window = e.Window,
+                FirstLine = e.Tab.ScrollLine,
+                FilterRules = [.. e.Tab.Search.GetFilterRules()],
+                SearchText = e.Tab.Search.ActiveSearchText,
+                SearchIsRegex = e.Tab.Search.IsRegex,
+                SearchMatchCase = e.Tab.Search.MatchCase,
+                SearchNonBacktracking = e.Tab.Search.UseNonBacktracking,
+                SearchInsideFilter = e.Tab.Search.SearchInsideFilter,
+                HideNonMatchingLines = e.Tab.HideNonMatchingLines,
             })],
-            SelectedIndex = SelectedTab is { } selected ? Tabs.IndexOf(selected) : -1,
+            SelectedIndex = MainGroup.SelectedTab is { } selected ? ordered.IndexOf(selected) : -1,
+            Windows = [.. groups.Skip(1).Select(group => new SessionWindow
+            {
+                Bounds = group.Bounds,
+                Maximized = group.IsMaximized,
+                SelectedIndex = group.SelectedTab is { } shown ? ordered.IndexOf(shown) : -1,
+            })],
         };
         _settings.Save();
     }
@@ -42,6 +55,8 @@ public sealed partial class MainViewModel
         var skipped = new List<string>();
         var indexing = new List<Task>();
         LogTabViewModel? selected = null;
+        var windows = session.Windows ?? [];
+        var floating = new TabGroupViewModel?[windows.Count];
 
         for (var i = 0; i < saved.Count; i++)
         {
@@ -65,7 +80,10 @@ public sealed partial class MainViewModel
                 continue;
             }
 
-            var added = File.Exists(fullPath) ? await AddTabAsync(fullPath, entry.Path) : null;
+            // Ticket 28: the tab's floating window, made when its first tab opens; an unknown window is the main one.
+            var window = entry.Window >= 1 && entry.Window <= windows.Count ? entry.Window - 1 : -1;
+            var group = window < 0 ? MainGroup : floating[window] ??= NewFloatingGroup(windows[window]);
+            var added = File.Exists(fullPath) ? await AddTabAsync(fullPath, entry.Path, group) : null;
             if (added is null)
             {
                 skipped.Add(entry.Path);
@@ -79,6 +97,11 @@ public sealed partial class MainViewModel
             }
 
             var tab = added.Value.Tab;
+            if (!group.IsMain)
+            {
+                if (i == windows[window].SelectedIndex) group.SelectedTab = tab;
+                if (!FloatingGroups.Contains(group)) FloatingGroups.Add(group); // its window opens with this tab
+            }
 
             tab.RestoreScroll(entry.FirstLine);
             if (entry.FilterRules is { Count: > 0 } rules) tab.Search.SetFilterRules(rules);
@@ -94,7 +117,8 @@ public sealed partial class MainViewModel
             if (i == session.SelectedIndex) selected = tab;
         }
 
-        SelectedTab = selected ?? SelectedTab ?? Tabs.LastOrDefault();
+        SelectedTab = selected ?? MainGroup.SelectedTab ?? MainGroup.Tabs.LastOrDefault();
+        if (SelectedTab is null || !MainGroup.Tabs.Contains(SelectedTab)) ActivateGroup(MainGroup);
         ErrorMessage = skipped.Count switch
         {
             0 => ErrorMessage,
@@ -102,5 +126,13 @@ public sealed partial class MainViewModel
             _ => $"Could not reopen {skipped.Count} files that no longer exist or cannot be opened: {string.Join(", ", skipped)}",
         };
         await Task.WhenAll(indexing);
+    }
+
+    /// <summary>A restored floating window's group, not yet open (it opens with its first tab).</summary>
+    private TabGroupViewModel NewFloatingGroup(SessionWindow? saved)
+    {
+        var group = new TabGroupViewModel(isMain: false) { Bounds = saved?.Bounds, IsMaximized = saved?.Maximized ?? false };
+        Watch(group);
+        return group;
     }
 }

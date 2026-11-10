@@ -43,7 +43,7 @@ public sealed partial class LogTabViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(ViewLines))]
     private LineSource? _lines;
 
-    /// <summary>True while this is the tab shown in the window (kept in sync by <see cref="MainViewModel"/>).</summary>
+    /// <summary>True while this is the tab shown in its window (kept in sync by its <see cref="TabGroupViewModel"/>).</summary>
     [ObservableProperty]
     private bool _isSelected;
 

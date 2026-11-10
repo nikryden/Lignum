@@ -84,6 +84,9 @@ public partial class MainWindow
             };
         }
 
+        // Ticket 28: belong to the window of the tab it searches, so it stays above that window.
+        var owner = ActiveTabWindow;
+        if (!ReferenceEquals(_findWindow.Owner, owner)) _findWindow.Owner = owner;
         _findWindow.ShowPage(page);
     }
 
@@ -112,6 +115,6 @@ public partial class MainWindow
             tab.Search.IsFilterBarOpen = false;
         }
 
-        Activate();
+        ActiveTabWindow.Activate();
     }
 }
