@@ -25,6 +25,13 @@ public partial class MainWindow
     private Window ActiveTabWindow =>
         (Window?)_tabWindows.FirstOrDefault(w => ReferenceEquals(w.Group, _viewModel.ActiveGroup)) ?? this;
 
+    /// <summary>
+    /// The window a dialog for the active tab (Find, Go to line) belongs to: the window in use, so the dialog
+    /// shows above it. That is the main window when its toolbar was clicked, even with every tab undocked.
+    /// </summary>
+    private Window DialogOwner =>
+        IsActive ? this : (Window?)_tabWindows.FirstOrDefault(w => w.IsActive) ?? ActiveTabWindow;
+
     private void OnFloatingGroupsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         foreach (var window in _tabWindows.Where(w => !_viewModel.FloatingGroups.Contains(w.Group)).ToList())

@@ -220,4 +220,59 @@ public sealed class TabWindowsTests : IDisposable
         Assert.True(a.IsScrollRestorePending);
         Assert.Equal(2, a.ScrollLine);
     }
+
+    [Fact]
+    public async Task With_every_tab_undocked_clicking_the_empty_main_window_keeps_the_active_tab()
+    {
+        using var vm = await CreateWithTabs("a.log", "b.log");
+        var group = vm.MoveToNewGroup(Tab(vm, "a.log"))!;
+        vm.MoveTab(Tab(vm, "b.log"), group, 1);
+        Assert.Empty(vm.MainGroup.Tabs);
+
+        vm.ActivateGroup(vm.MainGroup); // e.g. the filter button on the main toolbar
+
+        Assert.Same(group, vm.ActiveGroup);
+        Assert.Same(Tab(vm, "b.log"), vm.SelectedTab); // the filter acts on it
+        Assert.True(vm.CloseTabCommand.CanExecute(null));
+
+        var path = Path.Combine(_dir, "c.log");
+        File.WriteAllText(path, "1\n");
+        await vm.OpenFileAsync(path); // opened from the main window: it opens there
+
+        Assert.Equal(["c.log"], Names(vm.MainGroup));
+        Assert.Same(vm.MainGroup, vm.ActiveGroup);
+        Assert.Same(Tab(vm, "c.log"), vm.SelectedTab);
+    }
+
+    [Fact]
+    public async Task Closing_the_active_floating_window_falls_back_to_a_window_with_tabs()
+    {
+        using var vm = await CreateWithTabs("a.log", "b.log");
+        var first = vm.MoveToNewGroup(Tab(vm, "a.log"))!;
+        var second = vm.MoveToNewGroup(Tab(vm, "b.log"))!;
+        Assert.Same(second, vm.ActiveGroup);
+
+        vm.CloseTabCommand.Execute(Tab(vm, "b.log")); // the second window empties and closes
+
+        Assert.Equal([first], vm.FloatingGroups);
+        Assert.Same(first, vm.ActiveGroup);
+        Assert.Same(Tab(vm, "a.log"), vm.SelectedTab);
+    }
+
+    [Fact]
+    public async Task Closing_a_floating_window_with_the_main_window_empty_docks_its_tabs()
+    {
+        using var vm = await CreateWithTabs("a.log", "b.log");
+        var group = vm.MoveToNewGroup(Tab(vm, "a.log"))!;
+        vm.MoveTab(Tab(vm, "b.log"), group, 1);
+        vm.ActivateGroup(vm.MainGroup);
+
+        vm.CloseFloatingGroup(group);
+
+        Assert.Equal(["a.log", "b.log"], Names(vm.MainGroup));
+        Assert.Empty(vm.FloatingGroups);
+        Assert.Same(vm.MainGroup, vm.ActiveGroup);
+        Assert.Same(Tab(vm, "b.log"), vm.SelectedTab);
+        Assert.True(Tab(vm, "b.log").IsSelected);
+    }
 }

@@ -14,6 +14,6 @@ public partial class MainWindow
     private void OnGoToLineExecuted(object sender, ExecutedRoutedEventArgs e)
     {
         if (_viewModel.SelectedTab is not { LineCount: > 0 } tab) return;
-        new GoToLineDialog(tab.Navigation, tab.LineCount) { Owner = ActiveTabWindow }.ShowDialog();
+        new GoToLineDialog(tab.Navigation, tab.LineCount) { Owner = DialogOwner }.ShowDialog();
     }
 }

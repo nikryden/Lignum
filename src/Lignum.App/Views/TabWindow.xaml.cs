@@ -70,6 +70,7 @@ public partial class TabWindow : Window
         if (e.Cancel) return;
         _closing = true;
         if (!_closingForGood) _viewModel.CloseFloatingGroup(Group); // ✕ or Alt+F4: dock the tabs back
+        else _viewModel.DiagnosticsLog.Information("Floating window closed by the app ({Tabs} tabs left in it)", Group.Tabs.Count);
     }
 
     /// <summary>The main window's shortcuts (Ctrl+F, Ctrl+W, F3, …) work here too, on this window's tab.</summary>

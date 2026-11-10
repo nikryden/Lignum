@@ -118,7 +118,7 @@ public sealed partial class MainViewModel
         }
 
         SelectedTab = selected ?? MainGroup.SelectedTab ?? MainGroup.Tabs.LastOrDefault();
-        if (SelectedTab is null || !MainGroup.Tabs.Contains(SelectedTab)) ActivateGroup(MainGroup);
+        if (SelectedTab is null || !MainGroup.Tabs.Contains(SelectedTab)) ActivateFallback();
         ErrorMessage = skipped.Count switch
         {
             0 => ErrorMessage,

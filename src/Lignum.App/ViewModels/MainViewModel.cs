@@ -147,7 +147,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Appends a tab for <paramref name="document"/> to <paramref name="group"/> (null: the active window's),
+    /// Appends a tab for <paramref name="document"/> to <paramref name="group"/> (null: <see cref="NewTabGroup"/>),
     /// not yet indexing (call <see cref="LogTabViewModel.Start"/>).
     /// </summary>
     private LogTabViewModel AddTab(LogDocument document, OpenedPackage? package = null, TabGroupViewModel? group = null)
@@ -162,7 +162,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         tab.Search.HighlightOutsideFilter = HighlightMatchesOutsideFilter;
         tab.Detail.IncludeHiddenLines = DetailPane.IncludeHiddenLines;
         Tabs.Add(tab);
-        (group ?? ActiveGroup).Add(tab);
+        (group ?? NewTabGroup).Add(tab);
         return tab;
     }
 
@@ -273,6 +273,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (value is null || GroupOf(value) is not { } group) return;
         ActiveGroup = group;
+        _newTabGroup = group;
         group.SelectedTab = value;
     }
 
