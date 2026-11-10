@@ -1,0 +1,100 @@
+<!--
+    One window's status bar (ticket 28). DataContext is that window's TabGroupViewModel, so SelectedTab is the
+    tab shown in that window; app-wide state (packages, open errors) comes from the window's MainViewModel.
+-->
+<UserControl x:Class="Lignum.App.Views.TabStatusBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Lignum.App.Views"
+             xmlns:core="clr-namespace:Lignum.Core;assembly=Lignum.Core">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <views:EqualityConverter x:Key="IsEqual" />
+    </UserControl.Resources>
+    <StatusBar
+               Height="50"
+               Background="{DynamicResource StatusBarBackgroundBrush}"
+               Foreground="{DynamicResource StatusBarForegroundBrush}">
+        <StatusBarItem>
+            <TextBlock Text="{Binding SelectedTab.FileName, FallbackValue='No file open', TargetNullValue='No file open'}" />
+        </StatusBarItem>
+        <Separator />
+        <StatusBarItem>
+            <TextBlock Text="{Binding SelectedTab.Navigation.CaretText, FallbackValue=''}" />
+        </StatusBarItem>
+        <Separator />
+        <StatusBarItem>
+            <TextBlock Text="{Binding SelectedTab.LineCount, StringFormat='{}{0:N0} lines', FallbackValue=''}" />
+        </StatusBarItem>
+        <Separator />
+        <StatusBarItem>
+            <TextBlock Text="{Binding SelectedTab.FileSizeText, FallbackValue=''}" />
+        </StatusBarItem>
+        <Separator />
+        <!-- Encoding (ticket 06): click to read the file with another encoding. -->
+        <StatusBarItem Padding="0">
+            <Menu Background="Transparent" Foreground="{DynamicResource StatusBarForegroundBrush}">
+                <MenuItem Header="{Binding SelectedTab.EncodingText, FallbackValue=''}" Padding="6,0"
+                          ToolTip="Encoding: click to read the file with another encoding">
+                    <MenuItem Header="_Detect automatically" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                              CommandParameter="{x:Null}"
+                              IsChecked="{Binding SelectedTab.IsEncodingOverridden, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=False}" />
+                    <Separator />
+                    <MenuItem Header="UTF-_8" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                              CommandParameter="{x:Static core:LogEncoding.Utf8}"
+                              IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf8}" />
+                    <MenuItem Header="UTF-16 _LE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                              CommandParameter="{x:Static core:LogEncoding.Utf16LE}"
+                              IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16LE}" />
+                    <MenuItem Header="UTF-16 _BE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                              CommandParameter="{x:Static core:LogEncoding.Utf16BE}"
+                              IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16BE}" />
+                    <MenuItem Header="_Windows-1252" Command="{Binding SelectedTab.ChangeEncodingCommand}"
+                              CommandParameter="{x:Static core:LogEncoding.Windows1252}"
+                              IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Windows1252}" />
+                </MenuItem>
+            </Menu>
+        </StatusBarItem>
+        <Separator />
+        <StatusBarItem>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding SelectedTab.StatusText}" VerticalAlignment="Center" />
+                <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                        Command="{Binding SelectedTab.CancelIndexingCommand}"
+                        Visibility="{Binding SelectedTab.IsIndexing, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+            </StackPanel>
+        </StatusBarItem>
+        <StatusBarItem>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding SelectedTab.CopyMessage}" VerticalAlignment="Center" />
+                <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                        Command="{Binding SelectedTab.CancelCopyCommand}"
+                        Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+            </StackPanel>
+        </StatusBarItem>
+        <!-- .lm packages (ticket 06): export / extract progress and cancel. -->
+        <StatusBarItem>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding DataContext.PackageStatus, RelativeSource={RelativeSource AncestorType=Window}}" VerticalAlignment="Center" />
+                <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0" Command="{Binding DataContext.CancelPackageWorkCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        Visibility="{Binding DataContext.IsPackageWorkRunning, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}" />
+            </StackPanel>
+        </StatusBarItem>
+        <Separator />
+        <!-- Search (ticket 10): match count, progress and cancel for the selected tab. -->
+        <StatusBarItem>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding SelectedTab.Search.SearchStatus, FallbackValue=''}" VerticalAlignment="Center" />
+                <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
+                        Command="{Binding SelectedTab.Search.CancelSearchCommand}"
+                        Visibility="{Binding SelectedTab.Search.IsSearching, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
+            </StackPanel>
+        </StatusBarItem>
+        <StatusBarItem HorizontalAlignment="Right">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding SelectedTab.ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
+                <TextBlock Text="{Binding DataContext.ErrorMessage, RelativeSource={RelativeSource AncestorType=Window}}" Margin="8,0,0,0" Foreground="{DynamicResource ErrorForegroundBrush}" />
+            </StackPanel>
+        </StatusBarItem>
+    </StatusBar>
+</UserControl>

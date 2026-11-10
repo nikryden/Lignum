@@ -1,0 +1,102 @@
+<!--
+    One window's tab strip (ticket 28). DataContext is that window's TabGroupViewModel; the window's DataContext
+    is the MainViewModel (closing and moving tabs). Only the strip: each window shows the tab contents itself,
+    so every tab keeps its own view.
+-->
+<UserControl x:Class="Lignum.App.Views.TabStrip"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- Move items that would do nothing are hidden, not greyed out. -->
+        <Style x:Key="HiddenWhenDisabled" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <TabControl x:Name="Tabs" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
+                Padding="0" BorderThickness="0" Focusable="False">
+        <TabControl.Style>
+            <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Tabs.Count}" Value="0">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </TabControl.Style>
+        <!-- The whole tab (not only its text) shows the file's full path on hover (ticket 12). -->
+        <TabControl.ItemContainerStyle>
+            <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                <Setter Property="ToolTip" Value="{Binding SourcePath}" />
+            </Style>
+        </TabControl.ItemContainerStyle>
+        <TabControl.ItemTemplate>
+            <DataTemplate>
+                <StackPanel Orientation="Horizontal" Background="Transparent">
+                    <StackPanel.ContextMenu>
+                        <ContextMenu Opened="OnTabMenuOpened">
+                            <MenuItem Header="Copy full _path" Command="{Binding CopyFullPathCommand}" />
+                            <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
+                            <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
+                            <Separator />
+                            <!-- Ticket 28: dock and undock (also by dragging the tab). -->
+                            <MenuItem Header="Move to new _window" Style="{StaticResource HiddenWhenDisabled}"
+                                      Command="{Binding PlacementTarget.Tag.MoveToNewWindowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="Move to _main window" Style="{StaticResource HiddenWhenDisabled}"
+                                      Command="{Binding PlacementTarget.Tag.MoveToMainWindowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding}" />
+                            <MenuItem Header="Move _to window" Tag="MoveToWindow" />
+                            <Separator />
+                            <!-- Ticket 27: auto update and where the view goes on an update. -->
+                            <MenuItem Header="_Auto update" IsCheckable="True" IsChecked="{Binding AutoUpdate}" />
+                            <MenuItem Header="On update: _jump to last line" IsCheckable="True" IsChecked="{Binding JumpsToEnd}" />
+                            <MenuItem Header="On update: _stay in place" IsCheckable="True" IsChecked="{Binding StaysInPlace}" />
+                            <Separator />
+                            <MenuItem Header="_Close" InputGestureText="Ctrl+W"
+                                      Command="{Binding PlacementTarget.Tag.CloseTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding}" />
+                        </ContextMenu>
+                    </StackPanel.ContextMenu>
+                    <StackPanel.Tag>
+                        <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=Window}" />
+                    </StackPanel.Tag>
+                    <!-- Ticket 27: a small icon at the top of the tab, on every tab that needs one. -->
+                    <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="9" Margin="0,0,4,0" VerticalAlignment="Top">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Indicator}" Value="NeedsUpdate">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Setter Property="Text" Value="&#xE72C;" />
+                                        <Setter Property="Foreground" Value="{DynamicResource TabNeedsUpdateBrush}" />
+                                        <Setter Property="ToolTip" Value="The file changed on disk: right-click for Auto update, or use Reload" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Indicator}" Value="AutoUpdating">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Setter Property="Text" Value="&#xE895;" />
+                                        <Setter Property="Foreground" Value="{DynamicResource TabAutoUpdateBrush}" />
+                                        <Setter Property="ToolTip" Value="Auto updating when the file changes" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
+                    <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
+                            FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"
+                            ToolTip="Close (Ctrl+W)"
+                            Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding}" />
+                </StackPanel>
+            </DataTemplate>
+        </TabControl.ItemTemplate>
+        <TabControl.ContentTemplate>
+            <DataTemplate />
+        </TabControl.ContentTemplate>
+    </TabControl>
+</UserControl>

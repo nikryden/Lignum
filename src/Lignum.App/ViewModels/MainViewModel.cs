@@ -16,8 +16,6 @@ namespace Lignum.App.ViewModels;
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
-    private const string AppName = "Lignum";
-
     private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
     private readonly SettingsFile<AppSettings> _settings;
 
@@ -26,8 +24,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private string? _errorMessage;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Title))]
     [NotifyCanExecuteChangedFor(nameof(CloseTabCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MoveToNewWindowCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MoveToMainWindowCommand))]
     private LogTabViewModel? _selectedTab;
 
     /// <param name="settings">The app's one settings.json (recent files are stored there).</param>
@@ -37,11 +36,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         History = new SearchHistory(settings);
         _highlightMatchesOutsideFilter = settings.Value.HighlightMatchesOutsideFilter;
         LoadRecentFiles();
+        MainGroup = new TabGroupViewModel(isMain: true);
+        ActiveGroup = MainGroup;
+        Watch(MainGroup);
     }
 
     /// <summary>The find and filter history shared by every tab (the box dropdowns).</summary>
     public SearchHistory History { get; }
 
+    /// <summary>Every open tab, in every window (all-tabs search, the AI tools, close all). Each window's order is in its group.</summary>
     public ObservableCollection<LogTabViewModel> Tabs { get; } = [];
 
     /// <summary>Copies selections in every tab (the clipboard and the large-copy prompt); tests replace it.</summary>
@@ -53,7 +56,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>The app-wide highlight rules; "Add as highlight rule" (ticket 15) adds to them. Null: no such item.</summary>
     public HighlightingViewModel? Highlighting { get; init; }
 
-    public string Title => SelectedTab is { } tab ? $"{tab.FileName} - {AppName}" : AppName;
+    /// <summary>The main window's title: the file it shows (a floating window has its own, <see cref="TabGroupViewModel.Title"/>).</summary>
+    public string Title => TabGroupViewModel.TitleFor(MainGroup.SelectedTab);
 
     /// <summary>
     /// Opens <paramref name="path"/> in a new tab and selects it, or selects its tab if it is already open
@@ -154,6 +158,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         tab.Search.HighlightOutsideFilter = HighlightMatchesOutsideFilter;
         tab.Detail.IncludeHiddenLines = DetailPane.IncludeHiddenLines;
         Tabs.Add(tab);
+        ActiveGroup.Add(tab);
         return tab;
     }
 
@@ -232,25 +237,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Closes <paramref name="tab"/> (null = the selected tab, as Ctrl+W does) and releases its file.
-    /// Closing the selected tab selects the tab that took its place, or the one before it.
+    /// Closes <paramref name="tab"/> (null = the active tab, as Ctrl+W does) and releases its file.
+    /// Closing the tab shown in its window shows the tab that took its place, or the one before it;
+    /// a floating window left with no tabs closes.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanCloseTab))]
     private void CloseTab(LogTabViewModel? tab)
     {
         tab ??= SelectedTab;
-        if (tab is null) return;
-        var index = Tabs.IndexOf(tab);
-        if (index < 0) return;
+        if (tab is null || !Tabs.Contains(tab)) return;
 
-        if (ReferenceEquals(tab, SelectedTab))
-        {
-            SelectedTab = Tabs.Count > 1 ? Tabs[index + 1 < Tabs.Count ? index + 1 : index - 1] : null;
-        }
-
-        Tabs.RemoveAt(index);
+        TakeOut(tab);
+        Tabs.Remove(tab);
         tab.Dispose();
         CloseTabCommand.NotifyCanExecuteChanged();
+        NotifyMoveCommands();
     }
 
     private bool CanCloseTab(LogTabViewModel? tab) => (tab ?? SelectedTab) is not null;
@@ -260,10 +261,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         foreach (var tab in Tabs) tab.Dispose();
     }
 
-    partial void OnSelectedTabChanged(LogTabViewModel? oldValue, LogTabViewModel? newValue)
+    /// <summary>
+    /// Setting the active tab shows it in its window and makes that window the active one (the window
+    /// is brought to the front by the view, ticket 28).
+    /// </summary>
+    partial void OnSelectedTabChanged(LogTabViewModel? value)
     {
-        if (oldValue is not null) oldValue.IsSelected = false;
-        if (newValue is not null) newValue.IsSelected = true;
+        if (value is null || GroupOf(value) is not { } group) return;
+        ActiveGroup = group;
+        group.SelectedTab = value;
     }
 
     private LogTabViewModel? FindTab(string fullPath) =>

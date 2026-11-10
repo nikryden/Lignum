@@ -196,167 +196,9 @@
                 <ToggleButton Content="&#xE8F2;" ToolTip="AI access (Ctrl+Shift+A)" IsChecked="{Binding AssistantPane.IsOpen, Mode=TwoWay}" />
             </ToolBar>
         </ToolBarTray>
-        <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view. -->
-        <TabControl DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}"
-                    Padding="0" BorderThickness="0" Focusable="False">
-            <TabControl.Style>
-                <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Tabs.Count}" Value="0">
-                            <Setter Property="Visibility" Value="Collapsed" />
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </TabControl.Style>
-            <!-- The whole tab (not only its text) shows the file's full path on hover (ticket 12). -->
-            <TabControl.ItemContainerStyle>
-                <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
-                    <Setter Property="ToolTip" Value="{Binding SourcePath}" />
-                </Style>
-            </TabControl.ItemContainerStyle>
-            <TabControl.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Orientation="Horizontal" Background="Transparent">
-                        <StackPanel.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Copy full _path" Command="{Binding CopyFullPathCommand}" />
-                                <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
-                                <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
-                                <Separator />
-                                <!-- Ticket 27: auto update and where the view goes on an update. -->
-                                <MenuItem Header="_Auto update" IsCheckable="True" IsChecked="{Binding AutoUpdate}" />
-                                <MenuItem Header="On update: _jump to last line" IsCheckable="True" IsChecked="{Binding JumpsToEnd}" />
-                                <MenuItem Header="On update: _stay in place" IsCheckable="True" IsChecked="{Binding StaysInPlace}" />
-                                <Separator />
-                                <MenuItem Header="_Close" InputGestureText="Ctrl+W"
-                                          Command="{Binding PlacementTarget.Tag.CloseTabCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                          CommandParameter="{Binding}" />
-                            </ContextMenu>
-                        </StackPanel.ContextMenu>
-                        <StackPanel.Tag>
-                            <Binding Path="DataContext" RelativeSource="{RelativeSource AncestorType=Window}" />
-                        </StackPanel.Tag>
-                        <!-- Ticket 27: a small icon at the top of the tab, on every tab that needs one. -->
-                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="9" Margin="0,0,4,0" VerticalAlignment="Top">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Indicator}" Value="NeedsUpdate">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Setter Property="Text" Value="&#xE72C;" />
-                                            <Setter Property="Foreground" Value="{DynamicResource TabNeedsUpdateBrush}" />
-                                            <Setter Property="ToolTip" Value="The file changed on disk: right-click for Auto update, or use Reload" />
-                                        </DataTrigger>
-                                        <DataTrigger Binding="{Binding Indicator}" Value="AutoUpdating">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                            <Setter Property="Text" Value="&#xE895;" />
-                                            <Setter Property="Foreground" Value="{DynamicResource TabAutoUpdateBrush}" />
-                                            <Setter Property="ToolTip" Value="Auto updating when the file changes" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" />
-                        <Button Content="✕" Margin="6,0,0,0" Padding="4,0" MinWidth="0" MinHeight="0"
-                                FontSize="10" Background="Transparent" BorderThickness="0" Focusable="False"
-                                ToolTip="Close (Ctrl+W)"
-                                Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                CommandParameter="{Binding}" />
-                    </StackPanel>
-                </DataTemplate>
-            </TabControl.ItemTemplate>
-            <TabControl.ContentTemplate>
-                <DataTemplate />
-            </TabControl.ContentTemplate>
-        </TabControl>
-        <StatusBar DockPanel.Dock="Bottom"
-                   Height="50"
-                   Background="{DynamicResource StatusBarBackgroundBrush}"
-                   Foreground="{DynamicResource StatusBarForegroundBrush}">
-            <StatusBarItem>
-                <TextBlock Text="{Binding SelectedTab.FileName, FallbackValue='No file open', TargetNullValue='No file open'}" />
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem>
-                <TextBlock Text="{Binding SelectedTab.Navigation.CaretText, FallbackValue=''}" />
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem>
-                <TextBlock Text="{Binding SelectedTab.LineCount, StringFormat='{}{0:N0} lines', FallbackValue=''}" />
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem>
-                <TextBlock Text="{Binding SelectedTab.FileSizeText, FallbackValue=''}" />
-            </StatusBarItem>
-            <Separator />
-            <!-- Encoding (ticket 06): click to read the file with another encoding. -->
-            <StatusBarItem Padding="0">
-                <Menu Background="Transparent" Foreground="{DynamicResource StatusBarForegroundBrush}">
-                    <MenuItem Header="{Binding SelectedTab.EncodingText, FallbackValue=''}" Padding="6,0"
-                              ToolTip="Encoding: click to read the file with another encoding">
-                        <MenuItem Header="_Detect automatically" Command="{Binding SelectedTab.ChangeEncodingCommand}"
-                                  CommandParameter="{x:Null}"
-                                  IsChecked="{Binding SelectedTab.IsEncodingOverridden, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=False}" />
-                        <Separator />
-                        <MenuItem Header="UTF-_8" Command="{Binding SelectedTab.ChangeEncodingCommand}"
-                                  CommandParameter="{x:Static core:LogEncoding.Utf8}"
-                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf8}" />
-                        <MenuItem Header="UTF-16 _LE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
-                                  CommandParameter="{x:Static core:LogEncoding.Utf16LE}"
-                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16LE}" />
-                        <MenuItem Header="UTF-16 _BE" Command="{Binding SelectedTab.ChangeEncodingCommand}"
-                                  CommandParameter="{x:Static core:LogEncoding.Utf16BE}"
-                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Utf16BE}" />
-                        <MenuItem Header="_Windows-1252" Command="{Binding SelectedTab.ChangeEncodingCommand}"
-                                  CommandParameter="{x:Static core:LogEncoding.Windows1252}"
-                                  IsChecked="{Binding SelectedTab.Encoding, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Windows1252}" />
-                    </MenuItem>
-                </Menu>
-            </StatusBarItem>
-            <Separator />
-            <StatusBarItem>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding SelectedTab.StatusText}" VerticalAlignment="Center" />
-                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
-                            Command="{Binding SelectedTab.CancelIndexingCommand}"
-                            Visibility="{Binding SelectedTab.IsIndexing, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                </StackPanel>
-            </StatusBarItem>
-            <StatusBarItem>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding SelectedTab.CopyMessage}" VerticalAlignment="Center" />
-                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
-                            Command="{Binding SelectedTab.CancelCopyCommand}"
-                            Visibility="{Binding SelectedTab.IsCopying, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                </StackPanel>
-            </StatusBarItem>
-            <!-- .lm packages (ticket 06): export / extract progress and cancel. -->
-            <StatusBarItem>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding PackageStatus}" VerticalAlignment="Center" />
-                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0" Command="{Binding CancelPackageWorkCommand}"
-                            Visibility="{Binding IsPackageWorkRunning, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-            </StatusBarItem>
-            <Separator />
-            <!-- Search (ticket 10): match count, progress and cancel for the selected tab. -->
-            <StatusBarItem>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding SelectedTab.Search.SearchStatus, FallbackValue=''}" VerticalAlignment="Center" />
-                    <Button Content="Cancel" Margin="8,0,0,0" Padding="6,0"
-                            Command="{Binding SelectedTab.Search.CancelSearchCommand}"
-                            Visibility="{Binding SelectedTab.Search.IsSearching, Converter={StaticResource BoolToVisibility}, FallbackValue=Collapsed}" />
-                </StackPanel>
-            </StatusBarItem>
-            <StatusBarItem HorizontalAlignment="Right">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{Binding SelectedTab.ErrorMessage}" Foreground="{DynamicResource ErrorForegroundBrush}" />
-                    <TextBlock Text="{Binding ErrorMessage}" Margin="8,0,0,0" Foreground="{DynamicResource ErrorForegroundBrush}" />
-                </StackPanel>
-            </StatusBarItem>
-        </StatusBar>
+        <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view (ticket 28: shared with floating windows). -->
+        <views:TabStrip DockPanel.Dock="Top" DataContext="{Binding MainGroup}" />
+        <views:TabStatusBar DockPanel.Dock="Bottom" DataContext="{Binding MainGroup}" />
         <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->
         <Border DockPanel.Dock="Bottom" Height="260" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource PaneBorderBrush}"
                 Visibility="{Binding AllTabsSearch.IsResultsListVisible, Converter={StaticResource BoolToVisibility}}">
@@ -369,8 +211,8 @@
                 <views:AssistantPanel DataContext="{Binding Assistant}" />
             </views:DetailPaneLayout.Pane>
             <views:DetailPaneLayout.Main>
-        <!-- One LogTabView per open tab, all kept alive; only the selected one is visible. -->
-        <ItemsControl ItemsSource="{Binding Tabs}" Focusable="False">
+        <!-- One LogTabView per tab in this window, all kept alive; only the shown one is visible. -->
+        <ItemsControl ItemsSource="{Binding MainGroup.Tabs}" Focusable="False">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <Grid />
