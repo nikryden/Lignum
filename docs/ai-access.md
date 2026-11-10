@@ -39,7 +39,7 @@ With AI access on, the panel also has a chat. Pick the agent installed on this P
 
 - **Claude Code** (`claude`): uses your Claude subscription (Pro, Max, Team or Enterprise). Lignum runs it with only Lignum's tools (no file, shell or web tools).
 - **GitHub Copilot CLI** (`copilot`): uses your GitHub Copilot subscription. Lignum runs it in prompt mode with the Lignum MCP server added.
-- **Cursor CLI** (`agent`): uses your Cursor account. Lignum puts its MCP server in the conversation folder's `.cursor/mcp.json` and runs `agent -p --approve-mcps`.
+- **Cursor CLI** (`agent`): uses your Cursor account. Lignum puts its MCP server in the conversation folder's `.cursor/mcp.json`, allowlists `Mcp(lignum:*)` in `.cursor/cli.json` (print mode cannot answer per-tool MCP prompts), and runs `agent -p --approve-mcps`. The model dropdown is filled from `agent models` (effort is part of Cursor model ids).
 - **OpenAI Codex CLI** (`codex`): uses your ChatGPT plan. Lignum runs `codex exec` in a read-only sandbox with Lignum added through `-c mcp_servers.lignum...`. Installing it needs Node.js.
 - **Custom agent**: any other agent CLI, for example Antigravity CLI (`agy`, Google's replacement for Gemini CLI). Enter its command and an argument template; `{prompt}` is the question, `{mcpConfig}` an MCP settings file (mcpServers JSON) with Lignum in it, `{lignum}` the path of Lignum.exe.
 

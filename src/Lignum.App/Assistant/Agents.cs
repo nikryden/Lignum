@@ -149,6 +149,13 @@ public abstract class CliAgent
     public virtual IReadOnlyList<string> SuggestedModels => [];
 
     /// <summary>
+    /// Models the CLI reports (e.g. Cursor's <c>agent models</c>); null keeps <see cref="SuggestedModels"/>.
+    /// Called when the agent is ready so the dropdown can stay current.
+    /// </summary>
+    public virtual Task<IReadOnlyList<string>?> ListModelsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>?>(null);
+
+    /// <summary>
     /// Folders with the agent's own skills (<c>&lt;name&gt;\SKILL.md</c>), listed in the "/" box; empty when Lignum
     /// cannot run them. Typing <c>/name</c> for one sends the message as is: the agent expands it itself.
     /// </summary>
@@ -439,7 +446,9 @@ public sealed class CopilotCliAgent : CliAgent
 
 /// <summary>
 /// Cursor CLI (`agent`), on the user's Cursor subscription. Lignum's MCP server goes in the conversation folder's
-/// .cursor/mcp.json (Cursor reads project MCP settings) and is approved with --approve-mcps.
+/// .cursor/mcp.json (Cursor reads project MCP settings) and is approved with --approve-mcps. Individual lignum tools
+/// are allowlisted in .cursor/cli.json: print mode has no TTY to answer per-tool MCP prompts, so without that
+/// Cursor reports "User rejected MCP: lignum-…" (same role as Copilot's --allow-tool lignum).
 /// </summary>
 public sealed class CursorCliAgent : CliAgent
 {
@@ -463,6 +472,39 @@ public sealed class CursorCliAgent : CliAgent
             : exitCode == 0 && output.Contains("logged in", StringComparison.OrdinalIgnoreCase) ? true
             : null, cancellationToken);
 
+    /// <summary>Fallback while <c>agent models</c> has not run or failed; the box stays editable either way.</summary>
+    public override IReadOnlyList<string> SuggestedModels => ["auto"];
+
+    /// <summary>Cursor puts effort in the model id, so the live list from <c>agent models</c> fills the dropdown.</summary>
+    public override async Task<IReadOnlyList<string>?> ListModelsAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<string>? models = null;
+        await CheckOutputAsync(["models"], (exitCode, output) =>
+        {
+            if (exitCode != 0) return null;
+            models = ParseModelList(output);
+            return models.Count > 0;
+        }, cancellationToken);
+        return models is { Count: > 0 } ? models : null;
+    }
+
+    /// <summary>Lines look like <c>auto - Auto (default)</c>; the id is the part before <c> - </c>.</summary>
+    internal static IReadOnlyList<string> ParseModelList(string output)
+    {
+        var models = new List<string>();
+        foreach (var raw in output.Split('\n'))
+        {
+            var line = raw.Trim();
+            var dash = line.IndexOf(" - ", StringComparison.Ordinal);
+            if (dash <= 0) continue;
+            var id = line[..dash].Trim();
+            if (id.Length == 0 || id.Contains(' ')) continue;
+            models.Add(id);
+        }
+
+        return models;
+    }
+
     protected override IEnumerable<string> KnownLocations =>
     [
         .. new[] { "agent", "cursor-agent" }.Select(FindOnPath).OfType<string>(),
@@ -476,6 +518,13 @@ public sealed class CursorCliAgent : CliAgent
         WriteFile(Path.Combine(".cursor", "mcp.json"), JsonSerializer.Serialize(new
         {
             mcpServers = new Dictionary<string, object> { ["lignum"] = new { command = LignumExe, args = LignumArguments } },
+        }));
+        // Allow every lignum MCP tool without a prompt (Cursor's project permissions). Do not use --force: that
+        // would also auto-allow Cursor's own shell/write tools; Lignum gates those through its MCP tools (ADR 0002).
+        // Cursor's schema requires both allow and deny arrays (deny may be empty).
+        WriteFile(Path.Combine(".cursor", "cli.json"), JsonSerializer.Serialize(new
+        {
+            permissions = new { allow = new[] { "Mcp(lignum:*)" }, deny = Array.Empty<string>() },
         }));
         // Print mode cannot answer the workspace-trust prompt, and the conversation folder is never the one trusted
         // at sign-in: trust it explicitly (ticket 15). It only holds Lignum's MCP config.
