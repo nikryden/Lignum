@@ -7,7 +7,11 @@ namespace Lignum.App.Views;
 /// <summary>One window's tab strip (ticket 28); DataContext is the window's <see cref="TabGroupViewModel"/>.</summary>
 public partial class TabStrip : UserControl
 {
-    public TabStrip() => InitializeComponent();
+    public TabStrip()
+    {
+        InitializeComponent();
+        InitializeDrag();
+    }
 
     /// <summary>
     /// Fills "Move to window" with the other floating windows. It is hidden when there are none (the main
