@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 namespace Lignum.App.ViewModels;
 
 /// <summary>
-/// The tabs of one window (ticket 28): the main window has one group, each floating window another. The
+/// The tabs of one window (ticket 29): the main window has one group, each floating window another. The
 /// group owns the order of its tabs and which one is shown; <see cref="LogTabViewModel.IsSelected"/>
 /// means "shown in its window". <see cref="MainViewModel"/> moves tabs between groups.
 /// </summary>

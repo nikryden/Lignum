@@ -4,7 +4,7 @@ using Lignum.App.ViewModels;
 
 namespace Lignum.App.Views;
 
-/// <summary>One window's tab strip (ticket 28); DataContext is the window's <see cref="TabGroupViewModel"/>.</summary>
+/// <summary>One window's tab strip (ticket 29); DataContext is the window's <see cref="TabGroupViewModel"/>.</summary>
 public partial class TabStrip : UserControl
 {
     public TabStrip()

@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Lignum.App.ViewModels;
 
-// Docking and undocking tabs (ticket 28): the main window's tabs are MainGroup, each floating window's
+// Docking and undocking tabs (ticket 29): the main window's tabs are MainGroup, each floating window's
 // are one of FloatingGroups. Tabs keeps every tab. SelectedTab is the active tab: the tab shown in the
 // window that was activated last, which the main window's toolbar, menus and shortcuts act on.
 // Moving a tab never reopens or re-indexes its file; the new window builds a new view for it.

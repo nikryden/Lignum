@@ -267,7 +267,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Setting the active tab shows it in its window and makes that window the active one (the window
-    /// is brought to the front by the view, ticket 28).
+    /// is brought to the front by the view, ticket 29).
     /// </summary>
     partial void OnSelectedTabChanged(LogTabViewModel? value)
     {

@@ -9,7 +9,7 @@ using Lignum.App.ViewModels;
 
 namespace Lignum.App.Views;
 
-// Dragging tabs (ticket 28). A custom gesture with mouse capture, not OLE drag and drop: a drop outside every
+// Dragging tabs (ticket 29). A custom gesture with mouse capture, not OLE drag and drop: a drop outside every
 // window has to open a new one, and the windows already take OLE drops of files from Explorer.
 //   - Past the system drag distance, the strip captures the mouse and a ghost of the tab follows it.
 //   - Over a tab strip (of the window on top under the mouse), a marker shows where the tab will land.

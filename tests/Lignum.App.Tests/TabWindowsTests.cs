@@ -5,7 +5,7 @@ using Serilog.Core;
 
 namespace Lignum.App.Tests;
 
-/// <summary>Docking and undocking tabs: tab groups, moves and the active tab (ticket 28).</summary>
+/// <summary>Docking and undocking tabs: tab groups, moves and the active tab (ticket 29).</summary>
 public sealed class TabWindowsTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "lignum-tests", Guid.NewGuid().ToString("N"));

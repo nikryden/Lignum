@@ -5,7 +5,7 @@ using Lignum.App.ViewModels;
 namespace Lignum.App.Views;
 
 /// <summary>
-/// A floating window of tabs (ticket 28). The main window opens one for each of
+/// A floating window of tabs (ticket 29). The main window opens one for each of
 /// <see cref="MainViewModel.FloatingGroups"/> and closes it when its group goes. Closing it by hand docks
 /// its tabs back into the main window.
 /// </summary>

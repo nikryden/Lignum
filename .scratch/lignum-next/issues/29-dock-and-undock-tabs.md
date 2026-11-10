@@ -1,4 +1,4 @@
-# 28: Dock and undock tabs by dragging
+# 29: Dock and undock tabs by dragging
 
 **What to build:** Tabs can be dragged out of the main window into their own window, and dragged back in. A floating window has its own tab strip and can hold several tabs. Tabs can be dragged between any windows and reordered inside a strip. Session restore reopens floating windows where they were.
 

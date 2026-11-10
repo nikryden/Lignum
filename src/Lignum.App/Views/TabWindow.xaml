@@ -1,5 +1,5 @@
 <!--
-    A floating window of tabs (ticket 28). DataContext is the MainViewModel (LogTabView and the strip use it);
+    A floating window of tabs (ticket 29). DataContext is the MainViewModel (LogTabView and the strip use it);
     Group is this window's tabs. No toolbar or menu: the main window's commands act on the active tab, and its
     keyboard shortcuts are forwarded here.
 -->

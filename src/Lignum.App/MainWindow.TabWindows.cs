@@ -7,7 +7,7 @@ using Lignum.App.Views;
 
 namespace Lignum.App;
 
-// Floating windows of tabs (ticket 28). The view model says which groups exist and which is active; this
+// Floating windows of tabs (ticket 29). The view model says which groups exist and which is active; this
 // file opens a TabWindow per floating group, closes it when the group goes, brings the active group's window
 // to the front, and runs this window's keyboard shortcuts for keys pressed in a floating window.
 public partial class MainWindow
