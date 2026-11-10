@@ -54,12 +54,22 @@ public sealed class BuiltInSyntaxSchemesTests
             new string('"', 5_000) + new string('\'', 5_000),
             string.Concat(Enumerable.Repeat("  - key: value # c ", 500)),
         ];
+        // Catches catastrophic patterns (each search can burn up to its 100 ms match timeout, many times per
+        // line), not small slowdowns. The worst honest case is CSS on the second line, about 80 ms on a
+        // desktop: the tokenizer searches the block comment again after each string, and with no "*/" left
+        // each search runs to the end of the line. Shared CI runners were ~20x slower, so: up to three tries
+        // (a slow one is retried, against scheduling noise) and a generous budget.
         foreach (var scheme in Schemes)
         {
             var tokenizer = new SyntaxTokenizer(scheme.Rules);
-            var watch = Stopwatch.StartNew();
-            foreach (var line in lines) tokenizer.Tokenize(line);
-            Assert.True(watch.ElapsedMilliseconds < 1_000, $"{scheme.Name}: {watch.ElapsedMilliseconds} ms");
+            var best = long.MaxValue;
+            for (var run = 0; run < 3 && best >= 3_000; run++)
+            {
+                var watch = Stopwatch.StartNew();
+                foreach (var line in lines) tokenizer.Tokenize(line);
+                best = Math.Min(best, watch.ElapsedMilliseconds);
+            }
+            Assert.True(best < 3_000, $"{scheme.Name}: {best} ms (best of 3 tries)");
         }
     }
 
