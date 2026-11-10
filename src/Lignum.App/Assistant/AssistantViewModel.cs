@@ -333,6 +333,7 @@ public sealed partial class AssistantViewModel : ObservableObject
             _settings.Value.Assistant.Agent = value;
             _settings.Save();
             _agent = null;
+            _listedModels = null;
             ResetUsage();
             OnPropertyChanged();
             OnPropertyChanged(nameof(IsCustomAgent));
@@ -358,8 +359,11 @@ public sealed partial class AssistantViewModel : ObservableObject
         set => SaveModelChoice(ModelChoice?.Model, value);
     }
 
+    /// <summary>Models from the CLI when available (Cursor); otherwise the agent's built-in suggestions.</summary>
+    private IReadOnlyList<string>? _listedModels;
+
     /// <summary>Model names to offer for the selected agent; any other can be typed.</summary>
-    public IReadOnlyList<string> ModelSuggestions => CreateAgent(SelectedAgent).SuggestedModels;
+    public IReadOnlyList<string> ModelSuggestions => _listedModels ?? CreateAgent(SelectedAgent).SuggestedModels;
 
     /// <summary>"" (default) and the selected agent's reasoning levels; just "" when it has none.</summary>
     public IReadOnlyList<string> EffortChoices => ["", .. CreateAgent(SelectedAgent).EffortLevels];
@@ -464,6 +468,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         var agent = CreateAgent(index);
         AgentState = AgentState.Checking;
         AgentState state;
+        IReadOnlyList<string>? listed = null;
         if (agent.FindExecutable() is null)
         {
             state = AgentState.NotInstalled;
@@ -472,9 +477,13 @@ public sealed partial class AssistantViewModel : ObservableObject
         {
             var signedIn = await agent.IsSignedInAsync(CancellationToken.None);
             state = (signedIn ?? _settings.Value.Assistant.SignedIn.Contains(index)) ? AgentState.Ready : AgentState.NotSignedIn;
+            if (state == AgentState.Ready) listed = await agent.ListModelsAsync(CancellationToken.None);
         }
 
-        if (index == SelectedAgent) AgentState = state; // unless the user picked another agent meanwhile
+        if (index != SelectedAgent) return; // the user picked another agent meanwhile
+        AgentState = state;
+        _listedModels = listed;
+        OnPropertyChanged(nameof(ModelSuggestions));
     }
 
     /// <summary>Looks at the agent again when the panel opens with AI access on.</summary>

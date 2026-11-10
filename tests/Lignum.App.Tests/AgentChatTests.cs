@@ -185,6 +185,13 @@ public sealed class AgentChatTests : IDisposable
         Assert.Contains("--approve-mcps", arguments);
         Assert.Equal("-p", arguments[0]);
         Assert.Contains("\"lignum\"", File.ReadAllText(Path.Combine(agent.WorkFolder, ".cursor", "mcp.json")));
+        // Print mode cannot answer per-tool MCP prompts; allowlist lignum tools like Copilot's --allow-tool lignum.
+        // Cursor's schema requires both allow and deny arrays.
+        var cli = File.ReadAllText(Path.Combine(agent.WorkFolder, ".cursor", "cli.json"));
+        Assert.Contains("Mcp(lignum:*)", cli);
+        Assert.Contains("\"deny\"", cli);
+        Assert.DoesNotContain("--force", arguments);
+        Assert.DoesNotContain("--yolo", arguments);
     }
 
     private T Agent<T>(T agent, string? model, string? effort) where T : CliAgent
@@ -219,6 +226,7 @@ public sealed class AgentChatTests : IDisposable
         var cursor = Agent(new CursorCliAgent(), "gpt-5", "high").BuildArguments("hi");
         Assert.Equal("gpt-5", After(cursor, "--model"));
         Assert.DoesNotContain("high", cursor); // Cursor has no reasoning flag
+        Assert.Contains("auto", new CursorCliAgent().SuggestedModels); // dropdown is not empty before agent models runs
 
         var codex = Agent(new CodexCliAgent(), "gpt-5-codex", "medium").BuildArguments("hi");
         Assert.Equal("gpt-5-codex", After(codex, "-m"));
@@ -302,6 +310,22 @@ public sealed class AgentChatTests : IDisposable
 
         Assert.Contains("--trust", arguments);
         Assert.Equal(agent.WorkFolder, arguments[arguments.IndexOf("--workspace") + 1]);
+    }
+
+    [Fact]
+    public void Cursor_parses_model_ids_from_agent_models_output()
+    {
+        var models = CursorCliAgent.ParseModelList("""
+            Available models
+
+            auto - Auto (default)
+            composer-2.5 - Composer 2.5
+            gpt-5.2-high - GPT-5.2 High
+
+            Tip: use --model <id> to switch.
+            """);
+
+        Assert.Equal(["auto", "composer-2.5", "gpt-5.2-high"], models);
     }
 
     [Fact]
