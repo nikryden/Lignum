@@ -1,5 +1,5 @@
 <!--
-    One window's tab strip (ticket 28). DataContext is that window's TabGroupViewModel; the window's DataContext
+    One window's tab strip (ticket 29). DataContext is that window's TabGroupViewModel; the window's DataContext
     is the MainViewModel (closing and moving tabs). Only the strip: each window shows the tab contents itself,
     so every tab keeps its own view.
 -->
@@ -47,7 +47,7 @@
                             <MenuItem Header="Copy file _name" Command="{Binding CopyFileNameCommand}" />
                             <MenuItem Header="Open containing _folder" Command="{Binding OpenContainingFolderCommand}" />
                             <Separator />
-                            <!-- Ticket 28: dock and undock (also by dragging the tab). -->
+                            <!-- Ticket 29: dock and undock (also by dragging the tab). -->
                             <MenuItem Header="Move to new _window" Style="{StaticResource HiddenWhenDisabled}"
                                       Command="{Binding PlacementTarget.Tag.MoveToNewWindowCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                       CommandParameter="{Binding}" />
@@ -104,7 +104,7 @@
             <DataTemplate />
         </TabControl.ContentTemplate>
     </TabControl>
-    <!-- Ticket 28: where a dragged tab will land, and the tab following the mouse. -->
+    <!-- Ticket 29: where a dragged tab will land, and the tab following the mouse. -->
     <Canvas IsHitTestVisible="False">
         <Rectangle x:Name="Marker" Width="2" Visibility="Collapsed" Fill="{DynamicResource WindowForegroundBrush}" />
     </Canvas>

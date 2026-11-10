@@ -196,7 +196,7 @@
                 <ToggleButton Content="&#xE8F2;" ToolTip="AI access (Ctrl+Shift+A)" IsChecked="{Binding AssistantPane.IsOpen, Mode=TwoWay}" />
             </ToolBar>
         </ToolBarTray>
-        <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view (ticket 28: shared with floating windows). -->
+        <!-- Tab strip only: the tab contents live in the ItemsControl below so each tab keeps its own view (ticket 29: shared with floating windows). -->
         <views:TabStrip DockPanel.Dock="Top" DataContext="{Binding MainGroup}" />
         <views:TabStatusBar DockPanel.Dock="Bottom" DataContext="{Binding MainGroup}" />
         <!-- Find in all tabs (ticket 01): shared across tabs, above the status bar. -->

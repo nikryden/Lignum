@@ -29,7 +29,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _viewModel.SaveSession(); // ticket 18: reopened on the next start
-            CloseTabWindows(); // ticket 28: after saving, so the session still knows their tabs
+            CloseTabWindows(); // ticket 29: after saving, so the session still knows their tabs
             _viewModel.Dispose();
         };
     }

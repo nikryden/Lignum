@@ -1,5 +1,5 @@
 <!--
-    One window's status bar (ticket 28). DataContext is that window's TabGroupViewModel, so SelectedTab is the
+    One window's status bar (ticket 29). DataContext is that window's TabGroupViewModel, so SelectedTab is the
     tab shown in that window; app-wide state (packages, open errors) comes from the window's MainViewModel.
 -->
 <UserControl x:Class="Lignum.App.Views.TabStatusBar"

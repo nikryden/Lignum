@@ -14,11 +14,11 @@ public sealed class SessionSettings
     /// <summary>Index into <see cref="Tabs"/> of the tab shown in the main window; -1 for none.</summary>
     public int SelectedIndex { get; set; } = -1;
 
-    /// <summary>The floating windows (ticket 28); <see cref="SessionTab.Window"/> 1 is the first. Missing in older files.</summary>
+    /// <summary>The floating windows (ticket 29); <see cref="SessionTab.Window"/> 1 is the first. Missing in older files.</summary>
     public List<SessionWindow> Windows { get; set; } = [];
 }
 
-/// <summary>A floating window of tabs (ticket 28): where it was, and which of its tabs it showed.</summary>
+/// <summary>A floating window of tabs (ticket 29): where it was, and which of its tabs it showed.</summary>
 public sealed class SessionWindow
 {
     /// <summary>Its normal (not maximized) position and size; null: open it under the mouse.</summary>
@@ -35,7 +35,7 @@ public sealed class SessionTab
 {
     public string Path { get; set; } = "";
 
-    /// <summary>The window it was in (ticket 28): 0 the main window, n the n-th of <see cref="SessionSettings.Windows"/>.</summary>
+    /// <summary>The window it was in (ticket 29): 0 the main window, n the n-th of <see cref="SessionSettings.Windows"/>.</summary>
     public int Window { get; set; }
 
     /// <summary>The 0-based file line at the top of the viewer.</summary>

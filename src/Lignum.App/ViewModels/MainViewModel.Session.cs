@@ -10,7 +10,7 @@ public sealed partial class MainViewModel
     /// <summary>Writes the open tabs to settings.json (the app calls this on exit, before closing them).</summary>
     public void SaveSession()
     {
-        // Ticket 28: grouped by window, each window's tabs in its strip order.
+        // Ticket 29: grouped by window, each window's tabs in its strip order.
         var groups = new List<TabGroupViewModel> { MainGroup };
         groups.AddRange(FloatingGroups.Where(g => g.Tabs.Count > 0));
         var placed = groups.SelectMany((group, window) => group.Tabs.Select(tab => (Tab: tab, Window: window))).ToList();
@@ -80,7 +80,7 @@ public sealed partial class MainViewModel
                 continue;
             }
 
-            // Ticket 28: the tab's floating window, made when its first tab opens; an unknown window is the main one.
+            // Ticket 29: the tab's floating window, made when its first tab opens; an unknown window is the main one.
             var window = entry.Window >= 1 && entry.Window <= windows.Count ? entry.Window - 1 : -1;
             var group = window < 0 ? MainGroup : floating[window] ??= NewFloatingGroup(windows[window]);
             var added = File.Exists(fullPath) ? await AddTabAsync(fullPath, entry.Path, group) : null;
@@ -118,7 +118,7 @@ public sealed partial class MainViewModel
         }
 
         SelectedTab = selected ?? MainGroup.SelectedTab ?? MainGroup.Tabs.LastOrDefault();
-        if (SelectedTab is null || !MainGroup.Tabs.Contains(SelectedTab)) ActivateGroup(MainGroup);
+        if (SelectedTab is null || !MainGroup.Tabs.Contains(SelectedTab)) ActivateFallback();
         ErrorMessage = skipped.Count switch
         {
             0 => ErrorMessage,

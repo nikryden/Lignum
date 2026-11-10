@@ -5,7 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace Lignum.App.ViewModels;
 
-// Docking and undocking tabs (ticket 28): the main window's tabs are MainGroup, each floating window's
+// Docking and undocking tabs (ticket 29): the main window's tabs are MainGroup, each floating window's
 // are one of FloatingGroups. Tabs keeps every tab. SelectedTab is the active tab: the tab shown in the
 // window that was activated last, which the main window's toolbar, menus and shortcuts act on.
 // Moving a tab never reopens or re-indexes its file; the new window builds a new view for it.
@@ -17,15 +17,44 @@ public sealed partial class MainViewModel
     /// <summary>One group per floating window; the view opens a window when one is added and closes it when removed.</summary>
     public ObservableCollection<TabGroupViewModel> FloatingGroups { get; } = [];
 
-    /// <summary>The group of the window activated last; new files open in it.</summary>
+    /// <summary>The group of the active tab: the window with tabs that was activated last.</summary>
     [ObservableProperty]
     private TabGroupViewModel _activeGroup = null!;
 
-    /// <summary>The window of <paramref name="group"/> was activated: its shown tab becomes the active tab.</summary>
+    /// <summary>
+    /// Where new files open: the window activated last, even the main window with no tabs (every tab
+    /// undocked), which <see cref="ActiveGroup"/> never is while another window has tabs.
+    /// </summary>
+    public TabGroupViewModel NewTabGroup => _newTabGroup is { } group && IsOpenGroup(group) ? group : ActiveGroup;
+
+    private TabGroupViewModel? _newTabGroup;
+
+    /// <summary>
+    /// The window of <paramref name="group"/> was activated: its shown tab becomes the active tab. A window
+    /// with no tabs has nothing to act on, so the active tab stays where it was (clicking the toolbar of an
+    /// empty main window must still filter the tab in the floating window); new files open there, though.
+    /// </summary>
     public void ActivateGroup(TabGroupViewModel group)
     {
-        // A new floating window shows (and activates) before its first tab arrives: wait for MoveTab.
-        if (!IsOpenGroup(group) || (!group.IsMain && group.Tabs.Count == 0)) return;
+        if (!IsOpenGroup(group)) return;
+        if (group.Tabs.Count == 0)
+        {
+            // A new floating window shows (and activates) before its first tab arrives: wait for MoveTab.
+            if (group.IsMain) _newTabGroup = group;
+            if (SelectedTab is null) ActiveGroup = group;
+            return;
+        }
+
+        _newTabGroup = group;
+        ActiveGroup = group;
+        SelectedTab = group.SelectedTab;
+    }
+
+    /// <summary>The active window went away or was emptied: the main window if it has tabs, else a floating one that does.</summary>
+    private void ActivateFallback()
+    {
+        var group = MainGroup.Tabs.Count > 0 ? MainGroup : FloatingGroups.FirstOrDefault(g => g.Tabs.Count > 0) ?? MainGroup;
+        _newTabGroup = MainGroup;
         ActiveGroup = group;
         SelectedTab = group.SelectedTab;
     }
@@ -94,7 +123,12 @@ public sealed partial class MainViewModel
     /// </summary>
     public void CloseFloatingGroup(TabGroupViewModel group)
     {
-        if (group.IsMain || !FloatingGroups.Contains(group)) return;
+        if (group.IsMain || !FloatingGroups.Contains(group))
+        {
+            DiagnosticsLog.Warning("Closed a floating window whose group is not open ({Tabs} tabs): nothing docked", group.Tabs.Count);
+            return;
+        }
+        DiagnosticsLog.Information("Floating window closed: docking {Tabs} tabs into the main window", group.Tabs.Count);
 
         var shown = group.SelectedTab;
         foreach (var tab in group.Tabs.ToList())
@@ -119,7 +153,7 @@ public sealed partial class MainViewModel
     {
         group.PropertyChanged -= OnGroupPropertyChanged;
         FloatingGroups.Remove(group);
-        if (ReferenceEquals(ActiveGroup, group)) ActivateGroup(MainGroup);
+        if (ReferenceEquals(ActiveGroup, group)) ActivateFallback();
         NotifyMoveCommands();
     }
 

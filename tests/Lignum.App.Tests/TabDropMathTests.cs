@@ -3,7 +3,7 @@ using Lignum.App.Views;
 
 namespace Lignum.App.Tests;
 
-/// <summary>Where a dragged tab lands in a strip (ticket 28).</summary>
+/// <summary>Where a dragged tab lands in a strip (ticket 29).</summary>
 public sealed class TabDropMathTests
 {
     // Three 100-wide tabs in one row, then two in a second row.

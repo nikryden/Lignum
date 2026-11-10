@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace Lignum.App.Views;
 
-/// <summary>Where a dragged tab lands in a tab strip (ticket 28), from the tabs' bounds and the mouse.</summary>
+/// <summary>Where a dragged tab lands in a tab strip (ticket 29), from the tabs' bounds and the mouse.</summary>
 internal static class TabDropMath
 {
     /// <summary>

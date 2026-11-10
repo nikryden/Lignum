@@ -7,7 +7,7 @@ using Lignum.App.Views;
 
 namespace Lignum.App;
 
-// Floating windows of tabs (ticket 28). The view model says which groups exist and which is active; this
+// Floating windows of tabs (ticket 29). The view model says which groups exist and which is active; this
 // file opens a TabWindow per floating group, closes it when the group goes, brings the active group's window
 // to the front, and runs this window's keyboard shortcuts for keys pressed in a floating window.
 public partial class MainWindow
@@ -24,6 +24,13 @@ public partial class MainWindow
     /// <summary>The window that shows the active tab: dialogs for it (Go to line, Find) belong to it.</summary>
     private Window ActiveTabWindow =>
         (Window?)_tabWindows.FirstOrDefault(w => ReferenceEquals(w.Group, _viewModel.ActiveGroup)) ?? this;
+
+    /// <summary>
+    /// The window a dialog for the active tab (Find, Go to line) belongs to: the window in use, so the dialog
+    /// shows above it. That is the main window when its toolbar was clicked, even with every tab undocked.
+    /// </summary>
+    private Window DialogOwner =>
+        IsActive ? this : (Window?)_tabWindows.FirstOrDefault(w => w.IsActive) ?? ActiveTabWindow;
 
     private void OnFloatingGroupsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

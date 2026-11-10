@@ -84,8 +84,8 @@ public partial class MainWindow
             };
         }
 
-        // Ticket 28: belong to the window of the tab it searches, so it stays above that window.
-        var owner = ActiveTabWindow;
+        // Ticket 29: belong to the window in use, so it shows above it (not behind the main window).
+        var owner = DialogOwner;
         if (!ReferenceEquals(_findWindow.Owner, owner)) _findWindow.Owner = owner;
         _findWindow.ShowPage(page);
     }
