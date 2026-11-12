@@ -88,6 +88,61 @@ public sealed class AgentChatTests : IDisposable
     }
 
     [Fact]
+    public async Task A_saved_chat_is_listed_and_continuing_it_resumes_the_same_agent_session()
+    {
+        var exe = FakeClaude("""{"type":"result","subtype":"success","is_error":false,"result":"An answer.","session_id":"s"}""");
+        var first = Start();
+        first.Assistant.AgentFactory = (_, folder) => new ClaudeCodeAgent
+            { WorkFolder = folder, LignumExe = "", LignumArguments = [], Executable = exe };
+        await Ask(first.Assistant, "Any errors?");
+
+        var later = Start(); // a later run of Lignum, same settings folder
+        later.Assistant.AgentFactory = first.Assistant.AgentFactory;
+        later.Assistant.RefreshChatHistoryCommand.Execute(null);
+        var saved = Assert.Single(later.Assistant.ChatHistory);
+        Assert.Equal("Any errors?", saved.Title);
+
+        later.Assistant.OpenChatCommand.Execute(saved);
+        Assert.Contains(later.Assistant.Entries, e => e.Kind == ChatEntryKind.Assistant && e.Text == "An answer.");
+        await Ask(later.Assistant, "And warnings?");
+
+        var calls = File.ReadAllLines(Path.Combine(_dir, "args.txt"));
+        var session = calls[0].Split(' ')[calls[0].Split(' ').ToList().IndexOf("--session-id") + 1];
+        Assert.Contains($"--resume {session}", calls[1]);
+        later.Assistant.RefreshChatHistoryCommand.Execute(null);
+        Assert.Single(later.Assistant.ChatHistory); // continued, not a new chat
+
+        later.Assistant.DeleteChatCommand.Execute(later.Assistant.ChatHistory[0]);
+        later.Assistant.RefreshChatHistoryCommand.Execute(null);
+        Assert.Empty(later.Assistant.ChatHistory);
+    }
+
+    [Fact]
+    public void An_agent_that_cannot_resume_gets_the_earlier_turns_newest_kept_within_the_limits()
+    {
+        var lines = Enumerable.Range(1, 30).SelectMany(i => new[]
+        {
+            new ChatLine(ChatEntryKind.User, $"q{i}"),
+            new ChatLine(ChatEntryKind.Activity, "Searching"),
+            new ChatLine(ChatEntryKind.Assistant, $"a{i}"),
+        }).ToList();
+
+        var preamble = ChatHistoryStore.ContextPreamble(lines, maxTurns: 20);
+        Assert.StartsWith("Conversation so far:", preamble);
+        Assert.DoesNotContain("User: q10\n", preamble);
+        Assert.Contains("User: q11", preamble);
+        Assert.Contains("Assistant: a30", preamble);
+        Assert.DoesNotContain("Searching", preamble);
+        Assert.EndsWith("New question: ", preamble);
+
+        var small = ChatHistoryStore.ContextPreamble(lines, maxChars: 40);
+        Assert.Contains("Assistant: a30", small);
+        Assert.DoesNotContain("q1\n", small);
+        Assert.Equal("", ChatHistoryStore.ContextPreamble([]));
+        Assert.False(new CustomAgent("x", "-p {prompt}").CanResume);
+    }
+
+    [Fact]
     public async Task The_answer_streams_into_the_panel_and_the_follow_up_resumes_the_session()
     {
         var exe = FakeClaude(

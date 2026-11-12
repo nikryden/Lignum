@@ -331,7 +331,7 @@ public sealed class AiAccessTests : IDisposable
         var main = await Open();
 
         await main.Assistant.HandleToolCallAsync(Call("add_bookmark", new { line = 2, color = "red" }), default);
-        var bad = await main.Assistant.HandleToolCallAsync(Call("add_bookmark", new { line = 3, color = "pink" }), default);
+        var bad = await main.Assistant.HandleToolCallAsync(Call("add_bookmark", new { line = 3, color = "magenta" }), default);
         var list = await main.Assistant.HandleToolCallAsync(Call("list_bookmarks", new { }), default);
 
         var tab = main.SelectedTab!;

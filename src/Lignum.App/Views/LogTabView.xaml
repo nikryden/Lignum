@@ -33,6 +33,21 @@
                 <DataTrigger Binding="{Binding Color}" Value="Purple">
                     <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerPurpleBrush}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Orange">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerOrangeBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Pink">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerPinkBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Teal">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerTealBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Cyan">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerCyanBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Color}" Value="Gray">
+                    <Setter Property="Fill" Value="{DynamicResource BookmarkMarkerGrayBrush}" />
+                </DataTrigger>
             </Style.Triggers>
         </Style>
         <!-- Bulk bookmark actions (ticket 24); the items are the tab's BookmarkFilter.ColorToggles. -->
@@ -52,18 +67,18 @@
              the view's selection as parameter (null = the main view's); see LogTabViewModel.ContextMenu.cs.
              "Toggle bookmark" (ticket 17), the note and the color act on the caret line of the view the menu opened on. -->
         <ContextMenu x:Key="MainViewMenu">
-            <MenuItem Header="_Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
-            <MenuItem Header="Copy for _AI" Command="{Binding CopyForAiCommand}"
+            <MenuItem Header="_Copy" views:MenuIcon.Glyph="&#xE8C8;" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy for _AI" views:MenuIcon.Glyph="&#xE8F2;" Command="{Binding CopyForAiCommand}"
                       ToolTip="The lines with file name, line numbers and a short prompt, to paste into any AI chat" />
-            <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}" InputGestureText="Ctrl+Shift+C" />
+            <MenuItem Header="Copy to _search" views:MenuIcon.Glyph="&#xE721;" Command="{Binding CopyToSearchCommand}" InputGestureText="Ctrl+Shift+C" />
             <Separator />
-            <MenuItem Header="Add as _include filter" Command="{Binding AddIncludeFilterCommand}" />
-            <MenuItem Header="Add as e_xclude filter" Command="{Binding AddExcludeFilterCommand}" />
-            <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}" />
+            <MenuItem Header="Add as _include filter" views:MenuIcon.Glyph="&#xE71C;" Command="{Binding AddIncludeFilterCommand}" />
+            <MenuItem Header="Add as e_xclude filter" views:MenuIcon.Glyph="&#xE71C;" Command="{Binding AddExcludeFilterCommand}" />
+            <MenuItem Header="Add as _highlight rule" views:MenuIcon.Glyph="&#xE7E6;" Command="{Binding AddHighlightRuleCommand}" />
             <Separator />
-            <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
-            <MenuItem Header="Edit _description…" Click="OnEditNoteClick" />
-            <MenuItem Header="Bookmark co_lor">
+            <MenuItem Header="Toggle _bookmark" views:MenuIcon.Glyph="&#xE734;" Command="{Binding ToggleBookmarkCommand}" InputGestureText="Ctrl+F2" />
+            <MenuItem Header="Edit _description…" views:MenuIcon.Glyph="&#xE70F;" Click="OnEditNoteClick" />
+            <MenuItem Header="Bookmark co_lor" views:MenuIcon.Glyph="&#xE790;">
                 <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
                 </MenuItem>
@@ -79,36 +94,51 @@
                 <MenuItem Header="_Purple" Tag="Purple" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPurpleBrush}" /></MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Header="_Orange" Tag="Orange" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerOrangeBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Pin_k" Tag="Pink" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPinkBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Teal" Tag="Teal" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerTealBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Cyan" Tag="Cyan" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerCyanBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Gr_ay" Tag="Gray" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerGrayBrush}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
-            <MenuItem Header="Clear _all bookmarks" Command="{Binding ClearBookmarksCommand}" />
-            <MenuItem Header="Remove bookmarks _without notes" Command="{Binding RemoveBookmarksWithoutNotesCommand}" />
-            <MenuItem Header="Re_move bookmarks of color" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
+            <MenuItem Header="Clear _all bookmarks" views:MenuIcon.Glyph="&#xE74D;" Command="{Binding ClearBookmarksCommand}" />
+            <MenuItem Header="Remove bookmarks _without notes" views:MenuIcon.Glyph="&#xE894;" Command="{Binding RemoveBookmarksWithoutNotesCommand}" />
+            <MenuItem Header="Re_move bookmarks of color" views:MenuIcon.Glyph="&#xE790;" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
                       ItemContainerStyle="{StaticResource RemoveColorItem}" />
-            <MenuItem Header="Show onl_y colors" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
+            <MenuItem Header="Show onl_y colors" views:MenuIcon.Glyph="&#xE71C;" ItemsSource="{Binding BookmarkFilter.ColorToggles}"
                       ItemContainerStyle="{StaticResource ShowColorItem}" />
-            <MenuItem Header="Highlight _line…" Click="OnHighlightLineClick" />
-            <MenuItem Header="Remove highligh_t" Click="OnRemoveHighlightClick" />
-            <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
-            <MenuItem Header="Open in _editor at this line" Click="OnOpenInEditorClick" />
+            <MenuItem Header="Highlight _line…" views:MenuIcon.Glyph="&#xE7E6;" Click="OnHighlightLineClick" />
+            <MenuItem Header="Remove highligh_t" views:MenuIcon.Glyph="&#xE894;" Click="OnRemoveHighlightClick" />
+            <MenuItem Header="Show _full line" views:MenuIcon.Glyph="&#xE7C3;" Click="OnShowFullLineClick" />
+            <MenuItem Header="Open in _editor at this line" views:MenuIcon.Glyph="&#xE70F;" Click="OnOpenInEditorClick" />
         </ContextMenu>
         <ContextMenu x:Key="ResultsViewMenu">
-            <MenuItem Header="_Copy" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />
-            <MenuItem Header="Copy for _AI" Command="{Binding CopyForAiCommand}" CommandParameter="{Binding Search.ResultsSelection}"
+            <MenuItem Header="_Copy" views:MenuIcon.Glyph="&#xE8C8;" Command="{Binding CopyResultsCommand}" InputGestureText="Ctrl+C" />
+            <MenuItem Header="Copy for _AI" views:MenuIcon.Glyph="&#xE8F2;" Command="{Binding CopyForAiCommand}" CommandParameter="{Binding Search.ResultsSelection}"
                       ToolTip="The selected result lines with file name, line numbers and a short prompt" />
-            <MenuItem Header="Copy to _search" Command="{Binding CopyToSearchCommand}"
+            <MenuItem Header="Copy to _search" views:MenuIcon.Glyph="&#xE721;" Command="{Binding CopyToSearchCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+Shift+C" />
             <Separator />
-            <MenuItem Header="Add as _include filter" Command="{Binding AddIncludeFilterCommand}"
+            <MenuItem Header="Add as _include filter" views:MenuIcon.Glyph="&#xE71C;" Command="{Binding AddIncludeFilterCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" />
-            <MenuItem Header="Add as e_xclude filter" Command="{Binding AddExcludeFilterCommand}"
+            <MenuItem Header="Add as e_xclude filter" views:MenuIcon.Glyph="&#xE71C;" Command="{Binding AddExcludeFilterCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" />
-            <MenuItem Header="Add as _highlight rule" Command="{Binding AddHighlightRuleCommand}"
+            <MenuItem Header="Add as _highlight rule" views:MenuIcon.Glyph="&#xE7E6;" Command="{Binding AddHighlightRuleCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" />
             <Separator />
-            <MenuItem Header="Toggle _bookmark" Command="{Binding ToggleBookmarkCommand}"
+            <MenuItem Header="Toggle _bookmark" views:MenuIcon.Glyph="&#xE734;" Command="{Binding ToggleBookmarkCommand}"
                       CommandParameter="{Binding Search.ResultsSelection}" InputGestureText="Ctrl+F2" />
-            <MenuItem Header="Edit _description…" Click="OnEditNoteClick" />
-            <MenuItem Header="Bookmark co_lor">
+            <MenuItem Header="Edit _description…" views:MenuIcon.Glyph="&#xE70F;" Click="OnEditNoteClick" />
+            <MenuItem Header="Bookmark co_lor" views:MenuIcon.Glyph="&#xE790;">
                 <MenuItem Header="_Blue" Tag="Blue" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerBrush}" /></MenuItem.Icon>
                 </MenuItem>
@@ -124,8 +154,23 @@
                 <MenuItem Header="_Purple" Tag="Purple" Click="OnBookmarkColorClick">
                     <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPurpleBrush}" /></MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Header="_Orange" Tag="Orange" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerOrangeBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Pin_k" Tag="Pink" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerPinkBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Teal" Tag="Teal" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerTealBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="_Cyan" Tag="Cyan" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerCyanBrush}" /></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Gr_ay" Tag="Gray" Click="OnBookmarkColorClick">
+                    <MenuItem.Icon><Ellipse Width="10" Height="10" Fill="{DynamicResource BookmarkMarkerGrayBrush}" /></MenuItem.Icon>
+                </MenuItem>
             </MenuItem>
-            <MenuItem Header="Show _full line" Click="OnShowFullLineClick" />
+            <MenuItem Header="Show _full line" views:MenuIcon.Glyph="&#xE7C3;" Click="OnShowFullLineClick" />
         </ContextMenu>
     </UserControl.Resources>
     <DockPanel>
@@ -216,9 +261,9 @@
                             <ListBox.ContextMenu>
                                 <!-- The selected bookmark's links are added below these when it opens (code-behind). -->
                                 <ContextMenu Opened="OnBookmarkListMenuOpened">
-                                    <MenuItem Header="_Edit description…" Click="OnEditBookmarkDescriptionClick" />
-                                    <MenuItem Header="_Copy description" Click="OnCopyBookmarkDescriptionClick" />
-                                    <MenuItem Header="_Remove bookmark" Click="OnRemoveBookmarkClick" />
+                                    <MenuItem Header="_Edit description…" views:MenuIcon.Glyph="&#xE70F;" Click="OnEditBookmarkDescriptionClick" />
+                                    <MenuItem Header="_Copy description" views:MenuIcon.Glyph="&#xE8C8;" Click="OnCopyBookmarkDescriptionClick" />
+                                    <MenuItem Header="_Remove bookmark" views:MenuIcon.Glyph="&#xE74D;" Click="OnRemoveBookmarkClick" />
                                 </ContextMenu>
                             </ListBox.ContextMenu>
                             <ListBox.ItemContainerStyle>

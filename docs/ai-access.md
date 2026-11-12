@@ -8,7 +8,7 @@ In Lignum: **View > AI access** (Ctrl+Shift+A), then **Turn on AI access**. Whil
 
 ## Connect your AI tool (once)
 
-The panel's **Connect an AI tool** section copies the right setting for you. By hand, the MCP server is `Lignum.exe --mcp` (use the full path to your Lignum.exe):
+**View → Connect an AI tool…** (Settings → AI, also linked from the AI panel) copies the right setting for you. By hand, the MCP server is `Lignum.exe --mcp` (use the full path to your Lignum.exe):
 
 - **VS Code / GitHub Copilot** (`.vscode/mcp.json`, or MCP: Add Server):
   `{ "servers": { "lignum": { "type": "stdio", "command": "C:\...\Lignum.exe", "args": ["--mcp"] } } }`

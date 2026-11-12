@@ -4,16 +4,17 @@ using Lignum.App.Assistant.Permissions;
 namespace Lignum.App.Views;
 
 /// <summary>Lists the session and always grants of a <see cref="PermissionStore"/> and revokes them.</summary>
-public partial class AiPermissionsDialog : Window
+public partial class AiPermissionsPage : System.Windows.Controls.UserControl
 {
     private readonly PermissionStore _store;
 
-    public AiPermissionsDialog(PermissionStore store)
+    public AiPermissionsPage(PermissionStore store)
     {
         _store = store;
         InitializeComponent();
-        store.Changed += OnChanged;
-        Closed += (_, _) => store.Changed -= OnChanged;
+        // Listen only while shown: the page is swapped in and out of the Settings window (ticket 30).
+        Loaded += (_, _) => { store.Changed += OnChanged; Refresh(); };
+        Unloaded += (_, _) => store.Changed -= OnChanged;
         Refresh();
     }
 
@@ -37,7 +38,7 @@ public partial class AiPermissionsDialog : Window
 
     private void OnRevokeAllClick(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "Revoke every AI permission? The AI will ask again next time.", "AI permissions",
+        if (MessageBox.Show(Window.GetWindow(this)!, "Revoke every AI permission? The AI will ask again next time.", "AI permissions",
                 MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
             _store.RevokeAll();
     }

@@ -116,8 +116,20 @@ public abstract class CliAgent
     /// <summary>One line without double quotes, for prompts that go on the command line (cmd.exe shims).</summary>
     protected static string OneLine(string text) => text.Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' ');
 
-    /// <summary>Whether a turn was already sent in this conversation.</summary>
-    protected bool HasStarted { get; private set; }
+    /// <summary>Whether a turn was already sent in this conversation; set when a saved chat is continued (ticket 32).</summary>
+    public bool HasStarted { get; set; }
+
+    /// <summary>
+    /// The agent's own session id, for agents that resume a conversation by id (Claude Code); saved with the chat so
+    /// it can be continued later (ticket 32). Null for agents that do not use one.
+    /// </summary>
+    public string? SessionId { get; set; }
+
+    /// <summary>Whether the agent continues an earlier conversation itself; false: Lignum sends the earlier turns.</summary>
+    public virtual bool CanResume => true;
+
+    /// <summary>Text put before the next prompt only (the earlier turns of a chat the agent cannot resume).</summary>
+    public string? PendingContext { get; set; }
 
     /// <summary>A folder of the agent's own (MCP config, prompt file, working directory); created by the caller.</summary>
     public string WorkFolder { get; set; } = "";
@@ -185,6 +197,8 @@ public abstract class CliAgent
     {
         var exe = FindExecutable() ?? throw new AgentException($"{Name} is not installed. {InstallHint}");
         Directory.CreateDirectory(WorkFolder);
+        if (PendingContext is { Length: > 0 } context) prompt = context + prompt;
+        PendingContext = null;
         var arguments = BuildArguments(prompt);
         LastTurnUsage = null;
         var output = new StringBuilder();
@@ -254,7 +268,6 @@ public abstract class CliAgent
 /// <summary>Claude Code (`claude`), on the user's Claude subscription. Only Lignum's tools are available to it.</summary>
 public sealed class ClaudeCodeAgent : CliAgent
 {
-    private readonly string _sessionId = Guid.NewGuid().ToString();
     private bool _sawText;
 
     public override string Name => "Claude Code";
@@ -294,7 +307,7 @@ public sealed class ClaudeCodeAgent : CliAgent
             "--allowedTools", "mcp__lignum",
             "--append-system-prompt-file", instructions,
         ];
-        arguments.AddRange(HasStarted ? ["--resume", _sessionId] : ["--session-id", _sessionId]);
+        arguments.AddRange(HasStarted ? ["--resume", SessionId ??= Guid.NewGuid().ToString()] : ["--session-id", SessionId ??= Guid.NewGuid().ToString()]);
         AddModelArguments(arguments, "--model", "--effort");
         return arguments;
     }
@@ -605,6 +618,9 @@ public sealed class CodexCliAgent : CliAgent
 public sealed class CustomAgent(string command, string argumentTemplate) : CliAgent
 {
     public override string Name => "Custom agent";
+
+    /// <summary>Lignum cannot know whether the template continues a session, so a saved chat sends its earlier turns.</summary>
+    public override bool CanResume => false;
 
     public override string Command => command;
 

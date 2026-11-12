@@ -15,7 +15,7 @@ Each CLI has its own permission flags and config files, and they differ in shape
 - **A grant** is an access (read, write or execute) on a scope: a file, a folder and its subfolders, an executable (any arguments), or one exact command line. Write implies read. Execute is separate.
 - **Lifetimes:** *once* (nothing is stored), *this session* (in memory, gone when Lignum exits) and *always* (saved in `settings.json` under `aiPermissions`).
 - **Approval:** with no matching grant, Lignum shows a modal dialog in the app. It names the agent's request and offers the scopes that make sense (this file or its folder; this exact command or every command of that program). The buttons are Allow once, Allow for this session, Always allow and Deny.
-- **Revoking:** View → AI permissions… lists the session and always grants. Each has Revoke, and there is a Revoke all.
+- **Revoking:** View → Settings… → AI (Ctrl+,) lists the session and always grants. Each has Revoke, and there is a Revoke all.
 - **Paths are compared in canonical form:** a full path with `..` resolved, symlinks and junctions resolved to their final target (`GetFinalPathNameByHandle` on the deepest part that exists), compared without case. A grant on a folder covers a path only at a separator boundary, so `C:\a` does not cover `C:\ab`.
 - **Log files stay read-only:** `write_file` and `edit_file` refuse any file open as a log in a tab, whatever grants exist.
 

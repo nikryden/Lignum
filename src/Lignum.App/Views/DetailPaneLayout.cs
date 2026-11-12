@@ -40,6 +40,10 @@ public sealed class DetailPaneLayout : Grid
         new FrameworkPropertyMetadata(DetailPaneSettings.DefaultHeight,
             FrameworkPropertyMetadataOptions.BindsTwoWayByDefault, OnLayoutChanged));
 
+    /// <summary>Size the pane returns to when the splitter is double-clicked; NaN (default) turns that off.</summary>
+    public static readonly DependencyProperty DefaultPaneSizeProperty = DependencyProperty.Register(
+        nameof(DefaultPaneSize), typeof(double), typeof(DetailPaneLayout), new PropertyMetadata(double.NaN));
+
     private readonly GridSplitter _splitter;
 
     public DetailPaneLayout()
@@ -53,6 +57,7 @@ public sealed class DetailPaneLayout : Grid
         };
         _splitter.SetResourceReference(BackgroundProperty, Themes.ThemeKeys.PaneBorder);
         _splitter.DragCompleted += OnSplitterDragCompleted;
+        _splitter.MouseDoubleClick += OnSplitterDoubleClick;
         Children.Add(_splitter);
         UpdateLayoutDefinitions();
     }
@@ -85,6 +90,12 @@ public sealed class DetailPaneLayout : Grid
     {
         get => (double)GetValue(PaneWidthProperty);
         set => SetValue(PaneWidthProperty, value);
+    }
+
+    public double DefaultPaneSize
+    {
+        get => (double)GetValue(DefaultPaneSizeProperty);
+        set => SetValue(DefaultPaneSizeProperty, value);
     }
 
     public double PaneHeight
@@ -143,5 +154,12 @@ public sealed class DetailPaneLayout : Grid
         if (Pane is not FrameworkElement pane) return;
         if (Dock == DetailPaneDock.Right) SetCurrentValue(PaneWidthProperty, pane.ActualWidth);
         else SetCurrentValue(PaneHeightProperty, pane.ActualHeight);
+    }
+
+    private void OnSplitterDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (double.IsNaN(DefaultPaneSize)) return;
+        SetCurrentValue(Dock == DetailPaneDock.Right ? PaneWidthProperty : PaneHeightProperty, DefaultPaneSize);
+        e.Handled = true;
     }
 }

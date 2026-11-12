@@ -1,28 +1,36 @@
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using Lignum.App.ViewModels;
 
 namespace Lignum.App.Views;
 
-/// <summary>Edits <see cref="AppearanceViewModel.FontFamily"/> and <see cref="AppearanceViewModel.FontSize"/>.</summary>
-public partial class FontDialog : Window
+/// <summary>Settings > Appearance (ticket 30): theme and tab width apply at once; the font on Apply.</summary>
+public partial class AppearancePage : UserControl
 {
     private readonly AppearanceViewModel _appearance;
 
-    public FontDialog(AppearanceViewModel appearance)
+    public AppearancePage(AppearanceViewModel appearance)
     {
         _appearance = appearance;
+        DataContext = appearance;
         InitializeComponent();
         FamilyBox.ItemsSource = MonospacedFamilies();
-        FamilyBox.Text = appearance.FontFamily;
-        SizeBox.Text = appearance.FontSize.ToString(CultureInfo.CurrentCulture);
+        ShowCurrentFont();
     }
 
-    private void OnOkClick(object sender, RoutedEventArgs e)
+    private void ShowCurrentFont()
+    {
+        FamilyBox.Text = _appearance.FontFamily;
+        SizeBox.Text = _appearance.FontSize.ToString(CultureInfo.CurrentCulture);
+    }
+
+    private void OnApplyFontClick(object sender, RoutedEventArgs e)
     {
         if (!double.TryParse(SizeBox.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out var size))
         {
+            FontStatus.Text = "Type a number for the size.";
             SizeBox.Focus();
             SizeBox.SelectAll();
             return;
@@ -30,7 +38,14 @@ public partial class FontDialog : Window
 
         _appearance.FontFamily = FamilyBox.Text;
         _appearance.FontSize = size;
-        DialogResult = true;
+        ShowCurrentFont(); // shows the size after clamping
+        FontStatus.Text = "Applied.";
+    }
+
+    private void OnRevertFontClick(object sender, RoutedEventArgs e)
+    {
+        ShowCurrentFont();
+        FontStatus.Text = "";
     }
 
     /// <summary>Installed fonts whose narrow and wide glyphs have the same advance width.</summary>

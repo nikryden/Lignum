@@ -1,0 +1,28 @@
+<!-- View > Settings… (ticket 30): every settings page in one window; a page list on the left, the page on the right. -->
+<Window x:Class="Lignum.App.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Width="1180" Height="660" MinWidth="720" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+    <Window.InputBindings>
+        <KeyBinding Key="Escape" Command="ApplicationCommands.Close" />
+    </Window.InputBindings>
+    <Window.CommandBindings>
+        <CommandBinding Command="ApplicationCommands.Close" Executed="OnCloseExecuted" />
+    </Window.CommandBindings>
+    <DockPanel>
+        <ListBox x:Name="PageList" DockPanel.Dock="Left" Width="170" BorderThickness="0,0,1,0" Padding="0,8"
+                 BorderBrush="{DynamicResource PaneBorderBrush}"
+                 Background="{DynamicResource PaneBackgroundBrush}" Foreground="{DynamicResource WindowForegroundBrush}"
+                 SelectionChanged="OnPageSelected">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Title}" Padding="8,4" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <ContentControl x:Name="PageHost" Focusable="False" />
+    </DockPanel>
+</Window>
