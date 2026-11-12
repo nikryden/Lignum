@@ -82,4 +82,9 @@ public enum BookmarkColor
     Yellow,
     Green,
     Purple,
+    Orange,
+    Pink,
+    Teal,
+    Cyan,
+    Gray,
 }

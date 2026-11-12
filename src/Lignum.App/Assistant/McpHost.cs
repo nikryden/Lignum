@@ -74,7 +74,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
     public Task<string> AddBookmark(
         [Description("1-based line number.")] int line,
         [Description("Optional note shown on the bookmark.")] string? note = null,
-        [Description("Optional marker color: Blue (default), Red, Yellow, Green or Purple.")] string? color = null,
+        [Description("Optional marker color: Blue (default), Red, Yellow, Green, Purple, Orange, Pink, Teal, Cyan or Gray.")] string? color = null,
         [Description("Tab index or file name; default the selected tab.")] string? tab = null,
         CancellationToken cancellationToken = default)
     {
@@ -191,7 +191,7 @@ public sealed class LignumMcpTools(AiPipeClient lignum)
     public Task<string> EditBookmark(
         [Description("1-based line number of the bookmark.")] int line,
         [Description("New note; an empty string removes the note.")] string? note = null,
-        [Description("New color: Blue, Red, Yellow, Green or Purple.")] string? color = null,
+        [Description("New color: Blue, Red, Yellow, Green, Purple, Orange, Pink, Teal, Cyan or Gray.")] string? color = null,
         [Description("Tab index or file name; default the selected tab.")] string? tab = null,
         CancellationToken cancellationToken = default)
     {

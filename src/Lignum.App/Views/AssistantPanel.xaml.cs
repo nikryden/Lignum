@@ -25,19 +25,48 @@ public partial class AssistantPanel : UserControl
         InitializeComponent();
     }
 
-    /// <summary>Copies the MCP setting for the AI tool named in the button's Tag.</summary>
-    private void OnCopySetupClick(object sender, RoutedEventArgs e)
+    private void OnHistoryOpened(object sender, RoutedEventArgs e)
     {
-        if (DataContext is not AssistantViewModel assistant || sender is not Button { Tag: string tool }) return;
-        try
-        {
-            Clipboard.SetText(assistant.SetupSnippet(tool));
-            CopiedText.Text = "Copied. Paste it into your AI tool's MCP settings.";
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            CopiedText.Text = "The clipboard is busy; try again.";
-        }
+        if (DataContext is AssistantViewModel assistant) assistant.RefreshChatHistoryCommand.Execute(null);
+    }
+
+    private void OnHistoryClosed(object? sender, EventArgs e) => HistoryButton.IsChecked = false;
+
+    /// <summary>A click on a chat (not its ✕) opens it.</summary>
+    private void OnHistoryItemClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is DependencyObject source && FindParent<Button>(source) is not null) return;
+        OpenSelectedChat();
+    }
+
+    private void OnHistoryKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Enter) return;
+        OpenSelectedChat();
+        e.Handled = true;
+    }
+
+    private void OpenSelectedChat()
+    {
+        if (DataContext is not AssistantViewModel assistant || HistoryList.SelectedItem is not ChatSummary chat) return;
+        assistant.OpenChatCommand.Execute(chat);
+        HistoryButton.IsChecked = false;
+        InputBox.Focus();
+    }
+
+    private void OnDeleteAllChatsClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not AssistantViewModel { ChatHistory.Count: > 0 } assistant) return;
+        HistoryButton.IsChecked = false;
+        if (MessageBox.Show(Window.GetWindow(this)!, $"Delete all {assistant.ChatHistory.Count:N0} saved chats?", "AI chats",
+                MessageBoxButton.OKCancel, MessageBoxImage.Question) == MessageBoxResult.OK)
+            assistant.DeleteAllChatsCommand.Execute(null);
+    }
+
+    private static T? FindParent<T>(DependencyObject? element) where T : DependencyObject
+    {
+        while (element is not null and not T) element = System.Windows.Media.VisualTreeHelper.GetParent(element);
+        return element as T;
     }
 
     /// <summary>Enter sends; Shift+Enter adds a line. While skills are suggested, ↑/↓ choose, Tab/Enter insert, Esc closes.</summary>

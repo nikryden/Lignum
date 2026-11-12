@@ -21,6 +21,15 @@ public sealed partial class MainViewModel
     private DetailPaneLayoutViewModel? _assistantPane;
 
     /// <summary>Where the AI panel sits (right or bottom), its size and whether it is open; saved in settings.json.</summary>
+    /// <summary>Default height of the find-in-all-tabs / find-in-files results pane (ticket 34).</summary>
+    public const double DefaultSearchResultsPaneHeight = 260;
+
+    /// <summary>Size of the find-in-all-tabs / find-in-files results pane (ticket 34); its visibility comes from AllTabsSearch.</summary>
+    public DetailPaneLayoutViewModel SearchResultsPane => _searchResultsPane ??= new DetailPaneLayoutViewModel(_settings,
+        s => s.SearchResultsPane ??= new Settings.DetailPaneSettings { Dock = Settings.DetailPaneDock.Bottom, Height = DefaultSearchResultsPaneHeight });
+
+    private DetailPaneLayoutViewModel? _searchResultsPane;
+
     public DetailPaneLayoutViewModel AssistantPane => _assistantPane ??= new DetailPaneLayoutViewModel(_settings,
         s => s.AssistantPane ??= new Settings.DetailPaneSettings { IsOpen = false, Width = 380 });
 

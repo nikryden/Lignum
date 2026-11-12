@@ -1,0 +1,56 @@
+<!-- Settings > Appearance (ticket 30): theme, tab width and the viewer font. DataContext is the AppearanceViewModel. -->
+<UserControl x:Class="Lignum.App.Views.AppearancePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Lignum.App.Views"
+             xmlns:settings="clr-namespace:Lignum.App.Settings"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+    <UserControl.Resources>
+        <views:EqualityConverter x:Key="IsEqual" />
+    </UserControl.Resources>
+    <StackPanel Margin="12" MaxWidth="520" HorizontalAlignment="Left">
+        <TextBlock Text="Theme" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <RadioButton Content="Use Windows setting" GroupName="Theme" Margin="0,2" Command="{Binding SetThemeCommand}"
+                     CommandParameter="{x:Static settings:ThemeChoice.System}"
+                     IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=System}" />
+        <RadioButton Content="Light" GroupName="Theme" Margin="0,2" Command="{Binding SetThemeCommand}"
+                     CommandParameter="{x:Static settings:ThemeChoice.Light}"
+                     IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Light}" />
+        <RadioButton Content="Dark" GroupName="Theme" Margin="0,2,0,16" Command="{Binding SetThemeCommand}"
+                     CommandParameter="{x:Static settings:ThemeChoice.Dark}"
+                     IsChecked="{Binding ThemeChoice, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=Dark}" />
+
+        <TextBlock Text="Tab width" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+            <RadioButton Content="2" GroupName="TabWidth" Margin="0,0,16,0" Command="{Binding SetTabWidthCommand}"
+                         IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=2}">
+                <RadioButton.CommandParameter><sys:Int32>2</sys:Int32></RadioButton.CommandParameter>
+            </RadioButton>
+            <RadioButton Content="4" GroupName="TabWidth" Margin="0,0,16,0" Command="{Binding SetTabWidthCommand}"
+                         IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=4}">
+                <RadioButton.CommandParameter><sys:Int32>4</sys:Int32></RadioButton.CommandParameter>
+            </RadioButton>
+            <RadioButton Content="8" GroupName="TabWidth" Command="{Binding SetTabWidthCommand}"
+                         IsChecked="{Binding TabWidth, Mode=OneWay, Converter={StaticResource IsEqual}, ConverterParameter=8}">
+                <RadioButton.CommandParameter><sys:Int32>8</sys:Int32></RadioButton.CommandParameter>
+            </RadioButton>
+        </StackPanel>
+
+        <TextBlock Text="Font" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBlock Text="Family (monospaced fonts)" Margin="0,0,0,4" />
+        <ComboBox x:Name="FamilyBox" IsEditable="True" Margin="0,0,0,8" />
+        <TextBlock Text="Size (points)" Margin="0,0,0,4" />
+        <TextBox x:Name="SizeBox" Margin="0,0,0,8" />
+        <Border BorderBrush="{DynamicResource PaneBorderBrush}" BorderThickness="1" Padding="8"
+                Background="{DynamicResource ViewerBackgroundBrush}" Margin="0,0,0,8">
+            <TextBlock Text="2026-10-16 12:00:00 INFO Sample log line 0123456789"
+                       Foreground="{DynamicResource ViewerForegroundBrush}"
+                       FontFamily="{Binding Text, ElementName=FamilyBox}" />
+        </Border>
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Apply font" MinWidth="90" Margin="0,0,8,0" Click="OnApplyFontClick" />
+            <Button Content="Revert" MinWidth="80" Margin="0,0,8,0" Click="OnRevertFontClick" />
+            <TextBlock x:Name="FontStatus" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

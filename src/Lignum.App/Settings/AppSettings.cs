@@ -60,6 +60,9 @@ public sealed class AppSettings
     /// <summary>Where the AI panel sits and its size (closed by default); null until first used.</summary>
     public DetailPaneSettings? AssistantPane { get; set; }
 
+    /// <summary>Height of the find-in-all-tabs / find-in-files results pane (ticket 34); null until first resized.</summary>
+    public DetailPaneSettings? SearchResultsPane { get; set; }
+
     /// <summary>AI access (ticket 05).</summary>
     public AssistantSettings Assistant { get; set; } = new();
 

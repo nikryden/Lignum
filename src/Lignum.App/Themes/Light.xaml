@@ -12,6 +12,7 @@
     <SolidColorBrush x:Key="SearchMatchBackgroundBrush" Color="#FFE680" />
 
     <SolidColorBrush x:Key="PaneBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="ChatUserMessageBackgroundBrush" Color="#EEF2F8" />
     <SolidColorBrush x:Key="PaneBorderBrush" Color="#D6D6D6" />
 
     <SolidColorBrush x:Key="StatusBarBackgroundBrush" Color="#EBEBEB" />
@@ -36,4 +37,9 @@
     <SolidColorBrush x:Key="BookmarkMarkerYellowBrush" Color="#C99A00" />
     <SolidColorBrush x:Key="BookmarkMarkerGreenBrush" Color="#2E9E3E" />
     <SolidColorBrush x:Key="BookmarkMarkerPurpleBrush" Color="#8E44D1" />
+    <SolidColorBrush x:Key="BookmarkMarkerOrangeBrush" Color="#E06A00" />
+    <SolidColorBrush x:Key="BookmarkMarkerPinkBrush" Color="#D6338A" />
+    <SolidColorBrush x:Key="BookmarkMarkerTealBrush" Color="#00897B" />
+    <SolidColorBrush x:Key="BookmarkMarkerCyanBrush" Color="#0097B8" />
+    <SolidColorBrush x:Key="BookmarkMarkerGrayBrush" Color="#6E6E6E" />
 </ResourceDictionary>

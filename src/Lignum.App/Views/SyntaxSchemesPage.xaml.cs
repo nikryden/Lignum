@@ -10,7 +10,7 @@ using Microsoft.Win32;
 namespace Lignum.App.Views;
 
 /// <summary>Edits <see cref="SyntaxViewModel"/> schemes (ticket 25); every change applies at once.</summary>
-public partial class SyntaxSchemesDialog : Window
+public partial class SyntaxSchemesPage : System.Windows.Controls.UserControl
 {
     private const string JsonFilter = "Lignum syntax schemes (*.json)|*.json|All files (*.*)|*.*";
 
@@ -23,16 +23,19 @@ public partial class SyntaxSchemesDialog : Window
 
     private readonly SyntaxViewModel _syntax;
 
-    public SyntaxSchemesDialog(SyntaxViewModel syntax)
+    public SyntaxSchemesPage(SyntaxViewModel syntax)
     {
         _syntax = syntax;
         DataContext = syntax;
         InitializeComponent();
         SampleInput.Text = DefaultSample;
-        syntax.PropertyChanged += OnSyntaxChanged;
-        Closed += (_, _) => syntax.PropertyChanged -= OnSyntaxChanged;
-        // Commit a cell being edited when the dialog closes, so the last edit isn't lost.
-        Closing += (_, _) => RulesGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
+        // Listen only while shown: the page is swapped in and out of the Settings window (ticket 30).
+        Loaded += (_, _) => { syntax.PropertyChanged += OnSyntaxChanged; RenderSample(); };
+        Unloaded += (_, _) =>
+        {
+            syntax.PropertyChanged -= OnSyntaxChanged;
+            CommitEdits(); // so the last edit isn't lost
+        };
         RenderSample();
     }
 
@@ -72,7 +75,7 @@ public partial class SyntaxSchemesDialog : Window
     private void OnImportClick(object sender, RoutedEventArgs e)
     {
         var dialog = new OpenFileDialog { Title = "Import syntax schemes", Filter = JsonFilter };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
 
         List<Core.Syntax.SyntaxScheme> schemes;
         try
@@ -81,7 +84,7 @@ public partial class SyntaxSchemesDialog : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or InvalidDataException)
         {
-            MessageBox.Show(this, $"Could not import {Path.GetFileName(dialog.FileName)}: {ex.Message}", "Import",
+            MessageBox.Show(Window.GetWindow(this)!, $"Could not import {Path.GetFileName(dialog.FileName)}: {ex.Message}", "Import",
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -89,7 +92,7 @@ public partial class SyntaxSchemesDialog : Window
         var replace = false;
         if (_syntax.Conflicts(schemes) is { Count: > 0 } conflicts)
         {
-            var answer = MessageBox.Show(this,
+            var answer = MessageBox.Show(Window.GetWindow(this)!,
                 $"These schemes already exist: {string.Join(", ", conflicts)}.\n\nYes: replace them.  No: keep both.",
                 "Import", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
             if (answer == MessageBoxResult.Cancel) return;
@@ -112,7 +115,7 @@ public partial class SyntaxSchemesDialog : Window
     {
         CommitEdits();
         var dialog = new SaveFileDialog { Title = "Export syntax schemes", Filter = JsonFilter, FileName = name + ".json" };
-        if (dialog.ShowDialog(this) != true) return;
+        if (dialog.ShowDialog(Window.GetWindow(this)) != true) return;
         try
         {
             _syntax.Export(dialog.FileName, schemes);
@@ -120,13 +123,13 @@ public partial class SyntaxSchemesDialog : Window
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, $"Could not export: {ex.Message}", "Export", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(Window.GetWindow(this)!, $"Could not export: {ex.Message}", "Export", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
     private void OnFactoryDefaultsClick(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(this, "This brings back the built-in schemes and deletes added schemes and every change. Continue?",
+        if (MessageBox.Show(Window.GetWindow(this)!, "This brings back the built-in schemes and deletes added schemes and every change. Continue?",
                 "Factory defaults", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
         RulesGrid.CancelEdit(System.Windows.Controls.DataGridEditingUnit.Row);
         _syntax.ResetToFactoryDefaults();

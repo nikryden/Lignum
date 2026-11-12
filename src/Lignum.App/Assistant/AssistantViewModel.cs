@@ -546,8 +546,127 @@ public sealed partial class AssistantViewModel : ObservableObject
     {
         _cancel?.Cancel();
         _agent = null;
+        _chat = null;
         Entries.Clear();
         ResetUsage();
+    }
+
+    // ---- Chat history (ticket 32) ----
+
+    private ChatHistoryStore? _chatStore;
+    private ChatSession? _chat;
+
+    /// <summary>Where chats are saved: <c>chats</c> in the settings folder.</summary>
+    internal ChatHistoryStore ChatStore
+    {
+        get => _chatStore ??= new ChatHistoryStore(Path.Combine(_settings.Store.Directory, "chats"));
+        set => _chatStore = value;
+    }
+
+    /// <summary>Saved chats, newest first; filled when the history list opens.</summary>
+    public ObservableCollection<ChatSummary> ChatHistory { get; } = [];
+
+    /// <summary>The id of the chat shown, or null before its first question.</summary>
+    public string? CurrentChatId => _chat?.Id;
+
+    [RelayCommand]
+    private void RefreshChatHistory()
+    {
+        ChatHistory.Clear();
+        foreach (var chat in ChatStore.List()) ChatHistory.Add(chat);
+    }
+
+    /// <summary>Shows a saved chat; the next question continues it with the agent it used.</summary>
+    [RelayCommand]
+    private void OpenChat(ChatSummary? summary)
+    {
+        if (summary is null || ChatStore.Load(summary.Id) is not { } chat) return;
+        _cancel?.Cancel();
+        if (chat.Agent >= 0 && chat.Agent < AgentNames.Count) SelectedAgent = chat.Agent; // resets the agent and usage
+        _agent = null;
+        ResetUsage();
+        Entries.Clear();
+        foreach (var line in chat.Lines.TakeLast(MaxEntries)) Entries.Add(new ChatEntry(line.Kind, line.Text));
+        _chat = chat;
+        Add(ChatEntryKind.Activity, $"Continuing the chat from {chat.Updated.LocalDateTime:g}.");
+    }
+
+    [RelayCommand]
+    private void DeleteChat(ChatSummary? summary)
+    {
+        if (summary is null) return;
+        TryChatStore(() => ChatStore.Delete(summary.Id));
+        if (_chat?.Id == summary.Id) _chat = null; // the lines stay on screen; a new question starts a new chat
+        ChatHistory.Remove(summary);
+    }
+
+    [RelayCommand]
+    private void DeleteAllChats()
+    {
+        TryChatStore(ChatStore.DeleteAll);
+        _chat = null;
+        ChatHistory.Clear();
+    }
+
+    /// <summary>The agent for the current chat: a new one, or one set up to continue a saved chat.</summary>
+    private CliAgent AgentForChat(string question)
+    {
+        if (_chat is null)
+        {
+            _chat = new ChatSession { Title = TitleOf(question), Agent = SelectedAgent };
+            var fresh = CreateAgent(SelectedAgent, AgentFolder(_chat.Id));
+            _chat.WorkFolder = fresh.WorkFolder;
+            return fresh;
+        }
+
+        var sameAgent = _chat.Agent == SelectedAgent;
+        var agent = CreateAgent(SelectedAgent, sameAgent && _chat.WorkFolder is { Length: > 0 } folder ? folder : AgentFolder(_chat.Id));
+        if (sameAgent && agent.CanResume && _chat.HasStarted)
+        {
+            agent.HasStarted = true;
+            agent.SessionId = _chat.AgentSessionId;
+        }
+        else if (_chat.Lines.Count > 0)
+        {
+            // Another agent, or one that cannot resume: send the earlier turns with the next question.
+            agent.PendingContext = ChatHistoryStore.ContextPreamble(_chat.Lines);
+        }
+
+        _chat.Agent = SelectedAgent;
+        _chat.WorkFolder = agent.WorkFolder;
+        return agent;
+    }
+
+    /// <summary>Saves the current chat after a turn.</summary>
+    private void SaveChat(CliAgent agent)
+    {
+        if (_chat is null || !ReferenceEquals(agent, _agent)) return;
+        _chat.HasStarted = agent.HasStarted;
+        _chat.AgentSessionId = agent.SessionId;
+        _chat.Updated = DateTimeOffset.Now;
+        _chat.Lines = [.. Entries.Select(e => new ChatLine(e.Kind, e.Text))];
+        TryChatStore(() => ChatStore.Save(_chat));
+    }
+
+    private void TryChatStore(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.Warning(ex, "Could not update the AI chat history");
+        }
+    }
+
+    private static string AgentFolder(string chatId) =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lignum", "agents", chatId);
+
+    internal static string TitleOf(string question)
+    {
+        var line = question.ReplaceLineEndings(" ").Trim();
+        return line.Length <= 60 ? line : line[..59].TrimEnd() + "…";
     }
 
     private bool CanSend() => IsEnabled && !IsBusy && !string.IsNullOrWhiteSpace(Input);
@@ -582,7 +701,7 @@ public sealed partial class AssistantViewModel : ObservableObject
         Add(ChatEntryKind.User, question);
         var answer = new ChatEntry(ChatEntryKind.Assistant, "");
         Entries.Add(answer);
-        _agent ??= CreateAgent(SelectedAgent);
+        _agent ??= AgentForChat(question);
         var agent = _agent;
         _cancel = new CancellationTokenSource();
         IsBusy = true;
@@ -609,7 +728,11 @@ public sealed partial class AssistantViewModel : ObservableObject
             IsBusy = false;
             _cancel.Dispose();
             _cancel = null;
-            OnUi(() => CountUsage(agent));
+            OnUi(() =>
+            {
+                CountUsage(agent);
+                SaveChat(agent);
+            });
         }
     }
 
@@ -663,9 +786,9 @@ public sealed partial class AssistantViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsBusy))]
     private void Stop() => _cancel?.Cancel();
 
-    private CliAgent CreateAgent(int index)
+    private CliAgent CreateAgent(int index, string? workFolder = null)
     {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lignum",
+        var folder = workFolder ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lignum",
             "agents", Guid.NewGuid().ToString("N"));
         var made = AgentFactory?.Invoke(index, folder) ?? index switch
         {

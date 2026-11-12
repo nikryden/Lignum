@@ -4,18 +4,18 @@ using Lignum.App.ViewModels;
 namespace Lignum.App.Views;
 
 /// <summary>Edits <see cref="HighlightingViewModel"/> rules and presets; every change applies at once.</summary>
-public partial class HighlightRulesDialog : Window
+public partial class HighlightRulesPage : System.Windows.Controls.UserControl
 {
     private readonly HighlightingViewModel _highlighting;
 
-    public HighlightRulesDialog(HighlightingViewModel highlighting)
+    public HighlightRulesPage(HighlightingViewModel highlighting)
     {
         _highlighting = highlighting;
         DataContext = highlighting;
         InitializeComponent();
         PresetNameBox.Text = highlighting.ActivePreset?.Name ?? "";
-        // Commit a cell being edited when the dialog closes, so the last edit isn't lost.
-        Closing += (_, _) => RulesGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
+        // Commit a cell being edited when the page is hidden or Settings closes, so the last edit isn't lost.
+        Unloaded += (_, _) => RulesGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
     }
 
     private void OnSaveAsClick(object sender, RoutedEventArgs e)
@@ -35,7 +35,7 @@ public partial class HighlightRulesDialog : Window
     {
         var others = _highlighting.Presets.Count - 1;
         var lost = others > 0 ? $" and deletes the other {others:N0} preset{(others == 1 ? "" : "s")}" : "";
-        if (MessageBox.Show(this, $"This brings back the rules of the first start{lost}. Continue?",
+        if (MessageBox.Show(Window.GetWindow(this)!, $"This brings back the rules of the first start{lost}. Continue?",
                 "Factory defaults", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK) return;
         RulesGrid.CancelEdit(System.Windows.Controls.DataGridEditingUnit.Row);
         _highlighting.ResetToFactoryDefaults();

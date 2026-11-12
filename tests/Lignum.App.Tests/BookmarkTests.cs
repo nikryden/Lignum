@@ -213,6 +213,32 @@ public sealed class BookmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task Every_bookmark_color_is_saved_and_restored_and_has_a_brush_in_both_themes()
+    {
+        var a = WriteLog("a.log");
+        var tab = await Open(Start(), a);
+        var colors = Enum.GetValues<BookmarkColor>();
+        for (var i = 0; i < colors.Length; i++) tab.Bookmarks.SetColor(i, colors[i]);
+
+        var reopened = await Open(Start(), a);
+
+        Assert.Equal(colors, reopened.Bookmarks.Items.Select(b => b.Color));
+        foreach (var theme in new[] { "Dark", "Light" })
+        {
+            var themeXaml = File.ReadAllText(Path.Combine(RepoRoot(), "src", "Lignum.App", "Themes", theme + ".xaml"));
+            foreach (var color in colors)
+                Assert.Contains($"x:Key=\"{Lignum.App.Themes.ThemeKeys.BookmarkMarkerFor(color)}\"", themeXaml);
+        }
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "Lignum.sln"))) dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Lignum.sln not found above the test folder.");
+    }
+
+    [Fact]
     public async Task A_new_bookmark_is_blue_and_blue_is_not_written_to_the_file()
     {
         var tab = await Open(Start(), WriteLog("a.log"));

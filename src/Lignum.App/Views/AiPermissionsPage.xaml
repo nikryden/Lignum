@@ -1,18 +1,13 @@
-<!-- View → AI permissions… (ticket 17): every grant the AI has, with Revoke. -->
-<Window x:Class="Lignum.App.Views.AiPermissionsDialog"
+<!-- Settings > AI (tickets 17, 30): every grant the AI has, with Revoke. -->
+<UserControl x:Class="Lignum.App.Views.AiPermissionsPage"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AI permissions" Width="640" Height="380" MinWidth="420" MinHeight="240"
-        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        Background="{DynamicResource WindowBackgroundBrush}"
-        Foreground="{DynamicResource WindowForegroundBrush}">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <DockPanel Margin="12">
         <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8" Opacity="0.8"
                    Text="What the AI may do without asking. Session grants end when Lignum exits; Always grants stay until you revoke them." />
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
             <Button x:Name="RevokeButton" Content="_Revoke" MinWidth="80" Margin="0,0,8,0" Click="OnRevokeClick" />
             <Button Content="Revoke _all" MinWidth="80" Margin="0,0,8,0" Click="OnRevokeAllClick" />
-            <Button Content="Close" MinWidth="80" IsCancel="True" />
         </StackPanel>
         <TextBlock x:Name="EmptyText" DockPanel.Dock="Top" Text="No permissions granted." Opacity="0.7" Visibility="Collapsed" />
         <ListView x:Name="GrantList" SelectionMode="Extended">
@@ -27,4 +22,4 @@
             </ListView.View>
         </ListView>
     </DockPanel>
-</Window>
+</UserControl>

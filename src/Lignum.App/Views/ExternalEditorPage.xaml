@@ -1,0 +1,21 @@
+<!-- Settings > External editor (tickets 13, 30): which editor File > Open in editor starts, and its argument template. -->
+<UserControl x:Class="Lignum.App.Views.ExternalEditorPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StackPanel Margin="12" MaxWidth="520" HorizontalAlignment="Left">
+        <TextBlock Text="Preset" Margin="0,0,0,4" />
+        <ComboBox x:Name="PresetBox" Margin="0,0,0,12" SelectionChanged="OnPresetChanged" />
+        <TextBlock Text="Command (exe name on PATH or full path)" Margin="0,0,0,4" />
+        <DockPanel Margin="0,0,0,12">
+            <Button DockPanel.Dock="Right" Content="Browse…" MinWidth="80" Margin="8,0,0,0" Click="OnBrowseClick" />
+            <TextBox x:Name="CommandBox" />
+        </DockPanel>
+        <TextBlock Text="Arguments ({file} = full path, {line} = 1-based line)" Margin="0,0,0,4" />
+        <TextBox x:Name="ArgumentsBox" Margin="0,0,0,12" />
+        <StackPanel Orientation="Horizontal">
+            <Button Content="Apply" MinWidth="80" Margin="0,0,8,0" Click="OnApplyClick" />
+            <Button Content="Revert" MinWidth="80" Margin="0,0,8,0" Click="OnRevertClick" />
+            <TextBlock x:Name="Status" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

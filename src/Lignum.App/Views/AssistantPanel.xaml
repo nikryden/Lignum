@@ -5,6 +5,7 @@
 <UserControl x:Class="Lignum.App.Views.AssistantPanel"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:app="clr-namespace:Lignum.App"
              Background="{DynamicResource PaneBackgroundBrush}"
              Foreground="{DynamicResource WindowForegroundBrush}">
     <UserControl.Resources>
@@ -35,28 +36,55 @@
             <TextBlock Text="AI access" FontWeight="SemiBold" VerticalAlignment="Center" />
         </DockPanel>
 
-        <!-- How to connect an AI tool: shown both when off and on. -->
-        <Expander DockPanel.Dock="Bottom" Header="Connect an AI tool" Margin="8" IsExpanded="False">
-            <StackPanel Margin="0,4,0,0">
-                <TextBlock TextWrapping="Wrap" Margin="0,0,0,6"
-                           Text="Add Lignum as an MCP server in your AI tool once. Copy the setting for your tool and paste it where the tool keeps its MCP servers:" />
-                <Button Content="Copy for VS Code / GitHub Copilot (mcp.json)" Margin="0,2" HorizontalContentAlignment="Left"
-                        Padding="6,1" Tag="vscode" Click="OnCopySetupClick" />
-                <Button Content="Copy for Claude Desktop, Cursor, Windsurf, Antigravity (mcpServers JSON)" Margin="0,2" HorizontalContentAlignment="Left"
-                        Padding="6,1" Tag="claude-desktop" Click="OnCopySetupClick" />
-                <Button Content="Copy OpenAI Codex command" Margin="0,2" HorizontalContentAlignment="Left"
-                        Padding="6,1" Tag="codex" Click="OnCopySetupClick" />
-                <Button Content="Copy Claude Code command" Margin="0,2" HorizontalContentAlignment="Left"
-                        Padding="6,1" Tag="claude-code" Click="OnCopySetupClick" />
-                <TextBlock x:Name="CopiedText" Margin="0,4,0,0" Opacity="0.7" />
-                <TextBlock Margin="0,4,0,0" Opacity="0.7" TextWrapping="Wrap" Text="{Binding ExePath, StringFormat=Lignum: {0}}" />
-            </StackPanel>
-        </Expander>
+        <!-- How to connect an AI tool: moved to Settings > AI (ticket 31); this link opens it. -->
+        <TextBlock DockPanel.Dock="Bottom" Margin="8">
+            <Hyperlink Command="{x:Static app:MainWindow.SettingsCommand}" CommandParameter="Ai">Connect an AI tool…</Hyperlink>
+        </TextBlock>
 
         <!-- On: the chat. The selected agent CLI runs on the user's own subscription with Lignum's tools. -->
         <DockPanel DockPanel.Dock="Bottom" Margin="8,4,8,0" Visibility="{Binding IsEnabled, Converter={StaticResource BoolToVisibility}}">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
                 <Button DockPanel.Dock="Right" Content="New conversation" Padding="6,0" Command="{Binding NewConversationCommand}" />
+                <!-- Saved chats (ticket 32): pick one to continue it, ✕ deletes it. -->
+                <ToggleButton x:Name="HistoryButton" DockPanel.Dock="Right" Content="History ▾" Padding="6,0" Margin="0,0,4,0"
+                              ToolTip="Earlier chats: pick one to continue it" Checked="OnHistoryOpened" />
+                <Popup IsOpen="{Binding IsChecked, ElementName=HistoryButton}" PlacementTarget="{Binding ElementName=HistoryButton}"
+                       Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                       Closed="OnHistoryClosed">
+                    <Border Background="{DynamicResource PaneBackgroundBrush}" BorderBrush="{DynamicResource PaneBorderBrush}"
+                            BorderThickness="1" CornerRadius="4" Padding="4" Width="340">
+                        <DockPanel>
+                            <DockPanel DockPanel.Dock="Bottom" Margin="0,4,0,0">
+                                <Button DockPanel.Dock="Right" Content="Delete all" Padding="6,0" Click="OnDeleteAllChatsClick" />
+                                <TextBlock Text="{Binding ChatHistory.Count, StringFormat={}{0} saved chats}" Opacity="0.7"
+                                           VerticalAlignment="Center" Foreground="{DynamicResource WindowForegroundBrush}" />
+                            </DockPanel>
+                            <ListBox x:Name="HistoryList" ItemsSource="{Binding ChatHistory}" MaxHeight="320" BorderThickness="0"
+                                     Background="Transparent" Foreground="{DynamicResource WindowForegroundBrush}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                     MouseLeftButtonUp="OnHistoryItemClick" KeyDown="OnHistoryKeyDown">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="2,1">
+                                            <Button DockPanel.Dock="Right" Content="✕" Padding="4,0" Margin="4,0,0,0" ToolTip="Delete this chat"
+                                                    Command="{Binding DataContext.DeleteChatCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                                    CommandParameter="{Binding}" />
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding When}" Opacity="0.65" FontSize="11" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
+                </Popup>
                 <ComboBox ItemsSource="{Binding AgentNames}" SelectedIndex="{Binding SelectedAgent}" Margin="0,0,4,0"
                           ToolTip="The AI agent installed on this PC that answers here" />
             </DockPanel>
@@ -190,16 +218,22 @@
             <ItemsControl ItemsSource="{Binding Entries}" Margin="8,0">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <StackPanel Margin="0,2">
+                        <!-- Ticket 33: the user's own messages get a slightly different background. -->
+                        <Border x:Name="Bubble" Margin="0,2" Padding="0" CornerRadius="4" Background="Transparent">
+                        <StackPanel>
                             <TextBlock x:Name="Who" FontWeight="SemiBold" Visibility="Collapsed" />
                             <TextBox x:Name="Body" Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap"
                                      BorderThickness="0" Background="Transparent" Padding="0"
                                      Foreground="{DynamicResource WindowForegroundBrush}" />
                         </StackPanel>
+                        </Border>
                         <DataTemplate.Triggers>
                             <DataTrigger Binding="{Binding Kind}" Value="User">
                                 <Setter TargetName="Who" Property="Text" Value="You" />
                                 <Setter TargetName="Who" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Bubble" Property="Background" Value="{DynamicResource ChatUserMessageBackgroundBrush}" />
+                                <Setter TargetName="Bubble" Property="Padding" Value="6,4" />
+                                <Setter TargetName="Bubble" Property="Margin" Value="0,4" />
                             </DataTrigger>
                             <DataTrigger Binding="{Binding Kind}" Value="Assistant">
                                 <Setter TargetName="Who" Property="Text" Value="AI" />
