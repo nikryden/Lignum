@@ -20,14 +20,17 @@ public sealed class QueryResult : IDisposable
 {
     private readonly LineIndex _lines = new(); // an append-only list of longs; here, matching line numbers
     private readonly CancellationTokenSource _cancel = new();
-    private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource _completion = NewCompletion();
     private long _bytesSearched;
+    private long _totalBytes;
+    private long _nextLine;
     private int _state = (int)QueryState.Running;
 
-    internal QueryResult(Query query, long totalBytes)
+    internal QueryResult(LogDocument document, Query query, long totalBytes)
     {
+        Document = document;
         Query = query;
-        TotalBytes = totalBytes;
+        _totalBytes = totalBytes;
     }
 
     public Query Query { get; }
@@ -48,8 +51,11 @@ public sealed class QueryResult : IDisposable
         ? 1.0
         : Math.Min(1.0, (double)Interlocked.Read(ref _bytesSearched) / TotalBytes);
 
-    /// <summary>Completes when the query stops for any reason. Never faults; check <see cref="State"/>.</summary>
-    public Task Completion => _completion.Task;
+    /// <summary>
+    /// Completes when the query stops for any reason. Never faults; check <see cref="State"/>. After
+    /// <see cref="LogDocument.ExtendQuery"/> it is a new task that completes when the extension stops.
+    /// </summary>
+    public Task Completion => Volatile.Read(ref _completion).Task;
 
     /// <summary>Raised on a background thread when more matches arrive or the query stops. Marshal yourself.</summary>
     public event EventHandler? Changed;
@@ -80,15 +86,34 @@ public sealed class QueryResult : IDisposable
 
     public void Dispose() => Cancel();
 
-    internal long TotalBytes { get; }
+    internal LogDocument Document { get; }
+
+    internal long TotalBytes => Interlocked.Read(ref _totalBytes);
+
+    /// <summary>The line after the last one searched: where an extension continues.</summary>
+    internal long NextLine => Interlocked.Read(ref _nextLine);
 
     internal CancellationToken Token => _cancel.Token;
 
-    internal void Append(List<long> lines, long bytesSearched)
+    /// <summary>Adds matches in file order; a line already in the result (re-searched by an extension) is skipped.</summary>
+    internal void Append(List<long> lines, long nextLine, long bytesSearched)
     {
-        foreach (var line in lines) _lines.Append(line);
+        foreach (var line in lines)
+            if (_lines.Count == 0 || line > _lines[_lines.Count - 1]) _lines.Append(line);
+        Interlocked.Exchange(ref _nextLine, nextLine);
         Interlocked.Exchange(ref _bytesSearched, bytesSearched);
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Makes a completed query running again over a file now <paramref name="totalBytes"/> long; false otherwise.</summary>
+    internal bool TryResume(long totalBytes)
+    {
+        if (Token.IsCancellationRequested) return false;
+        if (Interlocked.CompareExchange(ref _state, (int)QueryState.Running, (int)QueryState.Completed)
+            != (int)QueryState.Completed) return false;
+        Volatile.Write(ref _completion, NewCompletion());
+        Interlocked.Exchange(ref _totalBytes, totalBytes);
+        return true;
     }
 
     internal void Finish(QueryState state, Exception? error = null)
@@ -96,6 +121,8 @@ public sealed class QueryResult : IDisposable
         Error = error;
         Volatile.Write(ref _state, (int)state);
         Changed?.Invoke(this, EventArgs.Empty);
-        _completion.TrySetResult();
+        Volatile.Read(ref _completion).TrySetResult();
     }
+
+    private static TaskCompletionSource NewCompletion() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

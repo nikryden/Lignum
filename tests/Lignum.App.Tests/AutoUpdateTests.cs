@@ -245,4 +245,42 @@ public class AutoUpdateTests : IDisposable
         Assert.False(tab.Search.IsOutdated);
         Assert.Equal(2, tab.Search.MatchCount);
     }
+
+    [Fact]
+    public async Task Auto_updating_results_add_the_matches_of_new_lines()
+    {
+        var (main, tab, path) = await OpenAsync("error 1\ninfo\n");
+        using var _ = main;
+        tab.Search.FindText = "error";
+        await tab.Search.FindAllCommand.ExecuteAsync(null);
+        var results = tab.Search.Results;
+        tab.AutoUpdate = true;
+        tab.Search.AutoUpdateResults = true;
+
+        File.AppendAllText(path, "error 2\n");
+        WaitUntil(() => tab.Search.MatchCount == 2 && !tab.Search.IsSearching);
+
+        Assert.False(tab.Search.IsOutdated);
+        Assert.Same(results, tab.Search.Results); // the same rows, so the pane keeps its place
+    }
+
+    [Fact]
+    public async Task Auto_updating_results_need_the_tab_to_auto_update()
+    {
+        var (main, tab, path) = await OpenAsync("error 1\ninfo\n");
+        using var _ = main;
+        tab.Search.FindText = "error";
+        await tab.Search.FindAllCommand.ExecuteAsync(null);
+        tab.Search.AutoUpdateResults = true;
+
+        File.AppendAllText(path, "error 2\n");
+        WaitUntil(() => tab.IsFileChanged);
+        await tab.ReloadCommand.ExecuteAsync(null);
+        WaitUntil(() => tab.Search.IsOutdated);
+        Assert.Equal(1, tab.Search.MatchCount);
+
+        tab.AutoUpdate = true; // catches up
+        WaitUntil(() => tab.Search.MatchCount == 2 && !tab.Search.IsSearching);
+        Assert.False(tab.Search.IsOutdated);
+    }
 }

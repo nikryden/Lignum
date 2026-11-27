@@ -21,12 +21,31 @@ public sealed partial class LogDocument
     {
         ArgumentNullException.ThrowIfNull(query);
         ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        var result = new QueryResult(query, TotalBytes);
-        Task.Run(() => RunQuery(result));
+        var result = new QueryResult(this, query, TotalBytes);
+        Task.Run(() => RunQuery(result, 0));
         return result;
     }
 
-    private async Task RunQuery(QueryResult result)
+    /// <summary>
+    /// Continues a completed <paramref name="result"/> of this document over the lines indexed since (after
+    /// <see cref="IndexAppendedAsync"/>), adding their matches to it on a background thread; its
+    /// <see cref="QueryResult.Completion"/> becomes a new task. The old last line is searched again, since a line
+    /// without a line break grows in place; a match it already had stays. Returns false, doing nothing, when
+    /// the result is still running, was cancelled or failed, or the index is invalid (truncated or replaced).
+    /// </summary>
+    public bool ExtendQuery(QueryResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+        if (!ReferenceEquals(result.Document, this))
+            throw new ArgumentException("The result belongs to another document.", nameof(result));
+        if (!IsIndexValid || !result.TryResume(TotalBytes)) return false;
+        var first = Math.Max(0, result.NextLine - 1);
+        Task.Run(() => RunQuery(result, first));
+        return true;
+    }
+
+    private async Task RunQuery(QueryResult result, long first)
     {
         var token = result.Token;
         var matcher = result.Query.Matcher;
@@ -43,7 +62,7 @@ public sealed partial class LogDocument
             onDispose = _cancel.Token.Register(result.Cancel);
             _ = IndexingCompletion.ContinueWith(_ => Wake(), TaskScheduler.Default);
 
-            var next = 0L;
+            var next = first;
             while (true)
             {
                 token.ThrowIfCancellationRequested();
@@ -130,7 +149,7 @@ public sealed partial class LogDocument
 
         var matches = new List<long>();
         foreach (var part in found) matches.AddRange(part);
-        result.Append(matches, LineStart(line, count));
+        result.Append(matches, line, LineStart(line, count));
         return line;
     }
 
