@@ -341,7 +341,12 @@
                         <DockPanel DockPanel.Dock="Top" Margin="8,2">
                             <Button DockPanel.Dock="Right" Content="✕" ToolTip="Collapse the results pane" Padding="6,0"
                                     Command="{Binding Search.ToggleResultsPaneCommand}" />
-                            <!-- Ticket 27: results are not extended when the file grows. -->
+                            <!-- Ticket 27: offered while the tab auto updates; on, growth extends the results. -->
+                            <ToggleButton DockPanel.Dock="Right" Content="Auto _update" Padding="6,0" Margin="0,0,6,0"
+                                          ToolTip="Add matches from new lines as the file grows"
+                                          IsChecked="{Binding Search.AutoUpdateResults}"
+                                          Visibility="{Binding AutoUpdate, Converter={StaticResource BoolToVisibility}}" />
+                            <!-- Ticket 27: without auto update, results are not extended when the file grows. -->
                             <Button DockPanel.Dock="Right" Content="Outdated: run _again" Padding="6,0" Margin="0,0,6,0"
                                     ToolTip="The file has grown since these results were found"
                                     Foreground="{DynamicResource TabNeedsUpdateBrush}"

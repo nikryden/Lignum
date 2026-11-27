@@ -199,4 +199,64 @@ public class GrowthTests : IDisposable
         Assert.Equal(0, doc.LineCount);
         lock (changes) Assert.Contains(FileChangeKind.Replaced, changes);
     }
+
+    private static Query Errors() => new([new QueryRule("error", RuleKind.Include, IsRegex: false, MatchCase: false)]);
+
+    private static long[] Rows(QueryResult result) => [.. Enumerable.Range(0, (int)result.Count).Select(i => result[i])];
+
+    [Fact]
+    public async Task An_extended_query_adds_the_matches_of_the_appended_lines()
+    {
+        var path = _temp.WriteFile("error 1\ninfo\n");
+        using var doc = LogDocument.Open(path);
+        await doc.StartIndexing();
+        var result = doc.StartQuery(Errors());
+        await result.Completion;
+
+        Append(path, "error 2\ninfo\nerror 3\n");
+        await doc.IndexAppendedAsync();
+        Assert.True(doc.ExtendQuery(result));
+        await result.Completion;
+
+        Assert.Equal(QueryState.Completed, result.State);
+        Assert.Equal([0L, 2, 4], Rows(result));
+    }
+
+    [Fact]
+    public async Task An_extension_searches_a_last_line_finished_by_the_growth_once()
+    {
+        var path = _temp.WriteFile("error 1\ner");
+        using var doc = LogDocument.Open(path);
+        await doc.StartIndexing();
+        var result = doc.StartQuery(Errors());
+        await result.Completion;
+        Assert.Equal([0L], Rows(result));
+
+        Append(path, "ror 2\n");
+        await doc.IndexAppendedAsync();
+        Assert.True(doc.ExtendQuery(result));
+        await result.Completion;
+        Append(path, "info\n");
+        await doc.IndexAppendedAsync();
+        Assert.True(doc.ExtendQuery(result));
+        await result.Completion;
+
+        Assert.Equal([0L, 1], Rows(result)); // line 1 now matches, and is not added twice
+    }
+
+    [Fact]
+    public async Task A_cancelled_query_is_not_extended()
+    {
+        var path = _temp.WriteFile("error 1\n");
+        using var doc = LogDocument.Open(path);
+        await doc.StartIndexing();
+        var result = doc.StartQuery(Errors());
+        result.Cancel();
+        await result.Completion;
+
+        Append(path, "error 2\n");
+        await doc.IndexAppendedAsync();
+
+        Assert.False(doc.ExtendQuery(result)); // even if it completed before Cancel
+    }
 }

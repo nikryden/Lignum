@@ -81,6 +81,8 @@ public sealed partial class LogTabViewModel
     {
         // Turning it on applies a change the banner is still offering.
         if (value && IsFileChanged) _ = Update();
+        // Results with their own auto update on catch up with growth found while the tab did not auto update.
+        else if (value && Search.IsOutdated) Search.OnFileGrew(tabAutoUpdates: true);
     }
 
     /// <summary>Brings the tab up to date with the file: indexes the growth, or reopens a truncated/replaced file.</summary>
@@ -102,7 +104,7 @@ public sealed partial class LogTabViewModel
             if (!ReferenceEquals(document, _document)) return;
             Refresh(document);
             FileSize = document.TotalBytes;
-            if (added > 0) Search.MarkOutdated();
+            if (added > 0) Search.OnFileGrew(AutoUpdate);
             if (added > 0 && follow) FollowEnd();
         });
     }
